@@ -1,0 +1,167 @@
+/* Mode demo — data contoh keluarga fiktif + server tiruan di memori (perubahan tidak disimpan). */
+(function () {
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  function buildDemo(big) {
+    const R = rng(20261110), pick = a => a[Math.floor(R() * a.length)], between = (a, b) => Math.round((a + R() * (b - a)) / 500) * 500;
+    const today = U.today(), now = new Date().toISOString();
+    const D = 'dimas@contoh.id', N = 'rini@contoh.id';
+    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [] };
+    T.Anggota.push({ id: 'm1', nama: 'Dimas', email: D, peran: 'admin', warna: '#0F5E59', izin: '{}', aktif: 'true', dibuat: now });
+    T.Anggota.push({ id: 'm2', nama: 'Rini', email: N, peran: 'pasangan', warna: '#F2B33D', izin: '{}', aktif: 'true', dibuat: now });
+    [['namaKeluarga', 'Keluarga Dimas & Rini'], ['periodeMulai', '1'], ['danaDaruratBulan', '6'], ['notifEmail', 'true'], ['kalenderSync', 'false'],
+     ['bagiGaji', JSON.stringify([{ pos: 'Kebutuhan', persen: 50, kelompok: 'kebutuhan' }, { pos: 'Keinginan', persen: 30, kelompok: 'keinginan' }, { pos: 'Tabungan', persen: 20, kelompok: 'tabungan' }])]]
+      .forEach(p => T.Pengaturan.push({ id: p[0], nilai: p[1] }));
+    const W = [['w_bca', 'BCA Bersama', 'bank', 'bersama', 15000000], ['w_mdr', 'Mandiri Gaji Dimas', 'bank', D, 4000000], ['w_jago', 'Jago Tabungan', 'bank', 'bersama', 8000000],
+               ['w_gopay', 'GoPay Rini', 'ewallet', N, 500000], ['w_tunai', 'Tunai Rumah', 'tunai', 'bersama', 1500000]];
+    W.forEach((w, i) => T.Wallet.push({ id: w[0], nama: w[1], jenis: w[2], pemilik: w[3], saldoAwal: String(w[4]), ikon: '', likuid: 'true', urutan: String(i), arsip: 'false', catatan: '' }));
+    const K = [['k_mkn', 'Makan & Minum', 'keluar', 'kebutuhan', 'utensils', 2500000], ['k_dpr', 'Belanja Dapur', 'keluar', 'kebutuhan', 'shopping-cart', 4000000],
+      ['k_trp', 'Transportasi', 'keluar', 'kebutuhan', 'car', 1700000], ['k_lst', 'Listrik, Air & Internet', 'keluar', 'kebutuhan', 'zap', 950000, 1],
+      ['k_pdd', 'Pendidikan Anak', 'keluar', 'kebutuhan', 'graduation-cap', 1850000, 1], ['k_kes', 'Kesehatan', 'keluar', 'kebutuhan', 'heart-pulse', 500000],
+      ['k_rmh', 'Rumah & Perawatan', 'keluar', 'kebutuhan', 'home', 600000], ['k_cic', 'Cicilan & Utang', 'keluar', 'kebutuhan', 'landmark', 0, 1],
+      ['k_iur', 'Iuran & Sosial', 'keluar', 'kebutuhan', 'users', 300000, 1], ['k_jjn', 'Jajan & Kafe', 'keluar', 'keinginan', 'coffee', 800000],
+      ['k_hbr', 'Hiburan & Langganan', 'keluar', 'keinginan', 'tv', 450000, 1], ['k_blj', 'Belanja Pribadi', 'keluar', 'keinginan', 'shopping-bag', 700000],
+      ['k_sdk', 'Sedekah & Zakat', 'keluar', 'kebutuhan', 'hand-heart', 550000], ['k_adm', 'Biaya Admin', 'keluar', 'kebutuhan', 'receipt', 0],
+      ['k_upd', 'Uang Pribadi Dimas', 'keluar', 'keinginan', 'lock', 1000000, 0, D], ['k_upr', 'Uang Pribadi Rini', 'keluar', 'keinginan', 'lock', 1000000, 0, N],
+      ['k_gaji', 'Gaji', 'masuk', 'pemasukan', 'banknote', 0], ['k_bonus', 'Bonus & THR', 'masuk', 'pemasukan', 'gift', 0], ['k_lain', 'Pemasukan Lain', 'masuk', 'pemasukan', 'plus-circle', 0]];
+    K.forEach((k, i) => T.Kategori.push({ id: k[0], nama: k[1], jenis: k[2], kelompok: k[3], ikon: k[4], batas: String(k[5] || 0), bawaSisa: 'false', tetap: k[6] ? 'true' : 'false', pribadi: k[7] || '', urutan: String(i), arsip: 'false' }));
+    const Rt = [['r_gd', 'Gaji Dimas', 'masuk', 13500000, 'k_gaji', 'w_mdr', 'bulanan', 25], ['r_gr', 'Gaji Rini', 'masuk', 8500000, 'k_gaji', 'w_bca', 'bulanan', 25],
+      ['r_pln', 'Listrik PLN Pascabayar', 'keluar', 485000, 'k_lst', 'w_bca', 'bulanan', 20], ['r_net', 'IndiHome WiFi', 'keluar', 399000, 'k_lst', 'w_bca', 'bulanan', 21],
+      ['r_spp', 'SPP Sekolah Aisha', 'keluar', 1500000, 'k_pdd', 'w_bca', 'bulanan', 10], ['r_les', 'Les Renang Aisha', 'keluar', 350000, 'k_pdd', 'w_gopay', 'bulanan', 3],
+      ['r_iur', 'Iuran Keamanan & Kebersihan', 'keluar', 150000, 'k_iur', 'w_tunai', 'bulanan', 5], ['r_nfx', 'Netflix Family', 'keluar', 186000, 'k_hbr', 'w_gopay', 'bulanan', 24, 1],
+      ['r_spt', 'Spotify Family', 'keluar', 86900, 'k_hbr', 'w_bca', 'bulanan', 28, 1], ['r_ggl', 'Google One 2TB', 'keluar', 135000, 'k_hbr', 'w_bca', 'bulanan', 14, 1],
+      ['r_pjk', 'Pajak Mobil Avanza', 'keluar', 2800000, 'k_trp', 'w_bca', 'tahunan', 14, 0, 1], ['r_pbb', 'PBB Rumah', 'keluar', 1200000, 'k_rmh', 'w_bca', 'tahunan', 30, 0, 8],
+      ['r_asr', 'Premi Asuransi Keluarga', 'keluar', 4200000, 'k_kes', 'w_bca', 'tahunan', 20, 0, 6], ['r_mtr', 'Pajak Motor', 'keluar', 450000, 'k_trp', 'w_bca', 'tahunan', 9, 0, 3]];
+    Rt.forEach(r => T.Rutin.push({ id: r[0], nama: r[1], jenis: r[2], jumlah: String(r[3]), kategoriId: r[4], walletId: r[5], frekuensi: r[6], tanggal: String(r[7]), bulan: String(r[9] || ''), mulai: '', selesai: '', langganan: r[8] ? 'true' : 'false', ditinjau: '', aktif: 'true', catatan: '' }));
+    const start = U.addMonths(today, big ? -60 : -14).slice(0, 8) + '01';
+    T.Pinjaman.push({ id: 'p_kpr', arah: 'utang', jenis: 'kpr', pihak: 'KPR BTN Syariah', pokok: '280000000', bunga: '7.25', metode: 'anuitas', tenor: '180', mulai: U.addMonths(start, -10).slice(0, 8) + '28', tanggalBayar: '28', cicilan: '', walletId: 'w_bca', lunas: 'false', catatan: 'Rumah Serpong', dibuat: now });
+    T.Pinjaman.push({ id: 'p_mtr', arah: 'utang', jenis: 'kendaraan', pihak: 'Cicilan Motor Vario', pokok: '27300000', bunga: '0', metode: 'tanpa', tenor: '35', mulai: U.addMonths(start, 2).slice(0, 8) + '10', tanggalBayar: '10', cicilan: '780000', walletId: 'w_mdr', lunas: 'false', catatan: '', dibuat: now });
+    T.Pinjaman.push({ id: 'p_pl', arah: 'utang', jenis: 'paylater', pihak: 'PayLater Tokopedia', pokok: '1800000', bunga: '0', metode: 'tanpa', tenor: '3', mulai: U.addMonths(today, -1).slice(0, 8) + '15', tanggalBayar: '15', cicilan: '600000', walletId: 'w_gopay', lunas: 'false', catatan: 'Kulkas 2 pintu', dibuat: now });
+    T.Pinjaman.push({ id: 'p_byu', arah: 'piutang', jenis: 'keluarga', pihak: 'Mas Bayu', pokok: '3500000', bunga: '0', metode: 'tanpa', tenor: '7', mulai: U.addMonths(today, -2).slice(0, 8) + '30', tanggalBayar: '28', cicilan: '500000', walletId: 'w_bca', lunas: 'false', catatan: 'Modal bengkel', dibuat: now });
+    T.Tujuan.push({ id: 'g_dar', nama: 'Dana Darurat Keluarga', ikon: 'shield', target: '90000000', tenggat: U.addMonths(today, 10), prioritas: '1', jenis: 'bersama', pemilik: '', setoranBulanan: '2000000', walletId: 'w_jago', arsip: 'false', catatan: '6 bulan pengeluaran', dibuat: start });
+    T.Tujuan.push({ id: 'g_pdd', nama: 'Dana Pendidikan SD Aisha', ikon: 'graduation-cap', target: '15000000', tenggat: U.addMonths(today, 8), prioritas: '2', jenis: 'bersama', pemilik: '', setoranBulanan: '1000000', walletId: '', arsip: 'false', catatan: '', dibuat: start });
+    T.Tujuan.push({ id: 'g_bali', nama: 'Liburan Bali', ikon: 'plane', target: '12000000', tenggat: U.addMonths(today, 14), prioritas: '3', jenis: 'bersama', pemilik: '', setoranBulanan: '500000', walletId: '', arsip: 'false', catatan: '', dibuat: start });
+    T.Tujuan.push({ id: 'g_lap', nama: 'Ganti Laptop Dimas', ikon: 'laptop', target: '10000000', tenggat: U.addMonths(today, 9), prioritas: '4', jenis: 'pribadi', pemilik: D, setoranBulanan: '500000', walletId: '', arsip: 'false', catatan: '', dibuat: start });
+    T.Acara.push({ id: 'a_mudik', nama: 'Mudik Lebaran', tanggal: U.addMonths(today, 4).slice(0, 8) + '18', estimasi: '8000000', besar: 'true', catatan: 'Tiket + oleh-oleh' });
+    T.Acara.push({ id: 'a_ultah', nama: 'Ulang Tahun Aisha', tanggal: U.addDays(today, 12), estimasi: '750000', besar: 'false', catatan: '' });
+    T.Template.push({ id: 'tp1', nama: 'Bensin Motor', jenis: 'keluar', jumlah: '50000', kategoriId: 'k_trp', walletId: 'w_tunai', catatan: 'Pertamax', urutan: '0' });
+    T.Template.push({ id: 'tp2', nama: 'Parkir', jenis: 'keluar', jumlah: '5000', kategoriId: 'k_trp', walletId: 'w_tunai', catatan: '', urutan: '1' });
+    T.Template.push({ id: 'tp3', nama: 'Sayur', jenis: 'keluar', jumlah: '30000', kategoriId: 'k_dpr', walletId: 'w_gopay', catatan: 'Tukang sayur', urutan: '2' });
+
+    // ---- Transaksi ----
+    let n = 0;
+    const tx = (d, jenis, jumlah, kat, wal, cat, who, extra) => {
+      n++;
+      T.Transaksi.push(Object.assign({ id: 'tx' + n, tanggal: d, jenis, jumlah: String(Math.round(jumlah)), kategoriId: kat || '', walletId: wal || '', walletTujuan: '', biaya: '0', catatan: cat || '',
+        dibayarOleh: who, tag: '', sumber: 'manual', refId: '', periodeRef: '', dicatatOleh: who, dibuat: d + 'T' + U.pad(7 + Math.floor(R() * 14)) + ':' + U.pad(Math.floor(R() * 60)) + ':00.000Z', riwayat: '' }, extra || {}));
+    };
+    const SPEND = [['k_mkn', ['Makan siang', 'Soto Betawi', 'Nasi Padang', 'Bakso', 'Warteg'], 20000, 85000, 0.9],
+      ['k_dpr', ['Superindo', 'Tukang sayur', 'Alfamart', 'Pasar pagi', 'Indomaret'], 25000, 350000, 0.7],
+      ['k_trp', ['Bensin', 'Parkir', 'Tol', 'Gojek', 'Grab'], 5000, 150000, 0.6], ['k_jjn', ['Kopi Kenangan', 'Janji Jiwa', 'Martabak', 'Es teh'], 15000, 70000, 0.35],
+      ['k_blj', ['Shopee', 'Tokopedia', 'Baju Aisha'], 50000, 400000, 0.08], ['k_kes', ['Apotek', 'Vitamin'], 30000, 250000, 0.05],
+      ['k_rmh', ['Galon & gas', 'Servis AC', 'Lampu'], 20000, 300000, 0.1], ['k_upd', ['Kopi kantor', 'Main futsal'], 25000, 120000, 0.12],
+      ['k_upr', ['Skincare', 'Arisan'], 30000, 200000, 0.1], ['k_sdk', ['Infaq Jumat', 'Sedekah'], 10000, 100000, 0.15]];
+    const WAL = { D: ['w_mdr', 'w_tunai', 'w_bca'], N: ['w_gopay', 'w_bca', 'w_tunai'] };
+    const tags = ['', '', '', '', '', 'Makan Siang', 'Weekend'];
+    for (let d = start; d <= today; d = U.addDays(d, 1)) {
+      const dt = U.parseDate(d), dom = dt.getDate(), ym = d.slice(0, 7), mon = dt.getMonth() + 1;
+      const daily = big ? 3 : 1;
+      for (let rep = 0; rep < daily; rep++) SPEND.forEach(s => {
+        if (R() < s[4] * (big ? 1 : 0.85)) {
+          const who = s[0] === 'k_upd' ? 'D' : s[0] === 'k_upr' ? 'N' : (R() < 0.5 ? 'D' : 'N');
+          tx(d, 'keluar', between(s[2], s[3]), s[0], pick(WAL[who]), pick(s[1]), who === 'D' ? D : N, { tag: pick(tags) });
+        }
+      });
+      T.Rutin.forEach(r => {
+        const rd = Number(r.tanggal);
+        if (Math.min(rd, U.daysInMonth(dt.getFullYear(), mon)) !== dom) return;
+        if (r.frekuensi === 'tahunan' && Number(r.bulan) !== mon) return;
+        if (d === today && R() < 0.5) return;
+        const pay = d > U.addDays(today, -2) ? d : (R() < 0.85 ? d : U.addDays(d, 2));
+        if (pay > today) return;
+        tx(pay, r.jenis, Number(r.jumlah), r.kategoriId, r.walletId, r.nama, r.jenis === 'masuk' ? (r.id === 'r_gr' ? N : D) : (R() < 0.6 ? D : N),
+          { sumber: 'rutin', refId: r.id, periodeRef: r.frekuensi === 'tahunan' ? d.slice(0, 4) : ym });
+      });
+      T.Pinjaman.forEach(p => {
+        if (p.arah === 'piutang') return;
+        if (Number(p.tanggalBayar) !== Math.min(dom, 28) || d < p.mulai) return;
+        const c = p.cicilan ? Number(p.cicilan) : Calc.loanCalc({ pokok: Number(p.pokok), bunga: Number(p.bunga), tenor: Number(p.tenor), metode: p.metode }).cicilan;
+        const ke = Calc.monthsBetween(p.mulai, d);
+        if (ke >= Number(p.tenor)) return;
+        tx(d, 'keluar', c, 'k_cic', p.walletId, 'Cicilan ' + p.pihak, D, { sumber: 'pinjaman', refId: p.id, periodeRef: ym });
+      });
+      if (dom === 26) {
+        tx(d, 'transfer', 3000000, '', 'w_mdr', 'Transfer ke rekening bersama', D, { walletTujuan: 'w_bca', biaya: '0' });
+        tx(d, 'transfer', 1800000, '', 'w_bca', 'Top up GoPay', N, { walletTujuan: 'w_gopay', biaya: '1000' });
+        tx(d, 'transfer', 1800000 * (big ? 2 : 1), '', 'w_bca', 'Tarik tunai', D, { walletTujuan: 'w_tunai', biaya: '0' });
+        T.Tujuan.forEach(g => {
+          if (d < g.dibuat) return;
+          const who = g.id === 'g_lap' ? D : (R() < 0.5 ? D : N);
+          if (g.jenis === 'bersama') {
+            tx(d, 'tujuan', Number(g.setoranBulanan) / 2, '', 'w_bca', 'Setor ' + g.nama, D, { refId: g.id, walletTujuan: g.walletId, sumber: 'tujuan' });
+            tx(d, 'tujuan', Number(g.setoranBulanan) / 2, '', 'w_bca', 'Setor ' + g.nama, N, { refId: g.id, walletTujuan: g.walletId, sumber: 'tujuan' });
+          } else tx(d, 'tujuan', Number(g.setoranBulanan), '', 'w_mdr', 'Setor ' + g.nama, who, { refId: g.id, walletTujuan: g.walletId, sumber: 'tujuan' });
+        });
+      }
+      if (mon === 4 && dom === 1) tx(d, 'masuk', 13500000, 'k_bonus', 'w_mdr', 'THR Dimas', D);
+    }
+    // Piutang Mas Bayu
+    const pb = T.Pinjaman.find(p => p.id === 'p_byu');
+    tx(pb.mulai <= today ? pb.mulai : today, 'pinjam_beri', 3500000, '', 'w_bca', 'Pinjaman ke Mas Bayu', D, { refId: 'p_byu', sumber: 'pinjaman' });
+    tx(U.addDays(today, -20), 'pinjam_kembali', 500000, '', 'w_bca', 'Cicilan dari Mas Bayu', D, { refId: 'p_byu', sumber: 'pinjaman', periodeRef: U.addDays(today, -20).slice(0, 7) });
+    tx(U.addDays(today, -1), 'pinjam_kembali', 500000, '', 'w_bca', 'Cicilan dari Mas Bayu', D, { refId: 'p_byu', sumber: 'pinjaman', periodeRef: U.addDays(today, -1).slice(0, 7) });
+    // Geser dana contoh
+    const pk = U.today().slice(0, 7);
+    T.GeserDana.push({ id: 'gd1', tanggal: U.addDays(today, -2), periode: pk, dari: 'k_trp', ke: 'k_mkn', jumlah: '150000', catatan: 'Jajan martabak mertua' });
+    return T;
+  }
+
+  // ---------- Server tiruan ----------
+  const SCH = () => Store.SCHEMA;
+  const DS = { tables: null, rev: 0, del: [], log: [] };
+  function cols(t) { return SCH()[t].concat(['rev', 'diubah', 'oleh']); }
+  DS.init = (big) => {
+    const T = buildDemo(big);
+    DS.tables = {}; DS.rev = 0; DS.del = [];
+    Object.keys(SCH()).forEach(t => {
+      DS.tables[t] = (T[t] || []).map(o => { DS.rev++; return cols(t).map(c => c === 'rev' ? String(DS.rev) : c === 'diubah' ? new Date().toISOString() : c === 'oleh' ? 'demo' : (o[c] == null ? '' : String(o[c]))); });
+    });
+  };
+  DS.me = () => ({ id: 'm1', nama: 'Dimas', email: 'dimas@contoh.id', peran: 'admin', warna: '#0F5E59', izin: {} });
+  DS.boot = () => { const tables = {}; Object.keys(DS.tables).forEach(t => tables[t] = { c: cols(t), r: DS.tables[t].map(r => r.slice()) }); return { rev: DS.rev, tables }; };
+  DS.handle = (action, d) => {
+    if (!DS.tables) DS.init(/big/.test(location.search));
+    const ok = (data, message) => ({ success: true, data, message: message || '' });
+    switch (action) {
+      case 'info': return ok({ app: 'SatuAtap', ver: 'demo', siap: true });
+      case 'boot': return ok({ me: DS.me(), boot: DS.boot() });
+      case 'sync': {
+        const since = Number(d.since || 0);
+        if (!since) return ok({ me: DS.me(), boot: DS.boot() });
+        const tables = {};
+        Object.keys(DS.tables).forEach(t => {
+          const c = cols(t), ir = c.indexOf('rev');
+          const r = DS.tables[t].filter(x => Number(x[ir]) > since);
+          if (r.length) tables[t] = { c, r };
+        });
+        return ok({ rev: DS.rev, tables, del: DS.del.filter(x => x[2] > since).map(x => [x[0], x[1]]) });
+      }
+      case 'write': {
+        (d.ops || []).forEach(op => {
+          const c = cols(op.t);
+          if (op.op === 'delete') { DS.rev++; DS.tables[op.t] = DS.tables[op.t].filter(r => r[0] !== op.id); DS.del.push([op.t, op.id, DS.rev]); return; }
+          DS.rev++;
+          let r = DS.tables[op.t].find(x => x[0] === op.row.id);
+          if (!r) { r = c.map(() => ''); DS.tables[op.t].push(r); }
+          c.forEach((k, i) => { if (op.row[k] !== undefined) r[i] = String(op.row[k]); });
+          r[c.indexOf('rev')] = String(DS.rev); r[c.indexOf('diubah')] = new Date().toISOString(); r[c.indexOf('oleh')] = 'dimas@contoh.id';
+        });
+        return ok({ rev: DS.rev });
+      }
+      case 'laporan.kirim': return ok({ tiket: 'DEMO-' + Math.floor(Math.random() * 9000 + 1000) }, 'Mode demo: laporan tidak benar-benar dikirim.');
+      case 'rahasia.status': return ok({ GOOGLE_CLIENT_ID: { ada: false, samar: '' }, FONNTE_TOKEN: { ada: false, samar: '' }, GEMINI_API_KEY: { ada: false, samar: '' } });
+      default: return { success: false, message: 'Tidak tersedia di mode demo.' };
+    }
+  };
+  window.DemoServer = DS;
+})();
