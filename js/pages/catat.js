@@ -9,13 +9,14 @@
     const k = Store.byId.Kategori[t.kategoriId];
     return !!(k && k.pribadi && Store.me && k.pribadi !== Store.me.email);
   };
+  UI.note = (t, f) => UI.isPrivate(t) ? '' : Priv.text(t, f || 'catatan');
   UI.txTitle = t => {
     const k = Store.byId.Kategori[t.kategoriId], W = Store.byId.Wallet;
     if (UI.isPrivate(t)) return k.nama;
-    if (t.jenis === 'transfer') return t.catatan || ('Transfer ke ' + (W[t.walletTujuan] ? W[t.walletTujuan].nama : '-'));
+    if (t.jenis === 'transfer') return UI.note(t) || ('Transfer ke ' + (W[t.walletTujuan] ? W[t.walletTujuan].nama : '-'));
     if (t.jenis === 'tujuan' || t.jenis === 'tujuan_ambil') { const g = Store.byId.Tujuan[t.refId]; return (t.jenis === 'tujuan' ? 'Setor: ' : 'Ambil: ') + (g ? g.nama : 'Tujuan'); }
     if (t.jenis.indexOf('pinjam') === 0) { const p = Store.byId.Pinjaman[t.refId]; return Calc.JENIS_LABEL[t.jenis] + (p ? ' · ' + p.pihak : ''); }
-    return t.catatan || (k ? k.nama : Calc.JENIS_LABEL[t.jenis] || 'Transaksi');
+    return UI.note(t) || (k ? k.nama : Calc.JENIS_LABEL[t.jenis] || 'Transaksi');
   };
   UI.txIcon = t => {
     if (t.jenis === 'transfer') return 'arrow-left-right';
@@ -28,7 +29,7 @@
     const k = Store.byId.Kategori[t.kategoriId], W = Store.byId.Wallet;
     const parts = [];
     if (t.jenis === 'transfer') parts.push((W[t.walletId] || {}).nama + ' → ' + (W[t.walletTujuan] || {}).nama);
-    else { if (k && t.catatan && !UI.isPrivate(t)) parts.push(k.nama); if (W[t.walletId]) parts.push(W[t.walletId].nama); }
+    else { if (k && UI.note(t)) parts.push(k.nama); if (W[t.walletId]) parts.push(W[t.walletId].nama); }
     if (t.refId && Store.byId.Rutin[t.refId]) parts.push('Rutin');
     return parts.join(' · ');
   };
@@ -100,7 +101,7 @@
     s.el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       s.close(); const a = b.dataset.a;
       if (a === 'open') UI.txDetail(t.id); else if (a === 'edit') UI.catat({ edit: t }); else if (a === 'del') UI.txDelete(t.id);
-      else if (a === 'dup') UI.catat({ preset: { jenis: t.jenis, jumlah: t.jumlah, kategoriId: t.kategoriId, walletId: t.walletId, walletTujuan: t.walletTujuan, catatan: t.catatan, biaya: t.biaya } });
+      else if (a === 'dup') UI.catat({ preset: { jenis: t.jenis, jumlah: t.jumlah, kategoriId: t.kategoriId, walletId: t.walletId, walletTujuan: t.walletTujuan, catatan: UI.note(t), biaya: t.biaya } });
     });
   });
   const canEdit = t => Store.can('mutasi', 'ubah') || (Store.me && t.dicatatOleh === Store.me.email);
@@ -124,8 +125,8 @@
       body: `<div class="detail-head"><span class="cat-ic lg ${t.jenis}">${I(UI.txIcon(t))}</span><div><h3>${U.esc(UI.txTitle(t))}</h3><div class="big-amt">${UI.amount(t.jumlah, t.jenis)}</div></div></div>
         <div class="kv-list">${row('Jenis', Calc.JENIS_LABEL[t.jenis])}${row('Tanggal', U.tgl(t.tanggal, 'long'))}${row('Kategori', k ? U.esc(k.nama) : '')}
         ${row('Dompet', W[t.walletId] ? U.esc(W[t.walletId].nama) : '')}${row('Ke dompet', W[t.walletTujuan] ? U.esc(W[t.walletTujuan].nama) : '')}
-        ${t.biaya ? row('Biaya admin', U.rp(t.biaya)) : ''}${priv ? row('Catatan', '<i class="muted">Detail uang pribadi disembunyikan</i>') : row('Catatan', U.esc(t.catatan))}
-        ${priv ? '' : row('Tag', U.esc(t.tag))}${row('Dibayar oleh', U.esc(Store.memberName(t.dibayarOleh || t.dicatatOleh)))}
+        ${t.biaya ? row('Biaya admin', U.rp(t.biaya)) : ''}${priv ? row('Catatan', '<i class="muted">Detail uang pribadi disembunyikan</i>') : row('Catatan', U.esc(UI.note(t)))}
+        ${priv ? '' : row('Tag', U.esc(UI.note(t, 'tag')))}${row('Dibayar oleh', U.esc(Store.memberName(t.dibayarOleh || t.dicatatOleh)))}
         ${row('Dicatat', U.esc(Store.memberName(t.dicatatOleh)) + (t.dibuat ? ' · ' + U.timeAgo(t.dibuat) : '') + (t.sumber && t.sumber !== 'app' ? ' · via ' + U.esc(t.sumber) : ''))}</div>
         ${riw.length ? `<h4 class="mini-h">${I('history')} Riwayat perubahan</h4><ul class="hist">${riw.slice().reverse().map(r => `<li><b>${U.esc(Store.memberName(r.oleh))}</b> · ${U.timeAgo(r.at)}<br><small>${Object.keys(r.ubah || {}).map(f => U.esc(f) + ': ' + U.esc(fmtVal(f, r.ubah[f]))).join(', ')}</small></li>`).join('')}</ul>` : ''}`,
       foot: canEdit(t) ? `<button class="btn ghost danger" data-a="del">${I('trash-2')} Hapus</button><button class="btn" data-a="edit">${I('pencil')} Ubah</button>` : ''
@@ -134,6 +135,7 @@
   };
   function fmtVal(f, v) {
     if (f === 'jumlah' || f === 'biaya') return U.rp(v);
+    if (Priv.isEnc(v)) return '(terenkripsi)';
     if (f === 'kategoriId') return (Store.byId.Kategori[v] || {}).nama || v;
     if (f === 'walletId' || f === 'walletTujuan') return (Store.byId.Wallet[v] || {}).nama || v;
     return v === '' ? '(kosong)' : v;
@@ -173,7 +175,7 @@
       expr: src.jumlah ? String(Math.round(src.jumlah)) : '',
       kategoriId: src.kategoriId || '', walletId: src.walletId || (Store.byId.Wallet[lastW] ? lastW : wl[0].id),
       walletTujuan: src.walletTujuan || '', biaya: src.biaya || 0,
-      tanggal: src.tanggal || U.today(), catatan: src.catatan || '', tag: src.tag || '',
+      tanggal: src.tanggal || U.today(), catatan: (edit ? UI.note(edit) : src.catatan) || '', tag: (edit ? UI.note(edit, 'tag') : src.tag) || '',
       dibayarOleh: src.dibayarOleh || me, split: null, patungan: null, more: false
     };
     const special = edit && ['keluar', 'masuk', 'transfer'].indexOf(edit.jenis) < 0;
@@ -184,7 +186,7 @@
 
     function render() {
       const isT = st.jenis === 'transfer';
-      const cats = isT ? [] : Calc.smartCategories(st.jenis);
+      const cats = isT ? [] : Calc.smartCategories(st.jenis).filter(k => !k.pribadi || k.pribadi === me);
       if (!isT && !special && !st.kategoriId && cats[0] && !edit) st.kategoriId = '';
       const top = cats.slice(0, st.more ? 99 : 7);
       if (st.kategoriId && !top.find(k => k.id === st.kategoriId)) { const k = Store.byId.Kategori[st.kategoriId]; if (k) top.push(k); }
@@ -293,7 +295,7 @@
     };
     document.addEventListener('keydown', onKey);
 
-    function save(again) {
+    async function save(again) {
       readForm();
       const j = amount();
       if (!j) return UI.toast('Isi jumlahnya dulu.', 'warn');
@@ -307,11 +309,13 @@
         const row = Object.assign({ id: edit.id, jumlah: j }, base);
         if (!special) Object.assign(row, { kategoriId: st.jenis === 'transfer' ? '' : st.kategoriId, walletTujuan: st.jenis === 'transfer' ? st.walletTujuan : '', biaya: st.jenis === 'transfer' ? (st.biaya || 0) : 0 });
         const ubah = {};
-        Object.keys(row).forEach(f => { if (f !== 'id' && String(edit[f] == null ? '' : edit[f]) !== String(row[f] == null ? '' : row[f])) ubah[f] = edit[f]; });
+        Object.keys(row).forEach(f => { const o = f === 'catatan' || f === 'tag' ? UI.note(edit, f) : edit[f]; if (f !== 'id' && String(o == null ? '' : o) !== String(row[f] == null ? '' : row[f])) ubah[f] = edit[f]; });
         if (!Object.keys(ubah).length) { s.close(); return; }
         row.riwayat = (Array.isArray(edit.riwayat) ? edit.riwayat : []).concat([{ at: now, oleh: me, ubah }]).slice(-20);
+        if (!row.kategoriId) row.kategoriId = edit.kategoriId;
         ops.push({ op: 'upsert', t: 'Transaksi', row });
-        Store.commit(ops); s.close(); UI.toast('Perubahan disimpan.'); return;
+        if (!(await UI.commitPriv(ops))) return;
+        s.close(); UI.toast('Perubahan disimpan.'); return;
       }
       const mk = (o) => Object.assign({ id: U.uid('t'), kategoriId: '', walletTujuan: '', biaya: 0, sumber: pre.sumber || 'app', refId: pre.refId || '', periodeRef: pre.periodeRef || '', dicatatOleh: me, dibuat: now, riwayat: [] }, base, o);
       if (st.jenis === 'transfer') ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jumlah: j, walletTujuan: st.walletTujuan, biaya: st.biaya || 0, kategoriId: '' }) });
@@ -334,7 +338,7 @@
         }
         if (mine > 0) ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jumlah: mine, kategoriId: st.kategoriId }) });
       }
-      Store.commit(ops);
+      if (!(await UI.commitPriv(ops))) return;
       const ids = ops.map(o => [o.t, o.row.id]);
       UI.toast(ops.length > 1 ? ops.length + ' catatan tersimpan.' : 'Tersimpan · ' + U.rp(j), 'ok', { undo: () => Store.commit(ids.map(([t, id]) => ({ op: 'delete', t, id }))), ms: 4500 });
       if (opt.onSaved) opt.onSaved(ops);
@@ -346,6 +350,42 @@
     s.el.querySelectorAll('[data-save]').forEach(b => b.onclick = () => save(b.dataset.save === 'again'));
     render();
   };
+
+  // ---------- Uang pribadi: enkripsi catatan sebelum disimpan ----------
+  /** Commit dengan enkripsi catatan/tag uang pribadi milik saya. false = dibatalkan. */
+  UI.commitPriv = async (ops) => {
+    const me = Store.me.email;
+    const need = ops.filter(o => o.t === 'Transaksi' && o.op === 'upsert' && (o.row.catatan || o.row.tag) && (Store.byId.Kategori[o.row.kategoriId] || {}).pribadi === me);
+    if (need.length && Priv.supported()) {
+      const g = await UI.privGuard();
+      if (g === 'cancel') return false;
+      if (g === 'enc') for (const o of need) { if (o.row.catatan && !Priv.isEnc(o.row.catatan)) o.row.catatan = await Priv.enc(o.row.catatan); if (o.row.tag && !Priv.isEnc(o.row.tag)) o.row.tag = await Priv.enc(o.row.tag); }
+    }
+    Store.commit(ops); Priv.decryptAll();
+    return true;
+  };
+  /** Pastikan kunci PIN siap: 'enc' | 'plain' | 'cancel' */
+  UI.privGuard = () => new Promise(res => {
+    if (Priv.unlocked()) return res('enc');
+    const has = Priv.has();
+    let done = false; const fin = v => { if (!done) { done = true; res(v); } };
+    const s = UI.sheet({ title: has ? 'Buka kunci uang pribadi' : 'Atur PIN uang pribadi', cls: 'small', onClose: () => fin('cancel'), body: `
+      <p class="muted small">${has ? 'Masukkan PIN uang pribadi Anda agar catatan bisa dienkripsi & dibaca di perangkat ini.' : 'Catatan uang pribadi dienkripsi di HP ini sehingga hanya Anda yang bisa membacanya — termasuk di spreadsheet. Nominal tetap masuk total keluarga. <b>PIN tidak bisa dipulihkan</b>; jika lupa, catatan lama tidak bisa dibaca lagi.'}</p>
+      ${UI.field('PIN (min. 6 angka)', `<input type="password" inputmode="numeric" autocomplete="off" name="pin" minlength="6" maxlength="12">`)}
+      ${has ? '' : UI.field('Ulangi PIN', `<input type="password" inputmode="numeric" autocomplete="off" name="pin2" maxlength="12">`)}<div class="pin-err bad small"></div>`,
+      foot: `${has ? '' : `<button class="btn ghost" data-plain>Tanpa enkripsi</button>`}<button class="btn" data-ok>${UI.icon('lock')} ${has ? 'Buka' : 'Atur PIN'}</button>` });
+    const err = s.el.querySelector('.pin-err');
+    const pl = s.el.querySelector('[data-plain]'); if (pl) pl.onclick = () => { fin('plain'); s.close(); };
+    s.el.querySelector('[data-ok]').onclick = async () => {
+      const f = UI.formData(s.el);
+      if (!/^\d{6,12}$/.test(f.pin)) { err.textContent = 'PIN 6–12 angka.'; return; }
+      if (!has && f.pin !== f.pin2) { err.textContent = 'PIN tidak sama.'; return; }
+      err.textContent = 'Memproses…';
+      if (has) { if (!(await Priv.unlock(f.pin))) { err.textContent = 'PIN salah.'; return; } }
+      else await Priv.setup(f.pin);
+      fin('enc'); s.close();
+    };
+  });
 
   UI.offerBagiGaji = (j) => {
     const s = UI.sheet({ title: 'Gaji masuk 🎉', cls: 'small', body: `<p>Gaji ${UI.m(j)} sudah tercatat. Mau langsung dibagi ke amplop & tujuan supaya setiap rupiah punya tugas?</p>`,

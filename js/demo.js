@@ -117,51 +117,21 @@
   }
 
   // ---------- Server tiruan ----------
-  const SCH = () => Store.SCHEMA;
-  const DS = { tables: null, rev: 0, del: [], log: [] };
-  function cols(t) { return SCH()[t].concat(['rev', 'diubah', 'oleh']); }
+  /** Backend tiruan di memori dengan antarmuka sama seperti Cloud (push/pull/checkVersion). */
+  const DS = { log: [], ver: 0 };
   DS.init = (big) => {
-    const T = buildDemo(big);
-    DS.tables = {}; DS.rev = 0; DS.del = [];
-    Object.keys(SCH()).forEach(t => {
-      DS.tables[t] = (T[t] || []).map(o => { DS.rev++; return cols(t).map(c => c === 'rev' ? String(DS.rev) : c === 'diubah' ? new Date().toISOString() : c === 'oleh' ? 'demo' : (o[c] == null ? '' : String(o[c]))); });
-    });
+    const T = buildDemo(big), now = new Date().toISOString();
+    DS.log = []; DS.ver = 1;
+    Object.keys(Store.SCHEMA).forEach(t => (T[t] || []).forEach(o => DS.log.push([now, 'demo', t, o.id, 'u', o])));
   };
   DS.me = () => ({ id: 'm1', nama: 'Dimas', email: 'dimas@contoh.id', peran: 'admin', warna: '#0F5E59', izin: {} });
-  DS.boot = () => { const tables = {}; Object.keys(DS.tables).forEach(t => tables[t] = { c: cols(t), r: DS.tables[t].map(r => r.slice()) }); return { rev: DS.rev, tables }; };
-  DS.handle = (action, d) => {
-    if (!DS.tables) DS.init(/big/.test(location.search));
-    const ok = (data, message) => ({ success: true, data, message: message || '' });
-    switch (action) {
-      case 'info': return ok({ app: 'SatuAtap', ver: 'demo', siap: true });
-      case 'boot': return ok({ me: DS.me(), boot: DS.boot() });
-      case 'sync': {
-        const since = Number(d.since || 0);
-        if (!since) return ok({ me: DS.me(), boot: DS.boot() });
-        const tables = {};
-        Object.keys(DS.tables).forEach(t => {
-          const c = cols(t), ir = c.indexOf('rev');
-          const r = DS.tables[t].filter(x => Number(x[ir]) > since);
-          if (r.length) tables[t] = { c, r };
-        });
-        return ok({ rev: DS.rev, tables, del: DS.del.filter(x => x[2] > since).map(x => [x[0], x[1]]) });
-      }
-      case 'write': {
-        (d.ops || []).forEach(op => {
-          const c = cols(op.t);
-          if (op.op === 'delete') { DS.rev++; DS.tables[op.t] = DS.tables[op.t].filter(r => r[0] !== op.id); DS.del.push([op.t, op.id, DS.rev]); return; }
-          DS.rev++;
-          let r = DS.tables[op.t].find(x => x[0] === op.row.id);
-          if (!r) { r = c.map(() => ''); DS.tables[op.t].push(r); }
-          c.forEach((k, i) => { if (op.row[k] !== undefined) r[i] = String(op.row[k]); });
-          r[c.indexOf('rev')] = String(DS.rev); r[c.indexOf('diubah')] = new Date().toISOString(); r[c.indexOf('oleh')] = 'dimas@contoh.id';
-        });
-        return ok({ rev: DS.rev });
-      }
-      case 'laporan.kirim': return ok({ tiket: 'DEMO-' + Math.floor(Math.random() * 9000 + 1000) }, 'Mode demo: laporan tidak benar-benar dikirim.');
-      case 'rahasia.status': return ok({ GOOGLE_CLIENT_ID: { ada: false, samar: '' }, FONNTE_TOKEN: { ada: false, samar: '' }, GEMINI_API_KEY: { ada: false, samar: '' } });
-      default: return { success: false, message: 'Tidak tersedia di mode demo.' };
-    }
+  DS.checkVersion = async () => ({ ok: true, version: String(DS.ver) });
+  DS.pull = async (cursor) => ({ ok: true, rows: DS.log.slice(cursor), cursor: DS.log.length });
+  DS.push = async (ops, oleh) => {
+    await new Promise(r => setTimeout(r, 40));
+    const now = new Date().toISOString();
+    ops.forEach(o => DS.log.push([now, oleh, o.t, o.op === 'delete' ? o.id : o.row.id, o.op === 'delete' ? 'd' : 'u', o.op === 'delete' ? '' : o.row]));
+    DS.ver++; return { ok: true };
   };
   window.DemoServer = DS;
 })();

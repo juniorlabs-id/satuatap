@@ -3,7 +3,8 @@
  *  - Render selalu dari data lokal (instan)
  *  - Perubahan diterapkan lokal dulu (optimistic), masuk antrean,
  *    lalu dikirim ke server dalam satu batch.
- *  - Sinkron hanya mengambil baris yang berubah (delta berbasis rev).
+ *  - Sinkron hanya membaca baris log baru (setelah kursor) dan hanya
+ *    bila versi file di Drive berubah.
  * ============================================================ */
 (function () {
   const SCHEMA = {
@@ -70,7 +71,7 @@
     SCHEMA, IDB, typed, rowFromArray,
     t: {},          // tabel → array baris
     byId: {},       // tabel → {id: baris}
-    rev: 0, ver: 0, me: null, token: '', gasUrl: '', mode: '',   // mode: 'live' | 'demo'
+    cursor: 0, version: '', ver: 0, me: null, fileId: '', mode: '', backend: null,   // mode: 'live' | 'demo'
     outbox: [],     // [{reqId, ops:[...]}]
     listeners: [],
     syncing: false, lastSync: 0, online: navigator.onLine !== false, pendingSave: null
@@ -79,43 +80,43 @@
 
   S.on = fn => S.listeners.push(fn);
   S.emit = (why) => { S.ver++; S.listeners.forEach(fn => { try { fn(why); } catch (e) { console.error(e); } }); };
-  S.ns = () => (S.mode === 'demo' ? 'demo:' : 'live:' + U.hash(S.gasUrl || '') + ':');
+  S.ns = () => (S.mode === 'demo' ? 'demo:' : 'live:' + S.fileId + ':');
 
-  S.reset = () => { Object.keys(SCHEMA).forEach(k => { S.t[k] = []; S.byId[k] = {}; }); S.rev = 0; S.outbox = []; };
+  S.reset = () => { Object.keys(SCHEMA).forEach(k => { S.t[k] = []; S.byId[k] = {}; }); S.cursor = 0; S.version = ''; };
 
-  S.applySnapshot = (boot) => {
-    S.reset();
-    Object.keys(boot.tables || {}).forEach(t => {
+  /** Snapshot lokal (IndexedDB) → memori. */
+  S.applySnapshot = (snap) => {
+    Object.keys(SCHEMA).forEach(k => { S.t[k] = []; S.byId[k] = {}; });
+    Object.keys(snap.tables || {}).forEach(t => {
       if (!SCHEMA[t]) return;
-      const { c, r } = boot.tables[t];
+      const { c, r } = snap.tables[t];
       const rows = r.map(a => rowFromArray(t, c, a));
-      S.t[t] = rows; S.byId[t] = {}; rows.forEach(x => S.byId[t][x.id] = x);
+      S.t[t] = rows; rows.forEach(x => S.byId[t][x.id] = x);
     });
-    S.rev = boot.rev || 0;
+    S.cursor = snap.cursor || 0; S.version = snap.version || '';
   };
 
-  S.applyDelta = (d) => {
+  /** Terapkan baris log [waktu, oleh, tabel, id, op, data]. Mengembalikan true bila ada perubahan. */
+  S.applyRows = (rows) => {
+    const pend = S.pendingIds(), touched = {};
     let changed = false;
-    const pend = S.pendingIds();
-    Object.keys(d.tables || {}).forEach(t => {
-      if (!SCHEMA[t]) return;
-      const { c, r } = d.tables[t];
-      r.forEach(a => {
-        const row = rowFromArray(t, c, a);
-        if (pend[t + ':' + row.id]) return;            // jangan timpa perubahan lokal yang belum terkirim
-        const ex = S.byId[t][row.id];
-        if (ex) {
-          if (SCHEMA[t].every(k => toWire(ex[k]) === toWire(row[k]))) return;   // sama persis (mis. gema tulisan sendiri) → tak perlu render ulang
-          Object.assign(ex, row);
-        } else { S.t[t].push(row); S.byId[t][row.id] = row; }
-        changed = true;
-      });
+    rows.forEach(r => {
+      const t = r[2], id = String(r[3] || ''), op = r[4];
+      if (!SCHEMA[t] || !id || pend[t + ':' + id]) return;
+      const map = S.byId[t];
+      if (op === 'd') { if (map[id]) { delete map[id]; touched[t] = 1; changed = true; } return; }
+      let data; try { data = typeof r[5] === 'string' ? JSON.parse(r[5]) : (r[5] || {}); } catch (e) { return; }
+      const ex = map[id];
+      if (ex) {
+        let diff = false;
+        Object.keys(data).forEach(c => { if (SCHEMA[t].indexOf(c) < 0) return; const v = typed(t, c, data[c]); if (toWire(ex[c]) !== toWire(v)) { ex[c] = v; diff = true; } });
+        if (diff) changed = true;
+      } else {
+        const full = {}; SCHEMA[t].forEach(c => full[c] = typed(t, c, data[c] === undefined ? '' : data[c]));
+        full.id = id; map[id] = full; touched[t] = 1; changed = true;
+      }
     });
-    (d.del || []).forEach(([t, id]) => {
-      if (!S.byId[t] || !S.byId[t][id]) return;
-      delete S.byId[t][id]; S.t[t] = S.t[t].filter(x => x.id !== id); changed = true;
-    });
-    if (d.rev) S.rev = d.rev;
+    Object.keys(touched).forEach(t => { S.t[t] = Object.values(S.byId[t]); });
     return changed;
   };
 
@@ -127,7 +128,7 @@
 
   // ---- Persistensi (debounce) ----
   S.persist = U.debounce(async () => {
-    const snap = { rev: S.rev, tables: {} };
+    const snap = { cursor: S.cursor, version: S.version, tables: {} };
     Object.keys(SCHEMA).forEach(t => {
       const cols = SCHEMA[t];
       snap.tables[t] = { c: cols, r: S.t[t].map(x => cols.map(c => toWire(x[c]))) };
@@ -178,51 +179,69 @@
   S.upsert = (t, row, opt) => S.commit([{ op: 'upsert', t, row }], opt);
   S.remove = (t, id) => S.commit([{ op: 'delete', t, id }]);
 
-  S.scheduleFlush = U.debounce(() => S.flush(), 300);
+  S.scheduleFlush = U.debounce(() => S.flush(), 400);
+  S.needAuth = false;
+  const authLost = () => { S.needAuth = true; UI && UI.authState && UI.authState(true); };
 
+  /** Kirim antrean ke file keluarga (beberapa batch digabung jadi satu permintaan). */
   S.flush = async () => {
-    if (S.flushing || !S.outbox.length) return;
-    if (!navigator.onLine && S.mode !== 'demo') return;
+    if (S.flushing || !S.outbox.length || !S.backend) return;
+    if (navigator.onLine === false && S.mode !== 'demo') return;
     S.flushing = true;
     try {
       while (S.outbox.length) {
-        // gabungkan beberapa batch kecil menjadi satu kiriman (maks 250 op)
-        const b = S.outbox[0];
-        const res = await API.call('write', { ops: b.ops }, { reqId: b.reqId });
-        if (res.success) { S.outbox.shift(); S.persist(); continue; }
-        if (res.network) { UI && UI.netState(false); break; }   // coba lagi nanti
-        // ditolak server (izin/validasi): buang & segarkan dari server
-        S.outbox.shift(); S.persist();
-        UI && UI.toast(res.message || 'Perubahan ditolak server.', 'error');
-        await S.sync(true);
+        let n = 0, ops = [];
+        while (n < S.outbox.length && ops.length + S.outbox[n].ops.length <= 300) { ops = ops.concat(S.outbox[n].ops); n++; }
+        if (!n) { n = 1; ops = S.outbox[0].ops; }
+        const res = await S.backend.push(ops, S.me ? S.me.email : '', S.outbox[0].reqId);
+        if (res.ok) { S.outbox.splice(0, n); S.persist(); UI && UI.netState(true); continue; }
+        if (res.auth) { authLost(); break; }
+        if (res.network || res.status === 429 || res.status >= 500 || !res.status) { UI && UI.netState(false); break; }
+        if (res.status === 403 || res.status === 404) { UI && UI.toast('Akses ke file keluarga ditolak. Minta Admin mengundang ulang akun ini.', 'error', { ms: 6000 }); break; }
+        S.outbox.splice(0, n); S.persist();   // 400: data tidak valid → buang agar tidak macet
+        UI && UI.toast(res.message || 'Perubahan ditolak Google.', 'error');
       }
     } finally { S.flushing = false; }
-    if (!S.outbox.length) S.sync();
   };
 
+  /** Sinkron: cek versi file dulu (murah), baca log baru hanya bila berubah. */
   S.sync = async (full) => {
-    if (S.syncing) return;
-    if (S.outbox.length && !full) { S.flush(); return; }
+    if (S.syncing || !S.backend) return;
     S.syncing = true;
     try {
-      const res = await API.call('sync', { since: full ? 0 : S.rev });
-      if (!res.success) { if (res.network) UI && UI.netState(false); return; }
-      UI && UI.netState(true);
-      const d = res.data;
+      if (S.outbox.length) await S.flush();
+      const v = await S.backend.checkVersion();
+      if (!v.ok) { if (v.auth) authLost(); else if (v.network) UI && UI.netState(false); else if (v.status === 404 || v.status === 403) S.emit('denied'); return v; }
+      S.needAuth = false; UI && UI.authState && UI.authState(false); UI && UI.netState(true);
+      if (!full && S.cursor > 0 && v.version && v.version === S.version) { S.lastSync = Date.now(); return { ok: true }; }
       let changed;
-      if (d.boot) { if (d.me) S.me = d.me; S.applySnapshot(d.boot); S.outbox.forEach(b => b.ops.forEach(applyOpLocal)); changed = true; }
-      else changed = S.applyDelta(d);
-      S.lastSync = Date.now();
-      if (changed) { S.emit('sync'); S.persist(); }
+      if (full || !S.cursor) {
+        const r = await S.backend.pull(0);
+        if (!r.ok) { if (r.auth) authLost(); return r; }
+        Object.keys(SCHEMA).forEach(k => { S.t[k] = []; S.byId[k] = {}; });
+        S.applyRows(r.rows); S.cursor = r.cursor;
+        S.outbox.forEach(b => b.ops.forEach(applyOpLocal));
+        changed = true;
+      } else {
+        const r = await S.backend.pull(S.cursor);
+        if (!r.ok) { if (r.auth) authLost(); return r; }
+        changed = S.applyRows(r.rows); S.cursor = r.cursor;
+      }
+      S.version = v.version; S.lastSync = Date.now();
+      S.emit(changed ? 'sync' : 'synced'); S.persist();
+      return { ok: true };
     } finally { S.syncing = false; }
   };
+
+  /** Tabel dalam bentuk {c, r} untuk cermin spreadsheet / cadangan. */
+  S.tablesWire = () => { const o = {}; Object.keys(SCHEMA).forEach(t => { o[t] = { c: SCHEMA[t], r: S.t[t].map(x => SCHEMA[t].map(c => toWire(x[c]))) }; }); return o; };
 
   // ---- Helper akses ----
   S.setting = (k, def) => { const r = S.byId.Pengaturan[k]; return r && r.nilai !== '' ? r.nilai : def; };
   S.setSetting = (k, v) => S.upsert('Pengaturan', { id: k, nilai: v });
   S.members = () => S.t.Anggota.filter(m => m.aktif !== false);
   S.member = email => S.t.Anggota.find(m => m.email === email);
-  S.memberName = email => { if (!email) return '-'; const m = S.member(email); return m ? m.nama : (email === 'darurat' ? 'Akses Darurat' : email.split('@')[0]); };
+  S.memberName = email => { if (!email) return '-'; const m = S.member(email); return m ? m.nama : String(email).split('@')[0]; };
   S.wallets = (all) => S.t.Wallet.filter(w => all || !w.arsip).sort((a, b) => a.urutan - b.urutan || a.nama.localeCompare(b.nama));
   S.kategori = (jenis, all) => S.t.Kategori.filter(k => (all || !k.arsip) && (!jenis || k.jenis === jenis)).sort((a, b) => a.urutan - b.urutan);
   S.isAdminLike = () => S.me && (S.me.peran === 'admin' || S.me.peran === 'pasangan');

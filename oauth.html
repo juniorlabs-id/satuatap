@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SatuAtap — Menyambungkan</title>
+<meta name="robots" content="noindex"><style>body{font-family:system-ui,sans-serif;background:#F7FAF9;color:#0E2B2C;display:grid;place-items:center;min-height:100vh;margin:0}p{opacity:.7}</style></head>
+<body><div><b>SatuAtap</b><p>Menyambungkan ke Google…</p></div>
+<script>
+/* Halaman kembali dari login Google: teruskan kode ke aplikasi lalu tutup. */
+(function () {
+  var p = new URLSearchParams(location.search);
+  var m = { type: 'satuatap-oauth', code: p.get('code') || '', state: p.get('state') || '', error: p.get('error') || '', at: Date.now() };
+  try { localStorage.setItem('sa:oauth', JSON.stringify(m)); } catch (e) {}
+  history.replaceState(null, '', location.pathname);
+  if (window.opener && !window.opener.closed) {
+    try { window.opener.postMessage(m, location.origin); } catch (e) {}
+    setTimeout(function () { window.close(); }, 80);
+  } else {
+    var back = './';
+    try { back = localStorage.getItem('sa:oauthBack') || './'; } catch (e) {}
+    location.replace(back);
+  }
+})();
+</script></body></html>

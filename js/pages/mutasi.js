@@ -19,7 +19,7 @@
       if (F.who && (t.dibayarOleh || t.dicatatOleh) !== F.who) return false;
       if (q) {
         const k = Store.byId.Kategori[t.kategoriId];
-        const hay = (UI.isPrivate(t) ? '' : (t.catatan + ' ' + t.tag)) + ' ' + (k ? k.nama : '') + ' ' + UI.txTitle(t) + ' ' + t.jumlah;
+        const hay = (UI.note(t) + ' ' + UI.note(t, 'tag')) + ' ' + (k ? k.nama : '') + ' ' + UI.txTitle(t) + ' ' + t.jumlah;
         if (hay.toLowerCase().indexOf(q) < 0) return false;
       }
       return true;
@@ -92,7 +92,7 @@
   });
   UI.act('mut-export', () => {
     const rows = [['Tanggal', 'Jenis', 'Kategori', 'Dompet', 'Ke Dompet', 'Jumlah', 'Biaya', 'Catatan', 'Tag', 'Dibayar oleh']];
-    filtered().forEach(t => rows.push([t.tanggal, Calc.JENIS_LABEL[t.jenis], (Store.byId.Kategori[t.kategoriId] || {}).nama || '', (Store.byId.Wallet[t.walletId] || {}).nama || '', (Store.byId.Wallet[t.walletTujuan] || {}).nama || '', t.jumlah, t.biaya || 0, UI.isPrivate(t) ? '' : t.catatan, UI.isPrivate(t) ? '' : t.tag, Store.memberName(t.dibayarOleh || t.dicatatOleh)]));
+    filtered().forEach(t => rows.push([t.tanggal, Calc.JENIS_LABEL[t.jenis], (Store.byId.Kategori[t.kategoriId] || {}).nama || '', (Store.byId.Wallet[t.walletId] || {}).nama || '', (Store.byId.Wallet[t.walletTujuan] || {}).nama || '', t.jumlah, t.biaya || 0, UI.note(t), UI.note(t, 'tag'), Store.memberName(t.dibayarOleh || t.dicatatOleh)]));
     U.download('mutasi-satuatap-' + U.today() + '.csv', '﻿' + U.csv(rows), 'text/csv');
   });
   const onSearch = U.debounce(v => { F.q = v.trim(); n = 0; renderList(); }, 250);

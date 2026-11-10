@@ -177,7 +177,7 @@
       ${UI.sec('Langganan')}<div class="card list">${rows(lg) || '<div class="row muted">Belum ada langganan.</div>'}</div>
       ${UI.sec('Tagihan tahunan', '<a class="link" href="#/anggaran/sinking">Dicicil per bulan</a>')}<div class="card list">${rows(thn) || '<div class="row muted">Belum ada.</div>'}</div>
       ${UI.sec('Pemasukan rutin', `<button class="link" data-act="rutin-add" data-jenis="masuk">${I('plus')} Tambah</button>`)}<div class="card list">${inc.map(r => `<div class="row" data-act="rutin-edit" data-id="${r.id}"><span class="cat-ic in">${I('banknote')}</span><div class="tx-txt"><b>${U.esc(r.nama)}</b><small>Tiap tgl ${r.tanggal}${r.aktif === false ? ' · nonaktif' : ''}</small></div>${UI.amount(r.jumlah, 'masuk')}</div>`).join('') || '<div class="row muted">Belum ada.</div>'}</div>
-      <p class="muted small">Pengingat dikirim ke email setiap pagi pukul 07.00 untuk H-7, H-3, H-1 dan hari H (atur di Pengaturan › Notifikasi).</p><div class="spacer"></div>`;
+      <p class="muted small">Tagihan yang jatuh tempo ≤ 3 hari juga tampil di Beranda. Ingin jadwal ini di Google Calendar? Lihat Lainnya › Notifikasi.</p><div class="spacer"></div>`;
   }
 
   function musim() {

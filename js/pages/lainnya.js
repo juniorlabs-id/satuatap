@@ -61,8 +61,7 @@
       return `<div class="me-card"><span class="avatar lg" style="background:${Store.me.warna || '#0F5E59'}">${U.esc(U.initials(Store.me.nama))}</span><div><b>${U.esc(Store.me.nama)}</b><small>${U.esc(Store.me.email)}</small></div></div>
         <div class="card list">${Object.keys(SUB).map(k => `<a class="row" href="#/pengaturan/${k}"><div class="tx-txt"><b>${SUB[k]}</b></div>${I('chevron-right')}</a>`).join('')}</div>
         <button class="btn block ghost danger" data-act="logout">${I('log-out')} Keluar</button><div class="spacer"></div>`;
-    },
-    after(view, p) { if (p === 'keamanan') loadRahasia(); }
+    }
   });
   const needAdmin = () => Store.isAdminLike() ? '' : `<div class="note warn">${I('lock')} Hanya Admin / Pasangan yang bisa mengubah bagian ini.</div>`;
 
@@ -85,11 +84,11 @@
     const ms = Store.t.Anggota.slice().sort((a, b) => (a.peran === 'admin' ? -1 : 0) - (b.peran === 'admin' ? -1 : 0));
     return `${needAdmin()}
       <div class="note">${I('info')} Maksimal 5 akun per keluarga. Anggota masuk memakai akun Google dengan email yang didaftarkan di sini.</div>
-      <div class="card list">${ms.map(m => `<div class="row" ${Store.me.peran === 'admin' || Store.me.darurat ? `data-act="member-edit" data-id="${m.id}"` : ''}><span class="avatar xs" style="background:${m.warna || '#5b7a78'}">${U.esc(U.initials(m.nama))}</span>
+      <div class="card list">${ms.map(m => `<div class="row" ${Store.me.peran === 'admin' ? `data-act="member-edit" data-id="${m.id}"` : ''}><span class="avatar xs" style="background:${m.warna || '#5b7a78'}">${U.esc(U.initials(m.nama))}</span>
         <div class="tx-txt"><b>${U.esc(m.nama)} ${m.aktif === false ? UI.pill('Nonaktif', '') : ''}</b><small>${U.esc(m.email)} · ${U.esc(PERAN[m.peran] || m.peran)}</small></div>${I('chevron-right')}</div>`).join('')}</div>
-      ${(Store.me.peran === 'admin' || Store.me.darurat) && Store.t.Anggota.filter(m => m.aktif !== false).length < 5 ? `<button class="btn block" data-act="member-add">${I('user-plus')} Undang anggota</button>` : ''}
-      ${Store.mode === 'live' ? `<div class="card"><b>Tautan undangan</b><p class="muted small">Kirim tautan ini ke anggota — alamat backend keluarga langsung terisi, ia tinggal masuk dengan Google.</p><div class="row-btns"><button class="btn ghost" data-act="copy-invite">${I('copy')} Salin tautan</button><button class="btn ghost" data-act="wa-invite">${I('message-circle')} Kirim via WA</button></div></div>` : ''}
-      <p class="muted small">Setelah ditambahkan, bagikan alamat aplikasi ini. Ia cukup menekan "Masuk dengan Google". Kalender pengingat bisa dibagikan manual dari Google Calendar Anda.</p>`;
+      ${Store.me.peran === 'admin' && Store.t.Anggota.filter(m => m.aktif !== false).length < 5 ? `<button class="btn block" data-act="member-add">${I('user-plus')} Undang anggota</button>` : ''}
+      <div class="card"><b>Cara anggota bergabung</b><ol class="steps small"><li>Admin menambahkan email di sini — Google Drive otomatis membagikan file keluarga & mengirim email undangan.</li><li>Anggota membuka aplikasi, <b>Masuk dengan Google</b>, lalu pilih <b>Saya diundang</b> dan pilih file "SatuAtap – Data …".</li></ol>
+        <div class="row-btns"><button class="btn ghost" data-act="wa-invite">${I('message-circle')} Kirim petunjuk via WA</button></div></div>`;
   }
   UI.memberForm = (m) => {
     const isNew = !m;
@@ -112,13 +111,18 @@
       if (!f.nama || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return UI.toast('Nama dan email valid wajib diisi.', 'warn');
       if (isNew && Store.t.Anggota.some(x => x.email === f.email)) return UI.toast('Email sudah terdaftar.', 'warn');
       if (!isNew && m.email === Store.me.email && f.peran !== 'admin' && m.peran === 'admin') return UI.toast('Anda tidak bisa menurunkan peran Anda sendiri.', 'warn');
+      if (f.aktif && (isNew || m.aktif === false) && Store.members().length >= 5) return UI.toast('Maksimal 5 akun aktif per keluarga.', 'warn');
       Store.upsert('Anggota', Object.assign({}, m, f, { izin }));
-      s.close(); UI.toast(isNew ? 'Anggota diundang. Minta ia membuka aplikasi & masuk dengan Google.' : 'Tersimpan.');
+      s.close();
+      if (Store.mode !== 'live') return UI.toast(isNew ? 'Mode demo: undangan tidak benar-benar dikirim.' : 'Tersimpan.');
+      const wasOn = !isNew && m.aktif !== false;
+      if (f.aktif && !wasOn) Cloud.share(f.email, Store.me.nama).then(r => UI.toast(r.ok ? 'Undangan terkirim ke ' + f.email + '. Minta ia masuk & pilih "Saya diundang".' : 'Anggota tersimpan, tapi gagal membagikan file: ' + r.message, r.ok ? 'ok' : 'warn', { ms: 6000 }));
+      else if (!f.aktif && wasOn) Cloud.unshare(f.email).then(r => UI.toast(r.ok ? 'Akses ' + f.email + ' ke file keluarga dicabut.' : 'Gagal mencabut akses file: ' + r.message, r.ok ? 'ok' : 'warn'));
+      else UI.toast('Tersimpan.');
+      App.syncMembers && App.syncMembers();
     };
   };
-  const inviteUrl = () => location.origin + location.pathname + '?api=' + encodeURIComponent(Store.gasUrl);
-  UI.act('copy-invite', async () => { try { await navigator.clipboard.writeText(inviteUrl()); UI.toast('Tautan disalin.'); } catch (e) { prompt('Salin tautan ini:', inviteUrl()); } });
-  UI.act('wa-invite', () => window.open('https://wa.me/?text=' + encodeURIComponent('Yuk catat keuangan keluarga bareng di SatuAtap 🏠\nBuka tautan ini lalu masuk dengan akun Google kamu:\n' + inviteUrl()), '_blank', 'noopener'));
+  UI.act('wa-invite', () => window.open('https://wa.me/?text=' + encodeURIComponent('Yuk catat keuangan keluarga bareng di SatuAtap 🏠\n1) Buka ' + location.origin + location.pathname + '\n2) Masuk dengan akun Google kamu\n3) Pilih "Saya diundang" lalu pilih file "SatuAtap – Data ' + Store.setting('namaKeluarga', '') + '"'), '_blank', 'noopener'));
   UI.act('member-add', () => UI.memberForm());
   UI.act('member-edit', el => UI.memberForm(Store.byId.Anggota[el.dataset.id]));
 
@@ -184,56 +188,48 @@
 
   // ---------- Notifikasi ----------
   function notif() {
-    const on = k => Store.setting(k, 'true') !== 'false' && Store.setting(k, 'true') !== false;
-    const kal = Store.setting('kalenderSync', 'false') === 'true';
-    return `${needAdmin()}<div class="card" id="f-not">
-      <label class="check"><input type="checkbox" name="notifEmail" ${on('notifEmail') ? 'checked' : ''} ${Store.isAdminLike() ? '' : 'disabled'}><span><b>Email pengingat tagihan</b><br><small class="muted">Dikirim pukul 07.00 untuk tagihan H-7, H-3, H-1 dan hari H, plus ringkasan setiap awal periode.</small></span></label>
-      <label class="check"><input type="checkbox" name="kalenderSync" ${kal ? 'checked' : ''} ${Store.isAdminLike() ? '' : 'disabled'}><span><b>Sinkron ke Google Calendar</b><br><small class="muted">Tagihan & acara 60 hari ke depan dibuat di kalender "Keuangan ${U.esc(Store.setting('namaKeluarga', ''))}" milik Admin (satu arah). Bagikan kalender itu ke pasangan dari Google Calendar.</small></span></label>
-      ${Store.isAdminLike() ? `<div class="row-btns"><button class="btn" data-act="save-not">Simpan</button>${Store.mode === 'live' ? `<button class="btn ghost" data-act="run-task">${I('play')} Kirim/sinkron sekarang</button>` : ''}</div>` : ''}</div>
-      <div class="note">${I('message-circle')} Catat via Telegram/WhatsApp & notifikasi WA hadir di pembaruan berikutnya.</div>`;
+    const on = Store.setting('notifEmail', 'true') !== 'false';
+    return `<div class="card"><h4 class="mini-h">${I('bell-ring')} Pengingat tagihan</h4>
+        <p class="small">Tagihan, cicilan & acara yang jatuh tempo ≤ 3 hari tampil di <b>Beranda</b>, lengkap dengan tombol bayar; jadwal lengkapnya ada di <b>Kalender</b>. Tagihan yang sudah lunas atau ditunda tidak ditampilkan.</p>
+        <p class="muted small">${I('message-circle')} Pengingat lewat Telegram / WhatsApp hadir di pembaruan berikutnya.</p></div>
+      ${needAdmin()}<div class="card" id="f-not">
+      <label class="check"><input type="checkbox" name="notifEmail" ${on ? 'checked' : ''} ${Store.isAdminLike() ? '' : 'disabled'}><span><b>Email ringkasan bulanan</b><br><small class="muted">Laporan (bukan pengingat): pemasukan, pengeluaran, kategori terbesar & tujuan periode lalu untuk Admin & Pasangan — terkirim saat aplikasi pertama kali dibuka di periode baru.</small></span></label>
+      ${Store.isAdminLike() ? `<button class="btn" data-act="save-not">Simpan</button>` : ''}</div>
+      <div class="card"><h4 class="mini-h">${I('calendar-plus')} Jadwal di Google Calendar <span class="pill">opsional</span></h4>
+        <p class="small">Ingin tagihan & cicilan muncul di Google Calendar (dengan notifikasi kalender sehari sebelumnya, bisa dibagikan ke pasangan)? Pasang <b>Skrip Pendamping</b> di akun Google Admin — sekitar 5 menit, ikuti Panduan Instalasi Bagian C.</p>
+        <p class="muted small">Saat memasang, Google menampilkan layar "aplikasi belum diverifikasi" satu kali karena skrip berjalan di akun Anda sendiri.</p>
+        ${Store.mode === 'live' ? `<div class="kv-list"><div class="kv"><span>ID file keluarga</span><b><code class="wrap">${U.esc(Store.fileId)}</code></b></div></div><button class="btn ghost sm" data-act="copy-fileid">${I('copy')} Salin ID file</button>` : ''}</div>`;
   }
   UI.act('save-not', () => { const f = UI.formData(document.getElementById('f-not')); Store.commit(Object.keys(f).map(k => ({ op: 'upsert', t: 'Pengaturan', row: { id: k, nilai: f[k] ? 'true' : 'false' } }))); UI.toast('Disimpan.'); });
-  UI.act('run-task', async el => { el.disabled = true; const r = await API.call('tugas.jalankan', {}); el.disabled = false; UI.toast(r.success ? 'Selesai: ' + JSON.stringify(r.data).slice(0, 120) : r.message, r.success ? 'ok' : 'error'); });
+  UI.act('copy-fileid', async () => { try { await navigator.clipboard.writeText(Store.fileId); UI.toast('ID file disalin.'); } catch (e) { prompt('Salin ID file:', Store.fileId); } });
 
   // ---------- Keamanan ----------
   function keamanan() {
-    const adm = Store.isAdminLike();
-    return `<div class="card"><h4 class="mini-h">${I('log-out')} Sesi</h4><p class="muted small">Sesi berlaku 30 hari. Kehilangan HP? Keluarkan semua perangkat sekaligus.</p>
-        <button class="btn ghost danger" data-act="logout-all" ${Store.mode === 'demo' ? 'disabled' : ''}>Keluar dari semua perangkat</button></div>
-      ${adm ? `<div class="card" id="rahasia"><h4 class="mini-h">${I('key-round')} Login Google (Client ID)</h4><div class="muted small">Memuat status…</div></div>
-      <div class="card"><h4 class="mini-h">${I('life-buoy')} Sandi akses darurat</h4><p class="muted small">Dipakai bila login Google bermasalah. Sandi awal ada di log setup — ganti setelah login pertama.</p>
-        ${UI.field('Sandi baru (min. 12 karakter, huruf + angka)', `<input type="password" id="sandi-baru" autocomplete="new-password" minlength="12">`)}
-        <button class="btn ghost" data-act="ganti-sandi" ${Store.mode === 'demo' ? 'disabled' : ''}>Ganti sandi darurat</button></div>` : ''}
-      <div class="note">${I('shield-check')} Data keuangan tersimpan di Google Drive milik keluarga Anda sendiri. Kunci rahasia hanya disimpan di Script Properties server, tidak pernah di browser atau spreadsheet.</div>`;
+    const has = Priv.has(), un = Priv.unlocked();
+    return `<div class="card"><h4 class="mini-h">${I('lock')} PIN uang pribadi</h4>
+        <p class="muted small">Catatan & tag transaksi di kategori uang pribadi Anda dienkripsi di perangkat. Anggota lain — juga lewat spreadsheet — hanya melihat nominalnya.</p>
+        <p class="small">${!has ? 'Belum diatur.' : un ? I('lock-open') + ' Terbuka di perangkat ini.' : I('lock') + ' Terkunci di perangkat ini.'}</p>
+        <div class="row-btns">${!has ? `<button class="btn" data-act="pin-set">Atur PIN</button>` : `${un ? `<button class="btn ghost" data-act="pin-lock">Kunci di perangkat ini</button>` : `<button class="btn" data-act="pin-unlock">Buka kunci</button>`}<button class="btn ghost" data-act="pin-change">Ganti PIN</button>`}</div>
+        <p class="muted tiny">PIN tidak bisa dipulihkan. Jika lupa, catatan lama tidak dapat dibaca (nominal tetap aman).</p></div>
+      <div class="card"><h4 class="mini-h">${I('shield-check')} Akses Google</h4>
+        <p class="muted small">SatuAtap hanya memakai izin <b>drive.file</b>: aplikasi hanya bisa membuka file yang ia buat atau yang Anda pilih — tidak bisa melihat file Drive lain.</p>
+        ${Store.mode === 'live' ? `<p class="small">Masuk sebagai <b>${U.esc(Auth.email)}</b></p>` : ''}
+        <button class="btn ghost danger" data-act="logout">${I('log-out')} Keluar & hapus data dari perangkat ini</button></div>
+      <div class="note">${I('info')} Untuk menghentikan akses SatuAtap sepenuhnya: buka myaccount.google.com › Keamanan › Aplikasi pihak ketiga › SatuAtap › Hapus akses.</div>`;
   }
-  async function loadRahasia() {
-    const box = document.getElementById('rahasia'); if (!box) return;
-    const r = await API.call('rahasia.status', {});
-    if (!document.getElementById('rahasia')) return;
-    if (!r.success) { box.querySelector('.muted').textContent = r.message || 'Gagal memuat.'; return; }
-    const c = r.data.GOOGLE_CLIENT_ID || {}, g = r.data.GEMINI_API_KEY || {};
-    box.innerHTML = `<h4 class="mini-h">${I('key-round')} Login Google (Client ID)</h4>
-      <p class="small">${c.ada ? `${I('circle-check')} Aktif: <code>${U.esc(String(c.samar).slice(0, 22))}…</code>` : `${I('triangle-alert')} Belum diisi — anggota belum bisa masuk dengan Google.`}</p>
-      ${UI.field('Client ID baru', `<input id="cid" autocomplete="off" placeholder="xxxx.apps.googleusercontent.com">`, 'Didapat dari panduan instalasi (Google Cloud › Kredensial › OAuth Client ID tipe Web).')}
-      <button class="btn ghost" data-act="save-secret" data-k="GOOGLE_CLIENT_ID" data-src="cid">Simpan Client ID</button>
-      <h4 class="mini-h">${I('sparkles')} Kunci Gemini AI (Fase 3)</h4><p class="small">${g.ada ? 'Tersimpan: <code>' + U.esc(g.samar) + '</code>' : 'Belum diisi (opsional).'}</p>
-      ${UI.field('Gemini API key', `<input id="gem" type="password" autocomplete="off" placeholder="${g.ada ? U.esc(g.samar) : 'opsional'}">`)}
-      <button class="btn ghost" data-act="save-secret" data-k="GEMINI_API_KEY" data-src="gem">Simpan kunci</button>`;
-  }
-  UI.act('save-secret', async el => {
-    const inp = document.getElementById(el.dataset.src), v = inp.value.trim(); if (!v) return UI.toast('Isi dulu nilainya.', 'warn');
-    el.disabled = true; const r = await API.call('rahasia.simpan', { kunci: el.dataset.k, nilai: v }); el.disabled = false; inp.value = '';
-    UI.toast(r.message || (r.success ? 'Tersimpan.' : 'Gagal.'), r.success ? 'ok' : 'error'); if (r.success) loadRahasia();
-  });
-  UI.act('ganti-sandi', async el => {
-    const v = document.getElementById('sandi-baru').value;
-    if (v.length < 12 || !/\d/.test(v) || !/[A-Za-z]/.test(v)) return UI.toast('Minimal 12 karakter berisi huruf & angka.', 'warn');
-    el.disabled = true; const r = await API.call('darurat.ganti', { sandiBaru: v }); el.disabled = false;
-    document.getElementById('sandi-baru').value = ''; UI.toast(r.message, r.success ? 'ok' : 'error');
-  });
-  UI.act('logout-all', async () => {
-    if (!(await UI.confirm('Keluar dari semua perangkat?', 'Semua HP/laptop yang memakai akun Anda harus masuk ulang.', 'Keluarkan semua', true))) return;
-    const r = await API.call('sesi.keluarSemua', {}); if (r.success) App.logout(); else UI.toast(r.message, 'error');
+  UI.act('pin-set', async () => { if (await UI.privGuard() === 'enc') { UI.toast('PIN diatur. Catatan uang pribadi baru akan dienkripsi.'); UI.render(); } });
+  UI.act('pin-unlock', async () => { if (await UI.privGuard() === 'enc') { UI.toast('Terbuka.'); UI.render(); } });
+  UI.act('pin-lock', async () => { await Priv.lock(); UI.toast('Dikunci di perangkat ini.'); UI.render(); });
+  UI.act('pin-change', () => {
+    const s = UI.sheet({ title: 'Ganti PIN uang pribadi', cls: 'small', body: `${UI.field('PIN lama', '<input type="password" inputmode="numeric" name="a" autocomplete="off">')}${UI.field('PIN baru (6–12 angka)', '<input type="password" inputmode="numeric" name="b" autocomplete="off">')}${UI.field('Ulangi PIN baru', '<input type="password" inputmode="numeric" name="c" autocomplete="off">')}<div class="bad small e"></div>`,
+      foot: `<button class="btn" data-ok>Ganti</button>` });
+    s.el.querySelector('[data-ok]').onclick = async () => {
+      const f = UI.formData(s.el), e = s.el.querySelector('.e');
+      if (!/^\d{6,12}$/.test(f.b) || f.b !== f.c) { e.textContent = 'PIN baru 6–12 angka dan harus sama.'; return; }
+      e.textContent = 'Memproses…';
+      if (!(await Priv.change(f.a, f.b))) { e.textContent = 'PIN lama salah.'; return; }
+      s.close(); UI.toast('PIN diganti & catatan dienkripsi ulang.'); UI.render();
+    };
   });
 
   // ---------- Data ----------
@@ -241,18 +237,19 @@
     const n = U.sum(Object.keys(Store.SCHEMA), t => Store.t[t].length);
     const pend = U.sum(Store.outbox, b => b.ops.length);
     return `<div class="card kv-list">
-        <div class="kv"><span>Mode</span><b>${Store.mode === 'demo' ? 'Demo (data contoh)' : 'Terhubung ke Google Sheets keluarga'}</b></div>
+        <div class="kv"><span>Mode</span><b>${Store.mode === 'demo' ? 'Demo (data contoh)' : 'Google Drive keluarga'}</b></div>
         <div class="kv"><span>Total baris data</span><b>${U.fmtNum(n)}</b></div><div class="kv"><span>Transaksi</span><b>${U.fmtNum(Store.t.Transaksi.length)}</b></div>
         <div class="kv"><span>Menunggu dikirim</span><b>${pend ? pend + ' perubahan' : 'Tidak ada ✓'}</b></div>
         <div class="kv"><span>Sinkron terakhir</span><b>${Store.lastSync ? U.timeAgo(new Date(Store.lastSync).toISOString()) : '-'}</b></div>
-        <div class="kv"><span>Versi data (rev)</span><b>${Store.rev}</b></div></div>
+        <div class="kv"><span>Baris log dibaca</span><b>${U.fmtNum(Store.cursor)}</b></div></div>
       <div class="row-btns"><button class="btn" data-act="sync-now">${I('refresh-cw')} Sinkron sekarang</button><button class="btn ghost" data-act="sync-full">${I('database-zap')} Muat ulang penuh</button></div>
+      ${Store.mode === 'live' ? `<div class="row-btns"><a class="btn ghost" href="${Cloud.link()}" target="_blank" rel="noopener">${I('sheet')} Buka spreadsheet</a>${Store.isAdminLike() ? `<button class="btn ghost" data-act="mirror-now">${I('table')} Perbarui tabel</button>` : ''}</div>` : ''}
       <button class="btn block ghost" data-act="backup">${I('download')} Unduh cadangan (JSON)</button>
-      ${Store.mode === 'live' ? `<div class="note">${I('link')} Backend: <code class="wrap">${U.esc(Store.gasUrl)}</code></div>` : ''}
-      <p class="muted small">Aplikasi menyimpan salinan data di perangkat agar terbuka instan & tetap bisa dipakai saat sinyal lemah; perubahan dikirim otomatis saat online.</p>`;
+      <p class="muted small">Aplikasi menyimpan salinan data di perangkat agar terbuka instan & tetap bisa dipakai saat sinyal lemah; perubahan dikirim otomatis saat online. Tab tabel di spreadsheet diperbarui otomatis sekali sehari dari perangkat Admin.</p>`;
   }
-  UI.act('sync-now', async () => { await Store.flush(); await Store.sync(); UI.toast('Sinkron selesai.'); UI.render(); });
-  UI.act('sync-full', async () => { await Store.flush(); await Store.sync(true); UI.toast('Data dimuat ulang dari server.'); UI.render(); });
+  UI.act('sync-now', async () => { await Store.flush(); const r = await Store.sync(); UI.toast(r && r.ok ? 'Sinkron selesai.' : (r && r.message) || 'Belum bisa sinkron.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
+  UI.act('sync-full', async () => { await Store.flush(); const r = await Store.sync(true); UI.toast(r && r.ok ? 'Data dimuat ulang dari Google Drive.' : (r && r.message) || 'Gagal.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
+  UI.act('mirror-now', async el => { el.disabled = true; const r = await Cloud.mirror(Store.tablesWire()); el.disabled = false; UI.toast(r.ok ? 'Tab tabel di spreadsheet diperbarui.' : 'Gagal: ' + r.message, r.ok ? 'ok' : 'error'); if (r.ok) localStorage.setItem('sa:mir:' + Store.fileId, String(Date.now())); });
   UI.act('backup', () => {
     const out = { app: 'SatuAtap', versi: APP_CONFIG.VERSION, dibuat: new Date().toISOString(), keluarga: Store.setting('namaKeluarga', ''), tables: {} };
     Object.keys(Store.SCHEMA).forEach(t => out.tables[t] = Store.t[t]);
@@ -261,7 +258,7 @@
 
   function tentang() {
     return `<div class="about"><img src="img/logo-wide.png" alt="SatuAtap" width="220"><p><b>SatuAtap — Keuangan Keluarga</b><br><i>Keuangan keluarga, di bawah satu atap.</i></p>
-      <div class="card kv-list"><div class="kv"><span>Versi aplikasi</span><b>${APP_CONFIG.VERSION}</b></div><div class="kv"><span>Dibuat oleh</span><b>JuniorLabs</b></div><div class="kv"><span>Data</span><b>Google Drive keluarga Anda</b></div></div>
+      <div class="card kv-list"><div class="kv"><span>Versi aplikasi</span><b>${APP_CONFIG.VERSION}</b></div><div class="kv"><span>Dibuat oleh</span><b>JuniorLabs</b></div><div class="kv"><span>Data</span><b>Google Drive keluarga Anda</b></div>${Store.setting('lisensiKode', '') ? `<div class="kv"><span>Lisensi</span><b>${U.esc(Store.setting('lisensiKode', ''))}</b></div>` : ''}</div>
       <p class="muted small">SatuAtap membantu mencatat & merencanakan keuangan. Angka simulasi bersifat perkiraan dan bukan nasihat keuangan, pajak, atau hukum.</p></div>`;
   }
 

@@ -104,7 +104,7 @@
     const rows = [['Tanggal', 'Jenis', 'Kategori', 'Kelompok', 'Dompet', 'Ke Dompet', 'Jumlah', 'Biaya Admin', 'Catatan', 'Tag', 'Dibayar oleh', 'Dicatat oleh']];
     Calc.txSorted().filter(t => t.tanggal >= f.dari && t.tanggal <= f.sampai).slice().reverse().forEach(t => {
       const k = Store.byId.Kategori[t.kategoriId] || {}, pv = UI.isPrivate(t);
-      rows.push([t.tanggal, Calc.JENIS_LABEL[t.jenis], k.nama || '', k.kelompok || '', (Store.byId.Wallet[t.walletId] || {}).nama || '', (Store.byId.Wallet[t.walletTujuan] || {}).nama || '', t.jenis === 'keluar' ? -t.jumlah : t.jumlah, t.biaya || 0, pv ? '' : t.catatan, pv ? '' : t.tag, Store.memberName(t.dibayarOleh || t.dicatatOleh), Store.memberName(t.dicatatOleh)]);
+      rows.push([t.tanggal, Calc.JENIS_LABEL[t.jenis], k.nama || '', k.kelompok || '', (Store.byId.Wallet[t.walletId] || {}).nama || '', (Store.byId.Wallet[t.walletTujuan] || {}).nama || '', t.jenis === 'keluar' ? -t.jumlah : t.jumlah, t.biaya || 0, pv ? '' : UI.note(t), pv ? '' : UI.note(t, 'tag'), Store.memberName(t.dibayarOleh || t.dicatatOleh), Store.memberName(t.dicatatOleh)]);
     });
     U.download('satuatap-transaksi-' + f.dari + '_' + f.sampai + '.csv', '﻿' + U.csv(rows), 'text/csv');
     UI.toast((rows.length - 1) + ' transaksi diekspor. Buka dengan Excel / Google Sheets.');

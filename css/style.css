@@ -418,3 +418,9 @@ table.ck, table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px;
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media print { #bottomnav, .fab, #sidebar, #topbar, .tiles, .demo-banner { display: none !important; } .card { box-shadow: none; } }
+.chip.warn { background: var(--gold-c); color: var(--gold-d); border-color: transparent; } [data-theme=dark] .chip.warn { color: var(--gold); }
+.auth-chip { padding: 6px 10px; font-size: 12px; }
+.gbtn-own { background: #fff; color: #1f1f1f; border: 1.5px solid var(--line-2); } [data-theme=dark] .gbtn-own { background: #131314; color: #e3e3e3; border-color: #8e918f; }
+.login .btn small { font-weight: 500; opacity: .8; }
+.splash-in { text-align: center; color: var(--muted); padding: 24px 0; }
+.steps { padding-left: 18px; margin: 8px 0; } .steps li { margin-bottom: 6px; }

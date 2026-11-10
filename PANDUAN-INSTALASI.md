@@ -1,185 +1,201 @@
-# Panduan Instalasi SatuAtap 1.0
+# Panduan Instalasi SatuAtap 1.2 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
-SatuAtap terdiri dari dua bagian:
+## Gambaran singkat
 
 | Bagian | Isi | Dipasang oleh | Berapa kali |
 |---|---|---|---|
-| **Frontend** (tampilan aplikasi) | `index.html`, `css/`, `js/`, `img/` | JuniorLabs | Sekali, di GitHub Pages, dipakai semua pembeli |
-| **Backend** (server + database) | `Kode.gs`, `appsscript.json` | Admin tiap keluarga | Sekali per keluarga, di akun Google keluarga itu |
+| **Aplikasi** (GitHub Pages) | `index.html`, `css/`, `js/`, `img/` | JuniorLabs | Sekali, dipakai semua pembeli |
+| **Relay** (Apps Script JuniorLabs) | `Relay.gs` + `appsscript-relay.json` | JuniorLabs | Sekali |
+| **Data keluarga** | 1 file Google Sheets "SatuAtap – Data …" | Dibuat otomatis oleh aplikasi | Per keluarga, di Drive Admin keluarga |
+| **Skrip Pendamping** (opsional) | `Pendamping.gs` — jadwal tagihan ke Google Calendar | Admin keluarga yang menginginkannya | Opsional |
 
-Data setiap keluarga tersimpan di Google Drive & Google Sheets milik keluarga itu sendiri. JuniorLabs tidak menyimpan atau bisa melihat data keuangan pembeli.
+Pembeli **tidak perlu** membuka Apps Script, men-deploy, atau menyalin URL. Mereka cukup membuka aplikasi, menekan **Masuk dengan Google**, lalu memasukkan kode lisensi.
+
+**Mengapa tidak ada layar "Google belum memverifikasi aplikasi ini"?** Aplikasi hanya meminta izin `drive.file`, yaitu akses ke file yang dibuat atau dipilih lewat SatuAtap saja. Google menggolongkan izin ini sebagai *non-sensitive* sehingga tidak perlu verifikasi. Layar peringatan hanya muncul untuk Skrip Pendamping yang sifatnya opsional (Bagian C).
 
 ---
 
 ## Bagian A — Untuk JuniorLabs (sekali saja)
 
-### A1. Buat OAuth Client ID untuk "Masuk dengan Google"
+Sebaiknya semua langkah dilakukan memakai akun **juniorlabs.id@gmail.com**.
 
-Client ID bukan rahasia (memang dipakai di browser). Satu Client ID dipakai bersama oleh semua keluarga.
+### A1. Siapkan proyek Google Cloud
 
-1. Buka <https://console.cloud.google.com> → buat proyek baru, misal `SatuAtap`.
-2. **APIs & Services › OAuth consent screen**
-   - User type: **External** → isi nama aplikasi `SatuAtap`, email dukungan, email developer.
-   - Scopes: cukup bawaan (`openid`, `email`, `profile`). Jangan tambah scope lain.
-   - Selesai, lalu tekan **Publish app** agar status menjadi **In production**. Dengan hanya scope dasar ini, biasanya tidak perlu proses verifikasi Google. Sebaiknya tidak mengunggah logo, karena logo memicu verifikasi merek.
-3. **APIs & Services › Credentials › Create credentials › OAuth client ID**
-   - Application type: **Web application**
-   - **Authorized JavaScript origins**: `https://USERNAME.github.io` (alamat GitHub Pages Anda, tanpa garis miring di akhir). Untuk uji lokal boleh tambahkan `http://localhost:8000`.
-   - Redirect URI tidak perlu diisi.
-4. Salin **Client ID** (berakhiran `.apps.googleusercontent.com`).
+1. Buka <https://console.cloud.google.com>, lalu buat proyek baru bernama `SatuAtap`.
+2. Buka **APIs & Services › Library**, lalu aktifkan tiga API: **Google Drive API**, **Google Sheets API**, dan **Google Picker API**.
+3. Buka **Google Auth Platform** (dulu bernama *OAuth consent screen*):
+   - **Branding**: isi nama aplikasi `SatuAtap` dan email dukungan. **Jangan unggah logo**, karena logo memicu proses verifikasi merek.
+   - **Audience**: pilih **External**, lalu tekan **Publish app** sampai statusnya **In production**. Selama masih berstatus *Testing*, hanya 100 akun uji yang bisa masuk dan sesi kedaluwarsa setiap 7 hari.
+   - **Data access**: tambahkan scope `.../auth/drive.file`, `openid`, `email`, dan `profile`. Semuanya non-sensitive.
+   - **Clients › Create client**: pilih jenis **Web application**.
+     - **Authorized JavaScript origins**: `https://USERNAME.github.io` (tanpa garis miring di akhir).
+     - **Authorized redirect URIs**: `https://USERNAME.github.io/satuatap/oauth.html` (halaman kembali setelah login; sesuaikan nama repository).
+     - Simpan, lalu salin **Client ID** dan **Client secret**.
+4. Buka **APIs & Services › Credentials › Create credentials › API key**, lalu edit kuncinya:
+   - **Application restrictions**: pilih *Websites*, isi `https://USERNAME.github.io/*`.
+   - **API restrictions**: pilih **Google Picker API** saja.
+5. Buka **Project settings** (ikon ⋮ di kanan atas), lalu catat **Project number** (berupa angka).
 
-### A2. Tanam Client ID ke `Kode.gs` sebelum dibagikan
+### A2. Pasang relay JuniorLabs
 
-Buka `Kode.gs`, cari baris ini di bagian atas:
+1. Buka <https://script.google.com> dengan akun JuniorLabs, lalu buat **Proyek baru** bernama `SatuAtap Relay`.
+2. Buka ⚙️ **Setelan Proyek**, lalu centang **Tampilkan file manifes appsscript.json**.
+3. Tempel isi `appsscript-relay.json` ke `appsscript.json`, lalu tempel isi `Relay.gs` ke `Kode.gs`.
+4. Di baris atas `Relay.gs`, isi `const CLIENT_ID = '…apps.googleusercontent.com'` dengan Client ID dari A1. Simpan.
+5. **Client secret (rahasia):** buka ⚙️ **Setelan Proyek › Script Properties › Tambahkan properti**. Isi nama `GOOGLE_CLIENT_SECRET` dan nilainya Client secret dari A1. **Jangan** menulisnya di kode atau di file lain.
+6. Pilih fungsi **`setupRelay`** lalu tekan **▶ Jalankan**. Izinkan akses. Layar peringatan Google wajar muncul di sini karena ini skrip milik JuniorLabs sendiri.
+   Log akan menampilkan "Client secret: tersimpan ✓". Kunci enkripsi sesi (`TOKEN_KEY`, `TOKEN_MAC`) dibuat otomatis.
+7. Buka **Deploy › New deployment › Web app**:
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+8. Salin URL yang berakhiran `/exec`.
+
+### A3. Isi `js/config.js`
 
 ```js
-const CLIENT_ID_AWAL = 'GANTI_DENGAN_CLIENT_ID.apps.googleusercontent.com';
+GOOGLE_CLIENT_ID: '1234-xxxx.apps.googleusercontent.com',   // A1 langkah 3
+GOOGLE_API_KEY:   'AIza…',                                   // A1 langkah 4
+GOOGLE_APP_ID:    '123456789012',                            // A1 langkah 5 (Project number)
+RELAY_URL:        'https://script.google.com/macros/s/…/exec' // A2
 ```
 
-Ganti dengan Client ID dari A1, lalu simpan. Dengan begitu pembeli tidak perlu mengatur apa pun soal login Google. Kalau lupa, Admin keluarga masih bisa mengisinya nanti dari **Pengaturan › Keamanan** setelah masuk dengan akses darurat.
+Keempat nilai ini memang publik karena dipakai oleh browser. Pengamannya adalah batasan domain dan API yang sudah diatur di A1.
 
-### A3. Deploy frontend ke GitHub Pages
+### A4. Unggah aplikasi ke GitHub Pages
 
-> **Penting:** folder tempat Anda menjalankan `git init` adalah folder hasil ekstrak ZIP yang **langsung berisi `index.html`**. Jangan menjalankannya di folder di atasnya.
+> Jalankan `git init` di folder hasil ekstrak ZIP yang **langsung berisi `index.html`**.
 
-1. Ekstrak `satuatap-frontend.zip`, misal ke `C:\Proyek\satuatap-frontend\`.
-2. Buka PowerShell di folder itu: klik address bar File Explorer, ketik `powershell`, tekan Enter.
-3. Pastikan isinya benar:
-   ```powershell
-   dir
-   ```
-   Harus terlihat `index.html`, `manifest.webmanifest`, `sw.js`, serta folder `css`, `js`, dan `img`. Kalau yang terlihat justru folder lain, Anda berada di folder yang salah. Jangan lanjut sebelum ini benar.
-4. Di github.com buat repository baru, misal `satuatap`, dengan pilihan **Public** dan **tanpa** README/.gitignore/license.
-5. Jalankan perintah berikut satu per satu:
+1. Ekstrak `satuatap-frontend.zip`, isi `js/config.js` (A3), lalu buka PowerShell di folder tersebut.
+2. Jalankan `dir` dan pastikan terlihat `index.html`, `sw.js`, serta folder `css`, `js`, dan `img`.
+3. Di github.com, buat repository **Public** bernama `satuatap` tanpa README.
+4. Jalankan:
    ```powershell
    git init
    git add .
-   git commit -m "SatuAtap 1.0.0"
+   git commit -m "SatuAtap 1.1.0"
    git branch -M main
    git remote add origin https://github.com/USERNAME/satuatap.git
    git push -u origin main
    ```
-   Saat diminta password, tempel **Personal Access Token** (buat di <https://github.com/settings/tokens> → classic → centang `repo`). Saat token ditempel, layar memang tidak menampilkan apa-apa. Itu normal.
-6. Di repository: **Settings › Pages** → Source **Deploy from a branch**, Branch **main / (root)** → Save. Centang **Enforce HTTPS**.
-7. Tunggu 1–2 menit. Aplikasi bisa dibuka di `https://USERNAME.github.io/satuatap/`. Coba dulu dengan tombol **Coba demo**.
+   Saat diminta password, tempel **Personal Access Token** (dibuat di github.com/settings/tokens, jenis classic, centang `repo`). Layar memang tidak menampilkan apa pun saat token ditempel.
+5. Buka **Settings › Pages**, pilih **Deploy from a branch**, lalu **main / (root)** → Save, dan centang **Enforce HTTPS**.
+6. Tunggu 1–2 menit, lalu buka `https://USERNAME.github.io/satuatap/`. Coba **Masuk dengan Google** dengan akun Anda sendiri.
 
-**Memperbarui frontend:** ganti file yang berubah, lalu jalankan:
+### A5. Membuat & mengelola lisensi
 
-```powershell
-git add .
-git commit -m "Versi 1.0.1"
-git push
-```
+Semua fungsi di bawah dijalankan dari editor relay:
 
-Naikkan juga `VER` di `sw.js` dan `VERSION` di `js/config.js` agar HP pengguna mengambil versi baru.
-
----
-
-## Bagian B — Untuk Admin setiap keluarga
-
-Yang dibutuhkan: satu akun Google (Gmail) yang akan menjadi pemilik data keluarga, plus berkas `Kode.gs` dan `appsscript.json` dari JuniorLabs. Waktu yang dibutuhkan sekitar 10 menit.
-
-### B1. Buat proyek Apps Script
-
-1. Masuk ke akun Google keluarga, lalu buka <https://script.google.com> → **Proyek baru**.
-2. Ganti nama proyek (klik "Proyek tanpa judul") menjadi `SatuAtap Keluarga`.
-3. Klik ⚙️ **Setelan Proyek** → centang **Tampilkan file manifes "appsscript.json" di editor**.
-4. Kembali ke **Editor** (ikon `< >`):
-   - Buka `appsscript.json` → hapus semua isinya → tempel isi berkas `appsscript.json` dari JuniorLabs.
-   - Buka `Kode.gs` → hapus semua isinya → tempel isi berkas `Kode.gs`.
-   - Tekan 💾 **Simpan** (Ctrl+S).
-
-### B2. Jalankan setup (sekali)
-
-1. Di toolbar atas, pilih fungsi **`setupAppEnvironment`** lalu tekan **▶ Jalankan**.
-2. Google akan meminta izin:
-   - **Tinjau izin** → pilih akun Anda.
-   - Akan muncul layar **"Google belum memverifikasi aplikasi ini"**. Layar ini selalu muncul untuk skrip pribadi yang Anda pasang sendiri di akun Anda. Skripnya hanya berjalan di akun Anda dan datanya tetap di Drive Anda. Klik **Lanjutan** → **Buka SatuAtap Keluarga (tidak aman)** → **Izinkan**.
-   - Izin yang diminta: Spreadsheet & Drive (database), Email (pengingat tagihan), Kalender (sinkron jadwal), dan pemicu harian.
-3. Buka **Log eksekusi** di bawah editor dan **catat**:
-   - `Nama pengguna : darurat`
-   - `Kata sandi : …` ← **hanya tampil sekali.** Simpan di tempat aman. Sandi ini dipakai bila login Google bermasalah.
-4. Setup otomatis membuat folder **"SatuAtap – Data Keluarga"** di Drive (berisi spreadsheet database), mendaftarkan email Anda sebagai **Admin**, dan memasang pengingat harian pukul 07.00.
-
-> Setup aman dijalankan ulang. Kunci rahasia dan data yang sudah ada tidak akan ditimpa.
-
-### B3. Deploy sebagai Web App
-
-1. Klik **Terapkan (Deploy) › Deployment baru**.
-2. ⚙️ Jenis: **Aplikasi web**.
-   - Deskripsi: `SatuAtap 1.0`
-   - Jalankan sebagai: **Saya (email Anda)**
-   - Yang memiliki akses: **Siapa saja (Anyone)**
-3. **Terapkan** → salin **URL aplikasi web** yang berakhiran **`/exec`**.
-
-URL `/exec` ini bukan kata sandi. Semua permintaan tetap harus membawa sesi login yang sah. Meski begitu, bagikan hanya ke anggota keluarga.
-
-### B4. Buka aplikasi & masuk
-
-1. Buka alamat aplikasi dari JuniorLabs (misal `https://juniorlabs.github.io/satuatap/`) di HP.
-2. Tempel URL `/exec` → **Hubungkan**. Pertama kali bisa memakan waktu 3–8 detik.
-3. Tekan **Masuk dengan Google** memakai email yang sama dengan pemilik Apps Script.
-   - Kalau tombol Google belum muncul (Client ID belum diisi): buka **Masuk dengan akses darurat**, masukkan `darurat` dan sandi dari log, lalu isi Client ID di **Lainnya › Keamanan**.
-4. Pasang ke layar utama: menu browser › **Tambahkan ke layar utama** / **Instal aplikasi**.
-
-### B5. Lengkapi data awal (5 menit)
-
-1. **Aset › Kas & Bank** → tambahkan rekening, e-wallet, dan tunai beserta saldo hari ini.
-2. **Kalender › Tambah Rutin** → gaji (pemasukan), listrik, internet, SPP, langganan, dan tagihan tahunan (pajak kendaraan, PBB, premi).
-3. **Lainnya › Anggaran** → tap tiap amplop untuk memberi batas, atau gunakan **Bagi Gaji**.
-4. **Lainnya › Tujuan** → mulai dari **Dana Darurat**. Tentukan rekening penyimpanannya bila ada.
-5. **Lainnya › Pengaturan › Keluarga** → bila gajian tanggal 25, ubah "periode dimulai" menjadi 25.
-
-### B6. Undang pasangan & anggota (maks. 5 akun)
-
-1. **Lainnya › Anggota & Izin › Undang anggota** → isi nama, email Google, dan peran:
-   - **Pasangan**: akses penuh, kecuali mengelola anggota.
-   - **Anggota**: izin per menu (Tidak/Lihat/Ubah), dan selalu bisa mencatat transaksinya sendiri.
-2. Tekan **Salin tautan** / **Kirim via WA**. Anggota cukup membuka tautan itu lalu **Masuk dengan Google**.
-3. Agar pasangan juga melihat jadwal di Google Calendar: aktifkan **Pengaturan › Notifikasi › Sinkron ke Google Calendar**, lalu di Google Calendar Admin bagikan kalender **"Keuangan …"** ke email pasangan.
-
-### B7. Amankan akses darurat
-
-Masuk ke **Lainnya › Keamanan › Ganti sandi darurat**, lalu buat sandi baru (minimal 12 karakter, berisi huruf dan angka). Sandi awal di log eksekusi otomatis tidak berlaku lagi.
-
-Lupa sandi darurat? Di editor Apps Script jalankan fungsi `resetAksesDarurat`, lalu lihat sandi baru di log.
-
----
-
-## Bagian C — Memperbarui backend ke versi baru
-
-1. Tempel `Kode.gs` versi baru (ganti semua isi) → Simpan.
-2. **Terapkan › Kelola deployment** → ikon ✏️ pada deployment yang ada → **Versi: Versi baru** → **Terapkan**.
-
-Dengan cara ini **URL `/exec` tetap sama**, jadi anggota tidak perlu mengatur ulang. Jangan memakai "Deployment baru" karena itu menghasilkan URL berbeda.
-
----
-
-## Bagian D — Masalah umum
-
-| Gejala | Penyebab & solusi |
+| Fungsi | Kegunaan |
 |---|---|
-| "Server membalas tidak terduga" saat Hubungkan | URL salah atau akses deployment bukan **Anyone**. Pastikan URL berakhiran `/exec` dan akses = Siapa saja. |
-| "Backend belum di-setup" | `setupAppEnvironment` belum dijalankan sampai selesai. Jalankan ulang (B2). |
-| "Email … belum terdaftar di keluarga ini" | Email Google belum diundang. Admin perlu menambahkannya di Anggota & Izin. |
-| "Token Google bukan untuk aplikasi ini" | Client ID di backend berbeda dengan yang diizinkan untuk alamat GitHub Pages. Periksa A1 & A2. |
-| Tombol Google tidak muncul | Client ID belum diisi. Masuk dengan akses darurat → Keamanan → isi Client ID. |
-| Perubahan dari HP pasangan belum muncul | Sinkron otomatis berjalan tiap 1 menit dan setiap aplikasi dibuka. Paksa lewat **Pengaturan › Data & Sinkron › Sinkron sekarang**. |
-| Email pengingat tidak datang | Pastikan **Notifikasi email** aktif. Cek folder Spam. Kuota Gmail gratis ±100 email/hari. Uji lewat tombol **Kirim/sinkron sekarang**. |
-| Tampilan masih versi lama | Tutup lalu buka ulang aplikasi dua kali, atau tekan Ctrl+Shift+R di laptop. |
-| Saldo tidak cocok dengan bank | **Aset › Kas & Bank › (dompet) › Cocokkan saldo**. Selisihnya dicatat sebagai penyesuaian. |
+| `buatLisensi` | Membuat 10 kode (`SA-XXXX-XXXX-XXXX`). Kodenya muncul di **Log eksekusi** dan tercatat di sheet **Lisensi**. Untuk jumlah lain, ubah sementara angkanya di baris `jumlah = …`. |
+| `cabutLisensi('SA-…')` | Menonaktifkan lisensi (misalnya ada refund). |
+| `pulihkanLisensi('SA-…')` | Mengaktifkan kembali lisensi yang dicabut. |
+| `lepasLisensi('SA-…')` | Melepas ikatan lisensi agar bisa diaktifkan ulang, misalnya pembeli pindah akun Google. |
+
+Pemanggilan dengan parameter: buat fungsi kecil, misal `function x(){ cabutLisensi('SA-ABCD-EFGH-JKLM') }`, lalu jalankan.
+
+Sheet **Lisensi** menampilkan siapa Admin-nya, nama keluarga, daftar email anggota (maks. 5), dan waktu cek terakhir.
+
+**Kuota email:** akun Gmail biasa dapat mengirim email ke sekitar 100 penerima per hari. Kalau banyak keluarga membuka aplikasi di awal bulan, ringkasan otomatis masuk antrean dan dikirim bertahap setiap jam. Dengan Google Workspace kuotanya sekitar 1.500 per hari.
 
 ---
 
-## Bagian E — Catatan teknis & keamanan
+## Bagian B — Untuk pembeli (Admin keluarga)
 
-- **Cepat walau data banyak:** aplikasi menyimpan salinan data di perangkat (IndexedDB) sehingga langsung tampil. Perubahan diterapkan seketika lalu dikirim ke server di latar belakang. Sinkron hanya mengambil baris yang berubah. Daftar mutasi dimuat bertahap. Dalam uji dengan ±19.000 transaksi, setiap halaman tampil di bawah 100 ms.
-- **Offline:** pencatatan tetap bisa dilakukan saat sinyal hilang. Antrean dikirim otomatis saat online, dan permintaan yang terulang tidak akan tercatat ganda.
-- **Rahasia** (kunci sesi, sandi darurat dalam bentuk hash, Client ID, kunci AI) hanya disimpan di **Script Properties**. Tidak ada di kode frontend, spreadsheet, maupun log.
-- Jangan menambahkan editor lain ke proyek Apps Script. Editor proyek bisa melihat Script Properties.
-- Rumus yang diawali `=`, `+`, `-`, `@` dinetralkan sebelum masuk ke Sheets.
-- **Uang pribadi:** catatan transaksi di kategori pribadi disamarkan oleh server untuk anggota lain. Totalnya tetap terhitung di ringkasan keluarga.
+### B1. Masuk & buat data keluarga
 
-Butuh bantuan? WhatsApp dukungan JuniorLabs: **0856-1254-689**, atau gunakan menu **Lainnya › Laporkan Masalah** di aplikasi.
+1. Buka `https://USERNAME.github.io/satuatap/` di HP, lalu tekan **Masuk dengan Google**.
+2. Google akan meminta izin agar SatuAtap bisa *melihat, mengedit, membuat, dan menghapus file Google Drive tertentu yang Anda gunakan dengan aplikasi ini*. Tekan **Izinkan**.
+3. Pilih **Buat data keluarga baru**, lalu isi nama keluarga, nama panggilan, dan **kode lisensi**.
+4. Selesai. File **"SatuAtap – Data …"** otomatis dibuat di Google Drive Anda.
+5. Pasang ke layar utama lewat menu browser › **Tambahkan ke layar utama**.
+
+### B2. Isi data awal (5 menit)
+
+1. **Aset › Kas & Bank**: tambahkan rekening, e-wallet, dan uang tunai beserta saldonya hari ini.
+2. **Kalender › Tambah Rutin**: masukkan gaji, listrik, internet, SPP, langganan, dan tagihan tahunan.
+3. **Lainnya › Anggaran**: beri batas untuk tiap amplop, atau gunakan **Bagi Gaji**.
+4. **Lainnya › Tujuan**: mulai dari **Dana Darurat**.
+5. **Pengaturan › Keluarga**: kalau gajian tanggal 25, ubah periode anggaran agar dimulai tanggal 25.
+
+### B3. Undang pasangan & anggota (maks. 5 akun)
+
+1. Buka **Lainnya › Anggota & Izin › Undang anggota**, lalu isi nama, email Google, dan peran:
+   - **Pasangan**: akses penuh.
+   - **Anggota**: izin diatur per menu.
+2. File keluarga otomatis dibagikan, dan Google mengirim email undangan ke anggota tersebut.
+3. Anggota lalu membuka aplikasi, menekan **Masuk dengan Google**, memilih **Saya diundang**, dan memilih file **"SatuAtap – Data …"**.
+4. Menonaktifkan anggota akan otomatis mencabut aksesnya ke file. Data di HP anggota itu juga ikut dibersihkan.
+
+### B4. Uang pribadi suami/istri
+
+Buat kategori uang pribadi di **Lainnya › Anggaran › Uang Pribadi**. Saat pertama mencatat di kategori ini, Anda diminta membuat **PIN 6–12 angka**.
+
+Catatan dan tag dienkripsi di HP Anda, sehingga anggota lain hanya melihat nominalnya, termasuk saat membuka spreadsheet. **PIN tidak bisa dipulihkan.** Kalau lupa, catatan lama tidak bisa dibaca lagi, tetapi nominalnya tetap aman.
+
+### B5. Hal yang perlu diketahui
+
+- **Sinkron otomatis:** cukup login sekali per HP. Setelah itu aplikasi menyambung ke Google sendiri tanpa perlu diketuk. Tombol kuning **Sinkronkan** hanya muncul bila Google mencabut izin, misalnya akses SatuAtap dihapus di akun Google atau tidak dipakai lebih dari 6 bulan. Ketuk sekali untuk login ulang.
+- **Pengingat tagihan** hanya tampil di dalam aplikasi: Beranda (≤ 3 hari lagi) dan Kalender. Tidak ada email pengingat. Pengingat lewat Telegram/WhatsApp menyusul.
+- **Email ringkasan bulanan** dikirim ke Admin & Pasangan saat aplikasi pertama kali dibuka di periode baru. Bisa dimatikan di **Lainnya › Notifikasi**.
+- **Spreadsheet:** tab Transaksi, Dompet, dan lainnya diperbarui otomatis sekali sehari. Jangan mengubah sheet tersembunyi `_log` karena itu sumber data aplikasi.
+
+---
+
+## Bagian C — Skrip Pendamping (opsional): jadwal di Google Calendar
+
+Untuk keluarga yang ingin tagihan, cicilan, dan acara muncul otomatis di **Google Calendar**. Skrip ini tidak mengirim email. Kalendernya bisa dibagikan ke pasangan, dan Google Calendar memberi notifikasi pukul 15.00 sehari sebelum jatuh tempo.
+
+1. Di aplikasi, buka **Lainnya › Notifikasi › Salin ID file**.
+2. Buka <https://script.google.com> dengan akun **Admin keluarga** (pemilik file), lalu buat **Proyek baru** bernama `SatuAtap Pendamping`.
+3. Buka **Setelan Proyek**, centang **Tampilkan appsscript.json**, lalu tempel isi `appsscript-pendamping.json`.
+4. Tempel isi `Pendamping.gs` ke `Kode.gs`, lalu ganti `TEMPEL_ID_FILE_DI_SINI` dengan ID file dari langkah 1. Simpan.
+5. Pilih fungsi **`setupPendamping`** lalu tekan **▶ Jalankan**.
+   - Akan muncul layar **"Google belum memverifikasi aplikasi ini"**. Ini normal untuk skrip yang Anda pasang sendiri di akun Anda. Klik **Lanjutan** → **Buka SatuAtap Pendamping (tidak aman)** → **Izinkan**.
+   - Skrip hanya *membaca* file keluarga dan menulis ke kalender "Keuangan …" milik Anda.
+6. Selesai. Setiap pagi sekitar pukul 06.00, kalender diperbarui untuk 60 hari ke depan. Jadwal yang sudah lunas diberi tanda ✓.
+7. Agar pasangan melihat kalender yang sama: buka Google Calendar, lalu pilih **Keuangan …** › **Setelan & berbagi** › tambahkan email pasangan.
+
+Untuk berhenti, jalankan fungsi `hentikanPendamping`.
+
+---
+
+## Bagian D — Memperbarui versi
+
+- **Aplikasi:** ganti file, naikkan `VERSION` di `js/config.js` dan `VER` di `sw.js`, lalu jalankan `git add .`, `git commit -m "Versi …"`, dan `git push`. Semua pembeli otomatis mendapat versi baru.
+- **Relay:** tempel kode baru, lalu buka **Deploy › Manage deployments** › ✏️ › **Version: New version** › Deploy. URL `/exec` tetap sama.
+- **Data keluarga** tidak perlu migrasi. Format log tetap kompatibel.
+
+---
+
+## Bagian E — Masalah umum
+
+| Gejala | Solusi |
+|---|---|
+| "GOOGLE_CLIENT_ID … masih kosong" | Isi `js/config.js` (A3) lalu push ulang. |
+| Pop-up login tidak muncul | Izinkan pop-up untuk situs ini. Di iPhone yang memasang aplikasi ke layar utama, login otomatis memakai mode pindah halaman dan langsung kembali ke aplikasi. |
+| "Error 400: redirect_uri_mismatch" | `https://USERNAME.github.io/satuatap/oauth.html` belum ada di **Authorized redirect URIs** (A1 langkah 3). |
+| "GOOGLE_CLIENT_SECRET belum diisi" | Isi Script Properties relay (A2 langkah 5). |
+| Anggota tidak menemukan file saat "Saya diundang" | Pastikan Admin sudah mengundang email yang sama persis, lalu cari di tab "Dibagikan kepada saya" pada pemilih file. |
+| "Akun … belum tercatat di lisensi" | Admin cukup membuka aplikasi sekali agar daftar anggota diperbarui ke server lisensi. |
+| "Kode lisensi sudah dipakai akun Google lain" | Jalankan `lepasLisensi('SA-…')` di relay (A5), lalu minta pembeli mengaktifkan ulang. |
+| Tombol **Sinkronkan** muncul | Izin Google dicabut atau server lisensi sedang tidak bisa dihubungi. Ketuk tombolnya untuk login ulang. |
+| Data pasangan belum muncul | Sinkron otomatis berjalan tiap 1 menit dan saat aplikasi dibuka. Bisa juga dipaksa lewat **Pengaturan › Data & Sinkron › Sinkron sekarang**. |
+| Saldo tidak cocok dengan bank | Buka **Aset › Kas & Bank › (dompet) › Cocokkan saldo**. |
+
+---
+
+## Bagian F — Catatan teknis & privasi
+
+- **Data keuangan** hanya ada di Google Drive keluarga dan di HP anggotanya. Relay JuniorLabs **tidak** menerima transaksi.
+- **Yang diketahui relay:** kode lisensi, email Admin & anggota (maks. 5), nama keluarga, dan ID file. Angka ringkasan bulanan hanya lewat sebentar di antrean email, lalu isinya dihapus setelah terkirim.
+- **Sinkron otomatis:** saat login, relay menukar kode login Google menjadi *kunci perpanjangan*. Kunci ini **disegel** (dienkripsi dan diberi tanda tangan, terikat ke email pemiliknya) lalu **disimpan di HP pengguna**, bukan di relay. Kunci di HP tidak berguna tanpa relay, dan relay tidak bisa membuka data tanpa kunci dari HP. Keluar dari aplikasi otomatis mencabut kunci tersebut di Google.
+- **Kuota email relay** dipakai hanya untuk ringkasan bulanan dan laporan masalah. Akun juniorlabs.id@gmail.com (Gmail biasa) bisa mengirim ke sekitar 100 penerima per hari; bila lebih, email masuk antrean dan dikirim bertahap.
+- **Kecepatan:** data disimpan di HP sehingga aplikasi langsung tampil. Sinkron hanya mengecek versi file di Drive, dan baru membaca baris log baru bila ada perubahan. Dalam uji dengan sekitar 19.000 transaksi, setiap halaman tampil di bawah 30 ms (laptop).
+- **Kuota Google Sheets API:** 300 baca per menit untuk seluruh proyek. Karena aplikasi cukup mengecek versi file di Drive dulu, kuota ini cukup untuk ratusan keluarga. Bila suatu saat kurang, kenaikan kuota bisa diajukan gratis di Cloud Console.
+- **Beberapa HP bersamaan:** setiap perubahan ditambahkan sebagai baris baru di `_log`, sehingga pencatatan suami dan istri di waktu yang sama tidak saling menimpa.
+- **Izin per menu** untuk peran Anggota dijaga oleh aplikasi. Anggota yang diberi akses file secara teknis tetap bisa membuka spreadsheet. Catatan uang pribadi tetap terenkripsi.
+
+Butuh bantuan? WhatsApp dukungan JuniorLabs **0856-1254-689**, atau gunakan menu **Lainnya › Laporkan Masalah** di aplikasi.

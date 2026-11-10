@@ -1,7 +1,7 @@
 /* Service worker SatuAtap — cache kerangka aplikasi agar terbuka instan & bisa offline.
  * Data keluarga TIDAK di-cache di sini (disimpan di IndexedDB oleh aplikasi). */
-const VER = 'satuatap-1.0.0';
-const SHELL = [ "./", "./index.html", "./manifest.webmanifest",   "./css/style.css",   "./img/apple-touch-icon.png",   "./img/favicon-32.png",   "./img/icon-192.png",   "./img/icon-512.png",   "./img/icon-maskable-512.png",   "./img/logo-wide.png",   "./js/api.js",   "./js/app.js",   "./js/calc.js",   "./js/charts.js",   "./js/config.js",   "./js/demo.js",   "./js/icons.js",   "./js/pages/anggaran.js",   "./js/pages/aset.js",   "./js/pages/beranda.js",   "./js/pages/catat.js",   "./js/pages/kalender.js",   "./js/pages/lainnya.js",   "./js/pages/mutasi.js",   "./js/pages/rapor.js",   "./js/pages/tujuan.js",   "./js/pages/utang.js",   "./js/store.js",   "./js/ui.js",   "./js/util.js",   "./js/voice.js",  ];
+const VER = 'satuatap-1.2.0';
+const SHELL = [ "./", "./index.html", "./manifest.webmanifest", "./css/style.css", "./img/apple-touch-icon.png", "./img/favicon-32.png", "./img/icon-192.png", "./img/icon-512.png", "./img/icon-maskable-512.png", "./img/logo-wide.png", "./js/api.js", "./js/app.js", "./js/calc.js", "./js/charts.js", "./js/cloud.js", "./js/config.js", "./js/demo.js", "./js/gapi.js", "./js/icons.js", "./js/pages/anggaran.js", "./js/pages/aset.js", "./js/pages/beranda.js", "./js/pages/catat.js", "./js/pages/kalender.js", "./js/pages/lainnya.js", "./js/pages/mutasi.js", "./js/pages/rapor.js", "./js/pages/tujuan.js", "./js/pages/utang.js", "./js/priv.js", "./js/store.js", "./js/ui.js", "./js/util.js", "./js/voice.js" ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VER).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });

@@ -60,16 +60,18 @@
     if (hd) {
       tb.innerHTML = `<button class="icon-btn" data-act="back" aria-label="Kembali">${I('arrow-left')}</button>
         <div class="tb-title">${hd.crumb ? `<div class="tb-crumb">${U.esc(hd.crumb)}</div>` : ''}<h1>${U.esc(hd.title)}</h1></div>
-        <div class="tb-actions">${hd.right || ''}</div>`;
+        <div class="tb-actions">${authChip()}${hd.right || ''}</div>`;
     } else {
       tb.innerHTML = `<div class="brand" data-act="go" data-to="beranda"><img src="img/icon-192.png" alt="" width="34" height="34"><div><b>SatuAtap</b><span class="fam"><i class="dot ${Store.mode === 'demo' ? 'demo' : (UI.netOk ? 'ok' : 'off')}"></i>${U.esc(fam)}</span></div></div>
-        <div class="tb-actions"><button class="icon-btn" data-act="toggle-hide" aria-label="Sembunyikan nominal">${I(UI.hide() ? 'eye-off' : 'eye')}</button>
+        <div class="tb-actions">${authChip()}<button class="icon-btn" data-act="toggle-hide" aria-label="Sembunyikan nominal">${I(UI.hide() ? 'eye-off' : 'eye')}</button>
         <button class="avatar sm" style="background:${(Store.me && Store.me.warna) || '#0F5E59'}" data-act="go" data-to="pengaturan" aria-label="Profil">${U.esc(U.initials(Store.me && Store.me.nama))}</button></div>`;
     }
     $('#fab').hidden = !!def.noFab;
     $('#demo-banner').hidden = Store.mode !== 'demo';
     document.title = (hd ? hd.title + ' · ' : '') + 'SatuAtap';
   };
+  const authChip = () => UI._auth ? `<button class="chip warn auth-chip" data-act="reauth" title="Sesi Google berakhir — ketuk untuk sinkron">${I('refresh-cw')} Sinkronkan</button>` : '';
+  UI.authState = on => { if (!!UI._auth === !!on) return; UI._auth = !!on; if (App.ready && UI.pages[UI.cur]) UI.chrome(UI.pages[UI.cur]); };
   UI.netOk = true;
   UI.netState = ok => { if (UI.netOk !== ok) { UI.netOk = ok; const d = $('.brand .dot'); if (d) d.className = 'dot ' + (ok ? 'ok' : 'off'); } };
 
