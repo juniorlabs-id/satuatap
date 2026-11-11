@@ -93,7 +93,11 @@ Keempat nilai ini memang publik karena dipakai oleh browser. Pengamannya adalah 
 
 - **Harga Emas:** status harga hari ini, sumbernya, pesan galat bila pengambilan terakhir gagal, tombol **Ambil harga sekarang**, dan isian manual harga beli/buyback per gram yang langsung dipakai semua keluarga.
 
-**Harga emas otomatis.** Relay mengambil harga tiap 2 jam berurutan dari: halaman harga Logam Mulia (Antam) → harga-emas.org → harga spot dunia (dikonversi ke Rupiah dengan rasio hari sebelumnya). Riwayat tersimpan di sheet **HargaEmas** pada spreadsheet relay. Kalau situs sumber berubah tampilan dan semua cara gagal, harga terakhir tetap dipakai, ubin **Harga Emas** di Konsol diberi tanda **!**, dan Anda cukup mengisi harga manual di Konsol sampai relay diperbaiki. Harga manual hari itu tidak ditimpa pengambilan otomatis.
+**Harga emas otomatis.** Relay mengambil harga **emas batangan Antam 1 gram** tiap 2 jam, hanya dari situs resmi Logam Mulia: harga beli dari `logammulia.com/harga-hari-ini/emas?tab=beli` (kolom *Harga Dasar*, sebelum PPh 0,25%) dan buyback dari `…?tab=jual` (kolom *Harga Emas*, sebelum potongan PPh). Riwayat tersimpan di sheet **HargaEmas** pada spreadsheet relay. Relay tidak lagi berpindah ke situs lain. Kalau situs Logam Mulia tidak terbaca (diblokir, sedang gangguan, atau tata letaknya berubah), harga Antam terakhir tetap dipakai, ubin **Harga Emas** di Konsol diberi tanda **!**, dan Anda bisa mengisi harga manual di Konsol. Angka yang melompat lebih dari 12% dari harga terakhir dianggap salah baca dan tidak disimpan. Harga manual hari itu tidak ditimpa pengambilan otomatis.
+
+**Jembatan Vercel (wajib).** Situs Logam Mulia menolak permintaan dari server Google (HTTP 403), jadi relay mengambil harga lewat fungsi kecil `api/emas.js` yang ikut di repo aplikasi dan berjalan gratis di Vercel (region Singapura, diatur `vercel.json`). Pastikan folder `api/` dan `vercel.json` ikut di-push. Cek di browser: `https://satuatap.vercel.app/api/emas` harus membalas `"success":true` dengan harga beli & buyback; tambahkan `?cek=1` untuk melihat diagnosis. Kalau alamat situs Anda berbeda, isi Script Property relay `EMAS_PROXY` dengan alamat lengkapnya.
+
+**Memeriksa koneksi ke Logam Mulia:** di editor relay, pilih fungsi **`cekHargaEmas`** lalu ▶ Jalankan. Log menampilkan apakah kedua halaman terbuka, angka 1 gram yang terbaca, dan cuplikan teks halaman.
 
 Superadmin juga bisa **membuat data keluarga tanpa kode lisensi**; lisensi internal dibuat otomatis. Untuk menambah superadmin lain, isi Script Property relay `SUPERADMIN` dengan email (pisahkan dengan koma).
 
@@ -183,9 +187,9 @@ Untuk berhenti, jalankan fungsi `hentikanPendamping`.
 - **Data keluarga** tidak perlu migrasi. Format log tetap kompatibel.
 
 **Khusus pembaruan ke 1.3 (Fase 2):**
-1. Unggah semua file aplikasi baru (ada file baru: `js/calc2.js`, `js/pages/emas.js`, `js/pages/investasi.js`, `js/pages/zakat.js`).
+1. Unggah semua file aplikasi baru (ada file baru: `js/calc2.js`, `js/pages/emas.js`, `js/pages/investasi.js`, `js/pages/zakat.js`, serta `api/emas.js` dan `vercel.json` untuk jembatan harga emas).
 2. Relay: tempel `Relay.gs` baru, lalu **Deploy › Manage deployments › ✏️ › Version: New version › Deploy**.
-3. Jalankan sekali fungsi **`setupRelay`** dari editor relay. Ini memasang pemicu `perbaruiHargaEmas` (tiap 2 jam) dan mengambil harga pertama. Rahasia yang sudah ada tidak ditimpa.
+3. Jalankan sekali fungsi **`setupRelay`** dari editor relay. Ini memasang pemicu `perbaruiHargaEmas` (tiap 2 jam) dan mengambil harga pertama; rahasia yang sudah ada tidak ditimpa. Lalu jalankan **`cekHargaEmas`** untuk memastikan harga Antam terbaca.
 4. Buka aplikasi dengan akun superadmin › **Lainnya › JuniorLabs › Harga Emas** dan pastikan harga sudah tampil.
 
 **Yang baru di 1.3:** Brankas Emas (koleksi per keping & gramasi, multi-pemilik, tautan ke Tujuan, tren akumulasi, jual sebagian + PPh 22, gadai/tebus, peringatan harga, simulasi jual), Investasi & aset lain (saham, reksa dana, SBN, deposito, kripto, properti, kendaraan), Target Alokasi, Zakat & Sedekah (mal dengan nisab & haul, penghasilan, fitrah, qurban, sedekah/donasi), dan Ringkasan SPT per tahun (unduh CSV). Tombol Catat Cepat kini bulat, dan setiap panel yang muncul dari bawah bisa ditutup dengan menggesernya ke bawah.

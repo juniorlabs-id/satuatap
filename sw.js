@@ -1,6 +1,6 @@
 /* Service worker SatuAtap — cache kerangka aplikasi agar terbuka instan & bisa offline.
  * Data keluarga TIDAK di-cache di sini (disimpan di IndexedDB oleh aplikasi). */
-const VER = 'satuatap-1.3.0';
+const VER = 'satuatap-1.3.2';
 const SHELL = [ "./", "./index.html", "./oauth.html", "./manifest.webmanifest", "./css/style.css", "./img/apple-touch-icon.png", "./img/favicon-32.png", "./img/icon-192.png", "./img/icon-512.png", "./img/icon-maskable-512.png", "./img/logo-wide.png", "./js/api.js", "./js/app.js", "./js/calc.js", "./js/calc2.js", "./js/charts.js", "./js/cloud.js", "./js/config.js", "./js/demo.js", "./js/gapi.js", "./js/icons.js", "./js/pages/anggaran.js", "./js/pages/aset.js", "./js/pages/beranda.js", "./js/pages/catat.js", "./js/pages/emas.js", "./js/pages/investasi.js", "./js/pages/kalender.js", "./js/pages/konsol.js", "./js/pages/lainnya.js", "./js/pages/mutasi.js", "./js/pages/rapor.js", "./js/pages/tujuan.js", "./js/pages/utang.js", "./js/pages/zakat.js", "./js/priv.js", "./js/store.js", "./js/ui.js", "./js/util.js", "./js/voice.js" ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VER).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
@@ -10,7 +10,7 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin) return;   // GAS, Google, font: lewat jaringan biasa
+  if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.indexOf('/api/') === 0) return;   // GAS, Google, font, /api: lewat jaringan biasa
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(hit => {
       const net = fetch(e.request).then(r => { if (r.ok) { const cp = r.clone(); caches.open(VER).then(c => c.put(e.request, cp)); } return r; }).catch(() => hit);

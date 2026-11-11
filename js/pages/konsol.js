@@ -104,7 +104,7 @@
           <button class="btn block" data-act="ks-emas-ambil">${I('refresh-cw')} Ambil harga sekarang</button>
           ${UI.sec('Isi manual untuk hari ini')}<div class="card" id="ks-emas"><div class="grid2">${UI.field('Harga beli / gram', UI.rpInput('beli', h && h.beli))}${UI.field('Buyback / gram', UI.rpInput('buyback', h && h.buyback))}</div>
             <button class="btn block ghost" data-act="ks-emas-manual">${I('save')} Simpan untuk semua keluarga</button></div>
-          <p class="muted small">Relay mengambil harga otomatis tiap 2 jam (Logam Mulia → harga-emas.org → harga spot dunia). Harga manual hari ini tidak ditimpa pengambilan otomatis. Keluarga juga bisa memakai harga manual sendiri di Brankas Emas › Harga.</p>`;
+          <p class="muted small">Relay mengambil harga 1 gram emas batangan Antam tiap 2 jam langsung dari logammulia.com (tab Beli untuk harga beli, tab Jual untuk buyback). Bila situs tidak terbaca, harga Antam terakhir tetap dipakai — tidak berpindah ke sumber lain. Harga manual hari ini tidak ditimpa pengambilan otomatis. Keluarga juga bisa memakai harga manual sendiri di Brankas Emas › Harga.</p>`;
       }
       if (p === 'buat') return tiles + `
         <div class="card" id="ks-form"><div class="grid2">${UI.field('Jumlah kode', '<input type="number" name="jumlah" min="1" max="50" value="1">')}${UI.field('Catatan', '<input name="catatan" maxlength="120" placeholder="mis. Shopee #12345 / nama pembeli">')}</div>
