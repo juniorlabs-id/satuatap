@@ -5,7 +5,7 @@
 (function () {
   const I = (n, c) => UI.icon(n, c);
   const SESS = 'sa:sess';
-  const App = { ready: false };
+  const App = Object.assign(window.App || {}, { ready: false });   // modul halaman bisa menambah fungsi lebih dulu
   window.App = App;
 
   App.applyTheme = () => {
@@ -45,6 +45,7 @@
 
   Store.on(why => {
     if (why === 'sync' || why === 'local') { scheduleRender(); Priv.decryptAll(); }
+    if (why === 'local' && App.notifAmplop) { clearTimeout(App._amp); App._amp = setTimeout(() => { try { App.notifAmplop(); } catch (e) {} }, 1500); }
     if ((why === 'sync' || why === 'synced') && Store.mode === 'live') App.afterSync();
     if (why === 'denied' && Store.mode === 'live' && App.ready) {
       Store.IDB.del(Store.ns() + 'snap'); Store.IDB.del(Store.ns() + 'outbox'); localStorage.removeItem('sa:file:' + Auth.email);
@@ -84,6 +85,9 @@
     Store.me = Object.assign({}, Store.me, { id: m.id, nama: m.nama, email: m.email, peran: m.peran, warna: m.warna, izin: m.izin || {} });
     App.license(); App.monthly(); App.syncMembers(); App.mirror();
     if (window.Harga) Harga.fetch().catch(() => {});
+    if (App.ambilKotak) { App.ambilKotak().catch(() => {}); }
+    if (App.syncAlertEmas) App.syncAlertEmas();
+    if (App.notifTagihan) setTimeout(() => { try { App.notifTagihan(); } catch (e) {} }, 4000);
     App.checkSuper().then(v => { if (v && UI.cur === 'lainnya' && !document.querySelector('[data-to="konsol"]')) UI.render(); }).catch(() => {});
   }, 1500);
 

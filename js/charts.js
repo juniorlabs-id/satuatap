@@ -28,13 +28,14 @@
     opt = opt || {};
     const W = 340, H = opt.h || 150, pad = { l: 6, r: 6, t: 16, b: 22 };
     if (!pts.length) return '';
-    const vals = pts.map(p => p.bal), lo = Math.min(...vals), hi = Math.max(...vals), min = opt.fit ? lo - (hi - lo) * 0.08 : Math.min(0, lo), max = opt.fit ? hi + (hi - lo) * 0.08 + (hi === lo ? 1 : 0) : Math.max(1, hi);
+    const vals = pts.map(p => p.bal).concat(opt.compare ? opt.compare.map(p => p.bal) : []), lo = Math.min(...vals), hi = Math.max(...vals), min = opt.fit ? lo - (hi - lo) * 0.08 : Math.min(0, lo), max = opt.fit ? hi + (hi - lo) * 0.08 + (hi === lo ? 1 : 0) : Math.max(1, hi);
     const x = i => pad.l + (i / Math.max(1, pts.length - 1)) * (W - pad.l - pad.r);
     const y = v => pad.t + (1 - (v - min) / (max - min || 1)) * (H - pad.t - pad.b);
     const path = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.bal).toFixed(1)).join(' ');
     let s = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="${U.esc(opt.aria || 'Grafik garis')}">`;
     if (min < 0) s += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(0)}" y2="${y(0)}" class="zero"/>`;
     s += `<path d="${path} L${x(pts.length - 1)} ${H - pad.b} L${x(0)} ${H - pad.b} Z" class="area"/>`;
+    if (opt.compare) s += `<path d="${opt.compare.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.bal).toFixed(1)).join(' ')}" class="line2"/>`;
     s += `<path d="${path}" class="line"/>`;
     if (opt.mark != null && pts[opt.mark]) s += `<circle cx="${x(opt.mark)}" cy="${y(pts[opt.mark].bal)}" r="5" class="dot-bad"/>`;
     const ticks = opt.ticks || [0, Math.floor(pts.length / 2), pts.length - 1];

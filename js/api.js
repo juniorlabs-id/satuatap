@@ -23,6 +23,10 @@
       if (Store.mode === 'demo') {
         await new Promise(r => setTimeout(r, 120));
         if (action === 'laporan.kirim') return { success: true, data: { tiket: 'DEMO-' + Math.floor(Math.random() * 9000 + 1000) }, message: 'Mode demo: laporan tidak benar-benar dikirim.' };
+        if (action === 'tg.info') return { success: true, data: { aktif: true, bot: 'SatuAtapBot', saya: true, terhubung: [{ email: 'dimas@contoh.id', nama: 'Dimas', username: 'dimas' }], demo: true } };
+        if (action === 'tg.kode') return { success: true, data: { kode: 'DEMO1234', bot: 'SatuAtapBot', link: 'https://t.me/SatuAtapBot', berlaku: 15 }, message: 'Mode demo: tautan contoh.' };
+        if (action === 'tg.ambil') { const n = (window.Demo && Demo.kotakDiambil) ? [] : [{ id: 'k1', teks: 'makan siang 45rb gopay', waktu: new Date(Date.now() - 36e5).toISOString(), sumber: 'telegram' }, { id: 'k2', teks: 'bensin 50.000', waktu: new Date(Date.now() - 18e5).toISOString(), sumber: 'wa' }]; window.Demo = Object.assign(window.Demo || {}, { kotakDiambil: true }); return { success: true, data: { item: n } }; }
+        if (action === 'tg.kirim') return { success: true, data: { terkirim: 0, demo: true } };
         return { success: true, data: { aktif: true, demo: true } };
       }
       if (!Relay.enabled()) return { success: false, off: true, message: 'Server lisensi belum diatur (RELAY_URL kosong).' };

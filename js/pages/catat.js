@@ -211,11 +211,12 @@
         ${isT ? `<div class="grid2">${UI.field('Biaya admin', UI.rpInput('biaya', st.biaya, '0'), 'Dihitung sebagai pengeluaran')}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${st.tanggal}">`)}</div>` : ''}
         <div class="chips">${[['Hari ini', U.today()], ['Kemarin', U.addDays(U.today(), -1)]].map(d => `<button class="chip ${st.tanggal === d[1] ? 'on' : ''}" data-date="${d[1]}">${d[0]}</button>`).join('')}</div>
         ${UI.field('Catatan', `<input name="catatan" maxlength="140" placeholder="mis. Makan siang soto" value="${U.esc(st.catatan)}">`)}
+        ${(edit && edit.lampiran) || pre.lampiran ? `<a class="link" href="https://drive.google.com/file/d/${encodeURIComponent((edit && edit.lampiran) || pre.lampiran)}/view" target="_blank" rel="noopener">${I('paperclip')} Lihat foto struk</a>` : ''}
         <div class="grid2">${Store.members().length > 1 ? UI.field('Dibayar oleh', `<select name="dibayarOleh">${UI.memberOpts(st.dibayarOleh)}</select>`) : ''}${UI.field('Tag', `<input name="tag" maxlength="40" placeholder="mis. liburan-bali" value="${U.esc(st.tag)}">`)}</div>
         ${st.jenis === 'keluar' && !edit ? `<div class="chips">
             <button class="chip ${st.split ? 'on' : ''}" data-x="split">${I('receipt')} Pecah struk</button>
             <button class="chip ${st.patungan ? 'on' : ''}" data-x="patungan">${I('users')} Patungan</button>
-            ${Voice.supported() ? `<button class="chip" data-x="voice">${I('mic')} Suara</button>` : ''}</div>
+            ${Voice.supported() ? `<button class="chip" data-x="voice">${I('mic')} Suara</button>` : ''}${window.AI && AI.siap() ? `<button class="chip" data-x="struk">${I('camera')} Foto struk</button>` : ''}</div>
             ${st.split ? splitHtml() : ''}${st.patungan ? patunganHtml() : ''}` : ''}`;
       UI.bindRp(body);
     }
@@ -265,6 +266,7 @@
       else if (b.dataset.x === 'split') st.split = st.split ? null : [{ kategoriId: Store.kategori('keluar')[0].id, jumlah: 0 }];
       else if (b.dataset.x === 'patungan') st.patungan = st.patungan ? null : [{ nama: '', jumlah: 0 }];
       else if (b.dataset.x === 'voice') { s.close(); UI.voiceCatat(); return; }
+      else if (b.dataset.x === 'struk') { s.close(); UI.fotoStruk(); return; }
       else if (b.dataset.sadd !== undefined) st.split.push({ kategoriId: Store.kategori('keluar')[0].id, jumlah: 0 });
       else if (b.dataset.sdel) st.split.splice(+b.dataset.sdel, 1);
       else if (b.dataset.padd !== undefined) st.patungan.push({ nama: '', jumlah: 0 });
@@ -319,7 +321,7 @@
         if (!(await UI.commitPriv(ops))) return;
         s.close(); UI.toast('Perubahan disimpan.'); return;
       }
-      const mk = (o) => Object.assign({ id: U.uid('t'), kategoriId: '', walletTujuan: '', biaya: 0, sumber: pre.sumber || 'app', refId: pre.refId || '', periodeRef: pre.periodeRef || '', dicatatOleh: me, dibuat: now, riwayat: [] }, base, o);
+      const mk = (o) => Object.assign({ id: U.uid('t'), kategoriId: '', walletTujuan: '', biaya: 0, sumber: pre.sumber || 'app', lampiran: pre.lampiran || '', refId: pre.refId || '', periodeRef: pre.periodeRef || '', dicatatOleh: me, dibuat: now, riwayat: [] }, base, o);
       if (st.jenis === 'transfer') ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jumlah: j, walletTujuan: st.walletTujuan, biaya: st.biaya || 0, kategoriId: '' }) });
       else {
         let mine = j;
@@ -424,6 +426,7 @@
     if (!o) return UI.toast('Jadwal tidak ditemukan.', 'warn');
     if (o.kind === 'acara') return UI.catat({ preset: { jenis: 'keluar', jumlah: o.sisa, catatan: o.nama, tanggal: U.today() } });
     if (o.kind === 'tujuan') return UI.go('tujuan/' + o.ref.id);
+    if (o.kind === 'rapat') return UI.go('rapat');
     const me = Store.me.email, now = new Date().toISOString();
     const cicKat = (Store.t.Kategori.find(k => /cicilan/i.test(k.nama) && k.jenis === 'keluar') || {}).id || '';
     const mkRow = (jumlah, walletId, tanggal) => {

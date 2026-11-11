@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.3 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.5 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -9,7 +9,10 @@
 | **Aplikasi** (GitHub Pages) | `index.html`, `css/`, `js/`, `img/` | JuniorLabs | Sekali, dipakai semua pembeli |
 | **Relay** (Apps Script JuniorLabs) | `Relay.gs` + `appsscript-relay.json` | JuniorLabs | Sekali |
 | **Data keluarga** | 1 file Google Sheets "SatuAtap – Data …" | Dibuat otomatis oleh aplikasi | Per keluarga, di Drive Admin keluarga |
-| **Skrip Pendamping** (opsional) | `Pendamping.gs` — jadwal tagihan ke Google Calendar | Admin keluarga yang menginginkannya | Opsional |
+| **Fungsi Vercel** | `api/emas.js` (harga emas), `api/tg.js` (jembatan Telegram), `vercel.json` | JuniorLabs | Sekali (ikut repo) |
+| **Bot Telegram** @SatuAtapBot | Dibuat lewat @BotFather, token di Script Properties relay | JuniorLabs | Sekali (Bagian G) |
+| **Skrip Pendamping** (opsional) | `Pendamping.gs` — Google Calendar, pengingat Telegram/WA pukul 08.00, catat lewat WA | Admin keluarga yang menginginkannya | Opsional (Bagian C) |
+| **Kunci Gemini** (opsional) | Untuk Tanya AI, foto struk, insight mingguan | Tiap keluarga, disimpan hanya di HP | Opsional (Bagian H) |
 
 Pembeli **tidak perlu** membuka Apps Script, men-deploy, atau menyalin URL. Mereka cukup membuka aplikasi, menekan **Masuk dengan Google**, lalu memasukkan kode lisensi.
 
@@ -168,21 +171,40 @@ Catatan dan tag dienkripsi di HP Anda, sehingga anggota lain hanya melihat nomin
 
 ---
 
-## Bagian C — Skrip Pendamping (opsional): jadwal di Google Calendar
+## Bagian C — Skrip Pendamping (opsional): kalender, pengingat Telegram & WhatsApp
 
-Untuk keluarga yang ingin tagihan, cicilan, dan acara muncul otomatis di **Google Calendar**. Skrip ini tidak mengirim email. Kalendernya bisa dibagikan ke pasangan, dan Google Calendar memberi notifikasi pukul 15.00 sehari sebelum jatuh tempo.
+Skrip ini dipasang **Admin keluarga** di akun Google-nya sendiri, untuk hal yang harus berjalan walau aplikasi tidak dibuka. Setiap pagi sekitar pukul **08.00** skrip ini:
 
-1. Di aplikasi, buka **Lainnya › Notifikasi › Salin ID file**.
+- mengisi kalender **"Keuangan …"** di Google Calendar untuk 60 hari ke depan;
+- mengirim pengingat tagihan & cicilan **H-7, H-3, H-1, dan hari H** ke Telegram setiap anggota yang sudah menghubungkan @SatuAtapBot, plus pengingat Rapat Keuangan;
+- (opsional) mengirim pengingat yang sama ke **WhatsApp** lewat akun Fonnte milik keluarga.
+
+Tanpa Pendamping, pengingat Telegram tetap terkirim **saat salah satu anggota membuka aplikasi** (tagihan ≤ 3 hari, amplop 80%/100%, insight mingguan, alert harga emas dari relay).
+
+### C1. Pasang
+1. Di aplikasi, buka **Lainnya › Notifikasi › Salin pengaturan Pendamping**. Yang tersalin adalah dua baris `FILE_ID` dan `RELAY_URL`.
 2. Buka <https://script.google.com> dengan akun **Admin keluarga** (pemilik file), lalu buat **Proyek baru** bernama `SatuAtap Pendamping`.
-3. Buka **Setelan Proyek**, centang **Tampilkan appsscript.json**, lalu tempel isi `appsscript-pendamping.json`.
-4. Tempel isi `Pendamping.gs` ke `Kode.gs`, lalu ganti `TEMPEL_ID_FILE_DI_SINI` dengan ID file dari langkah 1. Simpan.
+3. Buka ⚙️ **Setelan Proyek**, centang **Tampilkan file manifes appsscript.json**, lalu tempel isi `appsscript-pendamping.json` ke `appsscript.json`.
+4. Tempel isi `Pendamping.gs` ke `Kode.gs`. Ganti dua baris `const FILE_ID = …` dan `const RELAY_URL = …` di bagian atas dengan dua baris yang disalin di langkah 1. Simpan.
 5. Pilih fungsi **`setupPendamping`** lalu tekan **▶ Jalankan**.
    - Akan muncul layar **"Google belum memverifikasi aplikasi ini"**. Ini normal untuk skrip yang Anda pasang sendiri di akun Anda. Klik **Lanjutan** → **Buka SatuAtap Pendamping (tidak aman)** → **Izinkan**.
-   - Skrip hanya *membaca* file keluarga dan menulis ke kalender "Keuangan …" milik Anda.
-6. Selesai. Setiap pagi sekitar pukul 06.00, kalender diperbarui untuk 60 hari ke depan. Jadwal yang sudah lunas diberi tanda ✓.
-7. Agar pasangan melihat kalender yang sama: buka Google Calendar, lalu pilih **Keuangan …** › **Setelan & berbagi** › tambahkan email pasangan.
+   - Log menampilkan "✅ Pendamping aktif …" dan langsung menjalankan pengiriman pertama.
+6. Agar pasangan melihat kalender yang sama: buka Google Calendar, lalu pilih **Keuangan …** › **Setelan & berbagi** › tambahkan email pasangan.
 
-Untuk berhenti, jalankan fungsi `hentikanPendamping`.
+Untuk berhenti, jalankan fungsi `hentikanPendamping`. Kalender bisa dimatikan dengan mengubah `const KALENDER = false`.
+
+> **Sudah memasang Pendamping versi lama?** Tempel `Pendamping.gs` dan `appsscript-pendamping.json` yang baru (ada izin baru: kirim ke internet & alamat email), isi `RELAY_URL`, lalu jalankan `setupPendamping` sekali lagi dan izinkan.
+
+### C2. WhatsApp lewat Fonnte (opsional)
+Fonnte adalah layanan pihak ketiga yang mengirim WA dari nomor WhatsApp milik keluarga sendiri. Tokennya **hanya** disimpan di Script Properties Pendamping keluarga, tidak di aplikasi dan tidak di JuniorLabs.
+
+1. Daftar di <https://fonnte.com>, tambahkan **Device** dengan nomor WA keluarga (nomor pengirim), lalu scan QR-nya. Salin **Token** device.
+2. Di editor Pendamping: ⚙️ **Setelan Proyek › Script Properties**, tambahkan:
+   - `FONNTE_TOKEN` = token dari langkah 1;
+   - `WA_ANGGOTA` = daftar nomor dan email anggota, contoh `6281234567890=dimas@gmail.com,6281398765432=rini@gmail.com`.
+3. Jalankan fungsi **`setupWA`**. Pesan uji dikirim ke setiap nomor, dan log menampilkan kunci webhook.
+4. **Agar bisa mencatat lewat chat WA:** buka **Deploy › New deployment › Web app** (Execute as: **Me**, Who has access: **Anyone**) lalu salin URL `/exec`. Di fonnte.com › **Device › Edit › Webhook**, tempel `URL_/exec?k=KUNCI` persis seperti yang tertulis di log `setupWA`.
+5. Uji: dari nomor anggota kirim WA ke nomor keluarga, misalnya `makan siang 45rb gopay`. Buka aplikasi; Beranda menampilkan **"1 catatan dari chat menunggu"**; ketuk untuk memilih kategori dan menyimpan.
 
 ---
 
@@ -199,6 +221,14 @@ Untuk berhenti, jalankan fungsi `hentikanPendamping`.
 4. Buka aplikasi dengan akun superadmin › **Lainnya › JuniorLabs › Harga Emas** dan pastikan harga sudah tampil.
 
 **Yang baru di 1.3:** Brankas Emas (koleksi per keping & gramasi, multi-pemilik, tautan ke Tujuan, tren akumulasi, jual sebagian + PPh 22, gadai/tebus, peringatan harga, simulasi jual), Investasi & aset lain (saham, reksa dana, SBN, deposito, kripto, properti, kendaraan), Target Alokasi, Zakat & Sedekah (mal dengan nisab & haul, penghasilan, fitrah, qurban, sedekah/donasi), dan Ringkasan SPT per tahun (unduh CSV). Tombol Catat Cepat kini bulat, dan setiap panel yang muncul dari bawah bisa ditutup dengan menggesernya ke bawah.
+
+**Khusus pembaruan ke 1.5 (Fase 3):**
+1. Unggah semua file aplikasi baru. Ada file baru: `js/calc3.js`, `js/ai.js`, `js/i18n.js`, `js/i18n-en.js`, `js/pages/simulasi.js`, `kilas.js`, `rapat.js`, `impor.js`, `ai.js`, `notif.js`, serta `api/tg.js`. Jangan menimpa `js/config.js` milik Anda — cukup ubah `VERSION: '1.5.0'`.
+2. Relay: tempel `Relay.gs` baru, lalu **Deploy › Manage deployments › ✏️ › Version: New version › Deploy**.
+3. Siapkan bot Telegram (Bagian G).
+4. Beri tahu keluarga yang memakai Pendamping untuk memperbarui skripnya (Bagian C, catatan di akhir C1).
+
+**Yang baru di 1.5:** Simulasi Keputusan Besar (kredit, beli/jual aset, pemasukan/pengeluaran baru, dengan dampak ke skor, arus kas 12 bulan, dan Tujuan), Kilas Balik tahunan, Rapat Keuangan bulanan (agenda otomatis, notulen, keputusan, tugas dengan penanggung jawab & tenggat), Impor CSV mutasi bank (deteksi kolom & duplikat), fitur AI dengan kunci Gemini milik keluarga (Tanya AI, foto struk, insight mingguan, bahan diskusi rapat), pengingat & catat lewat Telegram dan WhatsApp, serta tampilan **English** (Pengaturan › Tampilan › Bahasa).
 
 ---
 
@@ -217,6 +247,11 @@ Untuk berhenti, jalankan fungsi `hentikanPendamping`.
 | Data pasangan belum muncul | Sinkron otomatis berjalan tiap 1 menit dan saat aplikasi dibuka. Bisa juga dipaksa lewat **Pengaturan › Data & Sinkron › Sinkron sekarang**. |
 | Harga emas tidak muncul / bertanda "perlu diperbarui" | Superadmin: buka Konsol › Harga Emas › Ambil sekarang, atau isi manual. Keluarga juga bisa memakai harga sendiri di **Brankas Emas › Harga & Alert › Isi manual**. |
 | Pemicu harga emas belum jalan | Jalankan `setupRelay` sekali lagi di editor relay (D, langkah 3). |
+| "Bot Telegram belum diaktifkan oleh JuniorLabs" | Jalankan `setupTelegram` di relay (G3) dan pastikan relay sudah dideploy sebagai New version. |
+| Bot tidak membalas /start | Cek Vercel › Environment Variables `RELAY_URL` sudah diisi lalu **Redeploy**. Jalankan `setupTelegram` lagi; log harus menampilkan "✅ Webhook". |
+| Pengingat Telegram pagi tidak datang | Pastikan Pendamping terpasang dengan `RELAY_URL` terisi (C1) dan anggota sudah menghubungkan Telegram di **Lainnya › Notifikasi**. |
+| Catat lewat WA tidak masuk | Cek webhook Fonnte memakai URL web app Pendamping lengkap dengan `?k=…`, dan nomor pengirim ada di `WA_ANGGOTA` (format 62…). |
+| "Kunci Gemini ditolak" / AI tidak menjawab | Buat kunci baru di Google AI Studio (Bagian H) lalu tempel ulang di **Lainnya › Tanya AI**. |
 | Saldo tidak cocok dengan bank | Buka **Aset › Kas & Bank › (dompet) › Cocokkan saldo**. |
 
 ---
@@ -231,5 +266,32 @@ Untuk berhenti, jalankan fungsi `hentikanPendamping`.
 - **Kuota Google Sheets API:** 300 baca per menit untuk seluruh proyek. Karena aplikasi cukup mengecek versi file di Drive dulu, kuota ini cukup untuk ratusan keluarga. Bila suatu saat kurang, kenaikan kuota bisa diajukan gratis di Cloud Console.
 - **Beberapa HP bersamaan:** setiap perubahan ditambahkan sebagai baris baru di `_log`, sehingga pencatatan suami dan istri di waktu yang sama tidak saling menimpa.
 - **Izin per menu** untuk peran Anggota dijaga oleh aplikasi. Anggota yang diberi akses file secara teknis tetap bisa membuka spreadsheet. Catatan uang pribadi tetap terenkripsi.
+
+
+---
+
+## Bagian G — Bot Telegram @SatuAtapBot (JuniorLabs, sekali saja)
+
+Telegram mengirim pesan ke `https://satuatap.vercel.app/api/tg`, lalu fungsi Vercel itu meneruskannya ke relay. Token bot hanya disimpan di Script Properties relay.
+
+1. **Buat bot.** Di Telegram, buka **@BotFather** › `/newbot` › isi nama `SatuAtap` dan username, misalnya `SatuAtapBot`. Salin token yang diberikan (bentuknya `123456:ABC…`).
+   Opsional: `/setdescription` dan `/setuserpic` dengan logo SatuAtap.
+2. **Simpan token di relay.** Editor relay › ⚙️ **Setelan Proyek › Script Properties** › tambahkan `TELEGRAM_TOKEN` = token tadi. Jangan menulisnya di kode.
+3. **Daftarkan webhook.** Pilih fungsi **`setupTelegram`** › ▶ Jalankan. Fungsi ini membuat `TELEGRAM_SECRET` otomatis, menyimpan nama bot, dan mendaftarkan webhook. Log harus menampilkan "✅ Webhook https://satuatap.vercel.app/api/tg". Bila domain aplikasi berbeda, isi dulu Script Property `TELEGRAM_WEBHOOK` dengan alamat `…/api/tg` Anda.
+4. **Sambungkan Vercel ke relay.** Vercel › proyek satuatap › **Settings › Environment Variables** › tambahkan `RELAY_URL` = URL `/exec` relay. Lalu **Deployments › ⋯ › Redeploy** agar variabel terbaca.
+5. **Uji.** Di aplikasi: **Lainnya › Notifikasi › Hubungkan Telegram saya** › Buka Telegram › **Start**. Bot membalas "Terhubung". Lalu ketuk **Kirim pesan uji**. Kirim juga `makan siang 25rb gopay` ke bot; catatannya muncul di Beranda untuk dikonfirmasi.
+
+Batas: maksimal 60 pesan per jam per keluarga. Kode penghubung berlaku 15 menit dan sekali pakai. Ketik `/putus` di bot untuk memutus.
+
+## Bagian H — Kunci Gemini untuk fitur AI (tiap keluarga, opsional)
+
+Fitur AI memakai kunci Gemini **milik keluarga sendiri**, sehingga biaya dan kuota tidak menumpuk di JuniorLabs.
+
+1. Buka <https://aistudio.google.com/apikey> dengan akun Google mana saja › **Create API key** › salin.
+2. Di aplikasi: **Lainnya › Tanya AI** › tempel kunci › **Sambungkan**. Aplikasi memilih model Gemini Flash terbaru secara otomatis.
+3. Kunci hanya disimpan di HP itu (tidak di Drive, tidak di relay). Pasangan yang ingin memakai AI di HP-nya perlu menempelkan kunci juga.
+
+Yang dikirim ke Gemini hanya **ringkasan angka** (total per kategori, saldo, tagihan, Tujuan). Kategori dan catatan uang pribadi tidak dikirim. Foto struk dikirim ke Gemini untuk dibaca, lalu disimpan di folder Drive "SatuAtap – Struk". Pada kunci gratis, Google dapat memakai data permintaan untuk meningkatkan layanannya. Bila keberatan, aktifkan penagihan di AI Studio (paket berbayar tidak dipakai untuk pelatihan).
+
 
 Butuh bantuan? WhatsApp dukungan JuniorLabs **0856-1254-689**, atau gunakan menu **Lainnya › Laporkan Masalah** di aplikasi.

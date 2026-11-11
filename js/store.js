@@ -13,7 +13,7 @@
     Wallet:    ['id', 'nama', 'jenis', 'pemilik', 'saldoAwal', 'ikon', 'likuid', 'urutan', 'arsip', 'catatan'],
     Kategori:  ['id', 'nama', 'jenis', 'kelompok', 'ikon', 'batas', 'bawaSisa', 'tetap', 'pribadi', 'urutan', 'arsip'],
     Transaksi: ['id', 'tanggal', 'jenis', 'jumlah', 'kategoriId', 'walletId', 'walletTujuan', 'biaya', 'catatan',
-                'dibayarOleh', 'tag', 'sumber', 'refId', 'periodeRef', 'dicatatOleh', 'dibuat', 'riwayat'],
+                'dibayarOleh', 'tag', 'sumber', 'refId', 'periodeRef', 'dicatatOleh', 'dibuat', 'riwayat', 'lampiran'],
     Template:  ['id', 'nama', 'jenis', 'jumlah', 'kategoriId', 'walletId', 'catatan', 'urutan'],
     Rutin:     ['id', 'nama', 'jenis', 'jumlah', 'kategoriId', 'walletId', 'frekuensi', 'tanggal', 'bulan',
                 'mulai', 'selesai', 'langganan', 'ditinjau', 'aktif', 'catatan'],
@@ -27,17 +27,20 @@
     Emas:      ['id', 'tanggal', 'merek', 'bentuk', 'gramKeping', 'jumlah', 'kadar', 'hargaBeli', 'biaya', 'walletId', 'tujuanId',
                 'kepemilikan', 'status', 'zakat', 'tglJual', 'hargaJual', 'pinjamanId', 'sertifikat', 'catatan', 'dibuat'],
     Investasi: ['id', 'kelas', 'nama', 'kode', 'unit', 'modal', 'nilai', 'tglNilai', 'tanggal', 'walletId', 'tujuanId',
-                'kepemilikan', 'jatuhTempo', 'imbal', 'zakat', 'status', 'tglJual', 'hargaJual', 'catatan', 'dibuat', 'riwayatNilai']
+                'kepemilikan', 'jatuhTempo', 'imbal', 'zakat', 'status', 'tglJual', 'hargaJual', 'catatan', 'dibuat', 'riwayatNilai'],
+    Skenario:  ['id', 'nama', 'jenis', 'data', 'catatan', 'dibuat', 'oleh'],
+    Rapat:     ['id', 'tanggal', 'jenis', 'judul', 'catatan', 'keputusan', 'hadir', 'skor', 'dibuat', 'oleh'],
+    Tugas:     ['id', 'judul', 'pj', 'tenggat', 'selesai', 'rapatId', 'sumber', 'catatan', 'dibuat', 'tglSelesai']
   };
   const NUM = { saldoAwal: 1, urutan: 1, batas: 1, jumlah: 1, biaya: 1, tanggal_r: 1, estimasi: 1, target: 1, prioritas: 1,
                 setoranBulanan: 1, pokok: 1, bunga: 1, tenor: 1, tanggalBayar: 1, cicilan: 1, rev: 1,
                 gramKeping: 1, kadar: 1, hargaBeli: 1, hargaJual: 1, unit: 1, modal: 1, nilai: 1, imbal: 1 };
-  const BOOL = { likuid: 1, arsip: 1, bawaSisa: 1, tetap: 1, langganan: 1, aktif: 1, besar: 1, lunas: 1, zakat: 1 };
-  const JSONC = { izin: 1, riwayat: 1, kepemilikan: 1, riwayatNilai: 1 };
+  const BOOL = { likuid: 1, arsip: 1, bawaSisa: 1, tetap: 1, langganan: 1, aktif: 1, besar: 1, lunas: 1, zakat: 1, selesai: 1 };
+  const JSONC = { izin: 1, riwayat: 1, kepemilikan: 1, riwayatNilai: 1, data: 1, keputusan: 1, hadir: 1 };
 
   function typed(t, col, v) {
     if (v === undefined || v === null) v = '';
-    if (JSONC[col]) { const arr = col === 'riwayat' || col === 'riwayatNilai'; if (typeof v === 'object') return v; try { return v ? JSON.parse(v) : (arr ? [] : {}); } catch (e) { return arr ? [] : {}; } }
+    if (JSONC[col]) { const arr = col === 'riwayat' || col === 'riwayatNilai' || col === 'keputusan' || col === 'hadir'; if (typeof v === 'object') return v; try { return v ? JSON.parse(v) : (arr ? [] : {}); } catch (e) { return arr ? [] : {}; } }
     if (BOOL[col]) return v === true || v === 'true';
     if ((NUM[col] && t !== 'Pengaturan') || (t === 'Rutin' && (col === 'tanggal' || col === 'bulan'))) return v === '' ? 0 : Number(v) || 0;
     return String(v);

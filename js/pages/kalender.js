@@ -83,8 +83,8 @@
   UI.act('proj-days', el => { K.proj = Number(el.dataset.v); UI.render(); });
 
   const occRow = (o) => `<div class="row" data-act="occ-pay" data-occ="${U.esc(o.id)}">
-    <span class="cat-ic ${o.lunas ? 'ok' : o.tanggal < U.today() && o.arah !== 'info' ? 'bad' : ''}">${I(o.kind === 'acara' ? 'party-popper' : o.kind === 'tujuan' ? 'target' : o.kind === 'pinjaman' ? 'landmark' : o.arah === 'masuk' ? 'banknote' : 'receipt')}</span>
-    <div class="tx-txt"><b>${U.esc(o.nama)}</b><small>${o.lunas ? 'Lunas ' + (o.tglBayar ? U.tgl(o.tglBayar, 'dm') : '') : o.kind === 'acara' ? 'Rencana' : o.dibayar ? 'Dibayar ' + UI.ms(o.dibayar) : U.relDay(o.tanggal)}${UI.isTunda(o) ? ' · ditunda' : ''}</small></div>
+    <span class="cat-ic ${o.lunas ? 'ok' : o.tanggal < U.today() && o.arah !== 'info' ? 'bad' : ''}">${I(o.kind === 'acara' ? 'party-popper' : o.kind === 'tujuan' ? 'target' : o.kind === 'rapat' ? 'users' : o.kind === 'pinjaman' ? 'landmark' : o.arah === 'masuk' ? 'banknote' : 'receipt')}</span>
+    <div class="tx-txt"><b>${U.esc(o.nama)}</b><small>${o.lunas ? (o.kind === 'rapat' ? 'Sudah dilaksanakan ' : 'Lunas ') + (o.tglBayar ? U.tgl(o.tglBayar, 'dm') : '') : o.kind === 'acara' ? 'Rencana' : o.kind === 'rapat' ? 'Rapat rutin · ' + U.relDay(o.tanggal) : o.dibayar ? 'Dibayar ' + UI.ms(o.dibayar) : U.relDay(o.tanggal)}${UI.isTunda(o) ? ' · ditunda' : ''}</small></div>
     ${o.arah === 'info' ? '' : UI.amount(o.lunas ? o.jumlah : o.sisa, o.arah === 'masuk' ? 'masuk' : 'keluar')}</div>`;
 
   function monthGrid() {
@@ -96,7 +96,7 @@
     for (let i = 0; i < lead; i++) h += '<div></div>';
     for (let d = 1; d <= dim; d++) {
       const s = K.ym + '-' + U.pad(d), it = by[s] || [], lib = UI.libur(s), hp = U.hijriParts(s);
-      const dots = [it.some(o => o.arah === 'masuk') ? 'in' : '', it.some(o => o.arah === 'keluar' && o.kind !== 'acara') ? (it.some(o => o.arah === 'keluar' && !o.lunas && s < U.today()) ? 'bad' : 'out') : '', it.some(o => o.kind === 'acara' || o.kind === 'tujuan') ? 'gold' : ''].filter(Boolean);
+      const dots = [it.some(o => o.arah === 'masuk') ? 'in' : '', it.some(o => o.arah === 'keluar' && o.kind !== 'acara') ? (it.some(o => o.arah === 'keluar' && !o.lunas && s < U.today()) ? 'bad' : 'out') : '', it.some(o => o.kind === 'acara' || o.kind === 'tujuan' || o.kind === 'rapat') ? 'gold' : ''].filter(Boolean);
       h += `<button class="cal-d ${s === U.today() ? 'today' : ''} ${s === K.day ? 'sel' : ''} ${lib ? 'hol' : ''} ${(lead + d) % 7 === 0 ? 'sun' : ''}" data-act="kal-day" data-d="${s}" aria-label="${U.tgl(s, 'long')}">
         <b>${d}</b>${hp ? `<small>${hp.d}</small>` : ''}<span class="dots">${dots.map(c => `<i class="${c}"></i>`).join('')}</span></button>`;
     }

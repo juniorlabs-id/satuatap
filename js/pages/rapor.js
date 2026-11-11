@@ -30,7 +30,7 @@
     { id: 'tren', icon: 'trending-up', label: 'Tren 12 Bulan', to: 'rapor/tren' },
     { id: 'ekspor', icon: 'file-down', label: 'Ekspor PDF/Excel', to: 'rapor/ekspor' },
     { id: 'spt', icon: 'file-text', label: 'Ringkasan SPT', to: 'spt' },
-    { id: 'kilas', icon: 'sparkles', label: 'Kilas Balik', soon: true, act: 'soon' }
+    { id: 'kilas', icon: 'sparkles', label: 'Kilas Balik', to: 'kilas' }
   ], cur);
 
   UI.page('rapor', {

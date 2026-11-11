@@ -41,14 +41,13 @@ Berkas Apps Script (`Relay.gs`, `Pendamping.gs`, serta manifesnya) **sengaja tid
 - **Utang & Piutang:** cicilan flat/anuitas, rasio cicilan, strategi Avalanche/Snowball, simulasi cicilan & KPR, tagih via WhatsApp.
 - **Aset:** kekayaan bersih, kas & bank, cocokkan saldo.
 - **Rapor:** ringkasan, rincian, perbandingan, rasio & skor kesehatan, tren 12 bulan, rapor PDF, dan Excel (CSV).
-- **Arsitektur relay:** masuk dengan Google, buat atau gabung keluarga lewat Google Picker, aktivasi lisensi, sinkron beberapa HP bersamaan, PIN uang pribadi, email ringkasan bulanan, sinkron otomatis tanpa ketuk (kunci perpanjangan tersegel disimpan di HP), dan Skrip Pendamping opsional untuk Google Calendar. Pengingat tagihan hanya tampil di dalam aplikasi.
+- **Arsitektur relay:** masuk dengan Google, buat atau gabung keluarga lewat Google Picker, aktivasi lisensi, sinkron beberapa HP bersamaan, PIN uang pribadi, email ringkasan bulanan, sinkron otomatis tanpa ketuk (kunci perpanjangan tersegel disimpan di HP), dan Skrip Pendamping opsional (Google Calendar, pengingat Telegram/WA pukul 08.00).
 - **Lainnya:** anggota & izin per menu (maks. 5), kategori, template, tema gelap, notifikasi, keamanan, cadangan JSON, laporkan masalah/usul fitur.
 
-## Belum termasuk (ditandai "Segera" di aplikasi)
+## Fitur tambahan
 
-- Fase 2: Brankas Emas, saham/reksa dana/SBN/properti, Zakat, target alokasi, ringkasan SPT.
-- Fase 3: AI Gemini, Rapat Keuangan, Simulasi Keputusan Besar, Kilas Balik, impor CSV.
-- Input via bot Telegram/WhatsApp dan Bahasa Inggris.
+- **Fase 2 (1.3):** Brankas Emas (harga Antam otomatis + harga per merek), investasi & aset lain, Target Alokasi, Zakat & Sedekah, ringkasan SPT.
+- **Fase 3 (1.5):** Simulasi Keputusan Besar, Kilas Balik tahunan, Rapat Keuangan (agenda, notulen, keputusan, tugas), Impor CSV mutasi bank, AI Gemini dengan kunci milik keluarga (Tanya AI, foto struk, insight mingguan, bahan rapat), bot Telegram @SatuAtapBot & WhatsApp (Fonnte keluarga) untuk pengingat dan catat lewat chat, serta tampilan English.
 
 ## Uji cepat
 

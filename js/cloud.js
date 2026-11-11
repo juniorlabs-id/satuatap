@@ -86,7 +86,25 @@
 
   // ---------- Salinan tabel yang mudah dibaca ----------
   const TITLE = { Anggota: 'Anggota', Pengaturan: 'Pengaturan', Wallet: 'Dompet', Kategori: 'Kategori', Transaksi: 'Transaksi', Template: 'Template', Rutin: 'Rutin',
-    Acara: 'Acara', GeserDana: 'Geser Dana', Tujuan: 'Tujuan', Pinjaman: 'Utang Piutang', Laporan: 'Laporan', Emas: 'Brankas Emas', Investasi: 'Investasi' };
+    Acara: 'Acara', GeserDana: 'Geser Dana', Tujuan: 'Tujuan', Pinjaman: 'Utang Piutang', Laporan: 'Laporan', Emas: 'Brankas Emas', Investasi: 'Investasi', Skenario: 'Skenario', Rapat: 'Rapat Keuangan', Tugas: 'Tugas' };
+  /** Simpan foto struk ke folder "SatuAtap – Struk" di Drive pencatat (izin drive.file). Hasil: id file. */
+  C.simpanStruk = async (blob, nama) => {
+    const kf = 'sa:strukFolder:' + (Auth.email || '');
+    let folder = localStorage.getItem(kf) || '';
+    if (folder) { const c = await G.req(`${G.DRIVE}/files/${enc(folder)}?fields=id,trashed`); if (!c.ok || c.data.trashed) folder = ''; }
+    if (!folder) {
+      const f = await G.req(`${G.DRIVE}/files?fields=id`, { method: 'POST', body: { name: 'SatuAtap – Struk', mimeType: 'application/vnd.google-apps.folder', appProperties: { satuatap: 'struk' } } });
+      if (!f.ok) throw new Error(f.message || 'folder gagal dibuat');
+      folder = f.data.id; try { localStorage.setItem(kf, folder); } catch (e) {}
+    }
+    await Auth.ensure();
+    const b = 'sa' + Date.now().toString(36), meta = JSON.stringify({ name: String(nama || 'struk.jpg').replace(/[\\/:*?"<>|]/g, '-'), parents: [folder], appProperties: { satuatap: 'struk' } });
+    const body = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: ${blob.type || 'image/jpeg'}\r\n\r\n`, blob, `\r\n--${b}--`]);
+    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', headers: { Authorization: 'Bearer ' + Auth.token, 'Content-Type': 'multipart/related; boundary=' + b }, body });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j.error && j.error.message) || 'HTTP ' + r.status);
+    return j.id;
+  };
   C.mirror = async (tables) => {
     const s = await G.req(`${G.SHEETS}/${enc(C.fileId)}?fields=${enc('sheets.properties(sheetId,title)')}`);
     if (!s.ok) return s;

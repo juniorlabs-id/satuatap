@@ -80,7 +80,7 @@
                ['aset', 'wallet', 'Aset'], ['rapor', 'chart-column', 'Rapor'], ['lainnya', 'menu', 'Lainnya']];
   const SIDE = [['beranda', 'house', 'Beranda'], ['mutasi', 'arrow-left-right', 'Mutasi'], ['kalender', 'calendar-days', 'Kalender'], ['aset', 'wallet', 'Aset'],
     ['rapor', 'chart-column', 'Rapor'], null, ['anggaran', 'clipboard-list', 'Anggaran'], ['tujuan', 'target', 'Tujuan'], ['utang', 'scale', 'Utang & Piutang'],
-    ['soon/zakat', 'hand-heart', 'Zakat'], ['soon/rapat', 'users', 'Rapat Keuangan'], null, ['pengaturan', 'settings', 'Pengaturan'], ['laporan', 'message-square-warning', 'Laporkan Masalah']];
+    ['emas', 'gem', 'Brankas Emas'], ['zakat', 'hand-heart', 'Zakat'], ['rapat', 'users', 'Rapat Keuangan'], ['ai', 'sparkles', 'Tanya AI'], null, ['pengaturan', 'settings', 'Pengaturan'], ['laporan', 'message-square-warning', 'Laporkan Masalah']];
   UI.shell = () => {
     document.body.innerHTML = `
       <div id="demo-banner" class="demo-banner" hidden>${I('flask-conical')} Mode demo — data contoh, perubahan tidak disimpan. <button class="link" data-act="exit-demo">Keluar demo</button></div>
@@ -249,4 +249,42 @@
   UI.ICON_PILIHAN = ['utensils', 'shopping-cart', 'car', 'zap', 'graduation-cap', 'heart-pulse', 'house', 'landmark', 'users', 'coffee', 'tv', 'shopping-bag', 'hand-heart', 'receipt',
     'circle-dot', 'banknote', 'gift', 'briefcase', 'circle-plus', 'lock', 'baby', 'plane', 'shirt', 'smartphone', 'wifi', 'fuel', 'dumbbell', 'paw-print', 'wrench', 'book-open', 'piggy-bank', 'shield', 'laptop', 'moon-star'];
   window.UI = UI;
+})();
+
+/* ---------- Kartu geser layar penuh (Kilas Balik, Mode presentasi Rapat) ---------- */
+(function () {
+  const I = UI.icon;
+  /** cards: [{html, cls}] · opt: {mulai, onClose, akhir:'Selesai', onAkhir} */
+  UI.slides = (cards, opt) => {
+    opt = opt || {};
+    const w = document.createElement('div');
+    w.className = 'slides-wrap'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
+    w.innerHTML = `<div class="slides-top"><div class="slides-dots">${cards.map((_, i) => `<i data-i="${i}"></i>`).join('')}</div>
+        <button class="icon-btn" data-x aria-label="Tutup">${I('x')}</button></div>
+      <div class="slides" tabindex="0">${cards.map((c, i) => `<section class="slide ${c.cls || ''}" aria-label="Kartu ${i + 1} dari ${cards.length}"><div class="slide-in">${c.html}</div></section>`).join('')}</div>
+      <div class="slides-nav"><button class="btn ghost" data-prev aria-label="Sebelumnya">${I('chevron-left')}</button><small></small><button class="btn" data-next></button></div>`;
+    document.body.appendChild(w);
+    document.body.classList.add('no-scroll');
+    const sc = w.querySelector('.slides'), dots = [...w.querySelectorAll('.slides-dots i')], cnt = w.querySelector('.slides-nav small'), nx = w.querySelector('[data-next]'), pv = w.querySelector('[data-prev]');
+    let cur = 0;
+    const upd = () => {
+      cur = Math.round(sc.scrollLeft / Math.max(1, sc.clientWidth));
+      dots.forEach((d, i) => d.classList.toggle('on', i <= cur));
+      cnt.textContent = (cur + 1) + ' / ' + cards.length;
+      pv.disabled = cur === 0;
+      nx.innerHTML = cur >= cards.length - 1 ? (opt.akhir || 'Selesai') + ' ' + I('check') : 'Lanjut ' + I('chevron-right');
+    };
+    const go = i => sc.scrollTo({ left: U.clamp(i, 0, cards.length - 1) * sc.clientWidth, behavior: 'smooth' });
+    const close = () => { w.remove(); document.body.classList.remove('no-scroll'); document.removeEventListener('keydown', key); opt.onClose && opt.onClose(); };
+    const key = e => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') go(cur + 1); else if (e.key === 'ArrowLeft') go(cur - 1); };
+    let t; sc.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(upd, 60); }, { passive: true });
+    nx.onclick = () => { if (cur >= cards.length - 1) { if (opt.onAkhir) opt.onAkhir(); close(); } else go(cur + 1); };
+    pv.onclick = () => go(cur - 1);
+    w.querySelector('[data-x]').onclick = close;
+    dots.forEach((d, i) => d.onclick = () => go(i));
+    document.addEventListener('keydown', key);
+    w.addEventListener('click', e => { if (e.target.closest('[data-act]') && e.target.closest('[data-tutup]')) close(); });
+    requestAnimationFrame(() => { if (opt.mulai) sc.scrollLeft = opt.mulai * sc.clientWidth; upd(); sc.focus({ preventScroll: true }); });
+    return { el: w, close, go };
+  };
 })();

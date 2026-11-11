@@ -6,7 +6,7 @@
     const R = rng(20261110), pick = a => a[Math.floor(R() * a.length)], between = (a, b) => Math.round((a + R() * (b - a)) / 500) * 500;
     const today = U.today(), now = new Date().toISOString();
     const D = 'dimas@contoh.id', N = 'rini@contoh.id';
-    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [], Emas: [], Investasi: [] };
+    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [], Emas: [], Investasi: [], Skenario: [], Rapat: [], Tugas: [] };
     T.Anggota.push({ id: 'm1', nama: 'Dimas', email: D, peran: 'admin', warna: '#0F5E59', izin: '{}', aktif: 'true', dibuat: now });
     T.Anggota.push({ id: 'm2', nama: 'Rini', email: N, peran: 'pasangan', warna: '#F2B33D', izin: '{}', aktif: 'true', dibuat: now });
     [['namaKeluarga', 'Keluarga Dimas & Rini'], ['periodeMulai', '1'], ['danaDaruratBulan', '6'], ['notifEmail', 'true'], ['kalenderSync', 'false'],
@@ -138,6 +138,15 @@
     T.Pengaturan.push({ id: 'zakatHaul', nilai: U.addDays(today, -300) });
     T.Pengaturan.push({ id: 'zakatJiwa', nilai: '4' });
     T.Pengaturan.push({ id: 'hargaAlert', nilai: JSON.stringify({ jual: 2400000, beli: 2400000 }) });
+    // Fase 3: rapat, tugas, skenario
+    const bl = n => U.addMonths(today, -n).slice(0, 7) + '-01';
+    [3, 2, 1].forEach((n, i) => T.Rapat.push({ id: 'rp' + n, tanggal: bl(n), jenis: 'rutin', judul: 'Rapat ' + U.tgl(bl(n), 'my'), catatan: i === 2 ? 'Fokus kurangi makan di luar. Mulai cicil dana pendidikan.' : '',
+      keputusan: JSON.stringify(i === 2 ? [{ teks: 'Anggaran makan di luar turun jadi 1,2 jt', topik: 'Amplop' }, { teks: 'Tugas: Bandingkan asuransi kendaraan — Dimas', tugasId: 'tg1' }] : [{ teks: 'Setoran dana darurat tetap 1 jt/bulan', topik: 'Tujuan' }]),
+      hadir: JSON.stringify([D, N]), skor: String(64 + i * 3), dibuat: bl(n) + 'T20:00:00.000Z', oleh: D }));
+    T.Tugas.push({ id: 'tg1', judul: 'Bandingkan asuransi kendaraan', pj: D, tenggat: U.addDays(today, 6), selesai: 'false', rapatId: 'rp1', sumber: 'Utang', catatan: '', dibuat: bl(1) + 'T20:10:00.000Z', tglSelesai: '' });
+    T.Tugas.push({ id: 'tg2', judul: 'Tutup langganan streaming yang jarang dipakai', pj: N, tenggat: U.addDays(today, -3), selesai: 'false', rapatId: 'rp1', sumber: 'Amplop', catatan: '', dibuat: bl(1) + 'T20:12:00.000Z', tglSelesai: '' });
+    T.Tugas.push({ id: 'tg3', judul: 'Cek promo cicilan 0% kulkas', pj: N, tenggat: U.addDays(today, -20), selesai: 'true', rapatId: 'rp2', sumber: '', catatan: '', dibuat: bl(2) + 'T20:12:00.000Z', tglSelesai: U.addDays(today, -25) });
+    T.Skenario.push({ id: 'sk1', nama: 'Kredit mobil baru 4,5 jt × 48 bln', jenis: 'cicilan', data: JSON.stringify({ jenis: 'cicilan', jumlah: 4500000, tenor: 48, mulai: U.addMonths(today, 2).slice(0, 7) + '-01', sumber: 'kas', dp: 60000000, ringkas: { dsr: 0.41, skor: 58, perHari: 61000, mundur: 2 } }), catatan: 'Ganti Avanza tahun depan?', dibuat: U.addDays(today, -12) + 'T10:00:00.000Z', oleh: D });
     tx(U.addDays(today, -6), 'keluar', 2500000, 'k_sdk', 'w_bca', 'Zakat penghasilan bulan lalu', D, { tag: 'zakat-penghasilan' });
     tx(U.addDays(today, -4), 'keluar', 200000, 'k_sdk', 'w_gopay', 'Panti Asuhan Al-Ikhlas', N, { tag: 'sedekah' });
     return T;

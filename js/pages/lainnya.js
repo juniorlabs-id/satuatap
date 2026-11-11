@@ -24,13 +24,13 @@
           { id: 'zak', icon: 'hand-heart', label: 'Zakat & Sedekah', to: 'zakat', gold: true },
           { id: 'emas', icon: 'gem', label: 'Brankas Emas', to: 'emas', gold: true },
           { id: 'kpr', icon: 'house', label: 'Simulasi KPR', to: 'utang/kpr' },
-          { id: 'sim', icon: 'git-fork', label: 'Simulasi Keputusan', soon: true, act: 'soon' }
+          { id: 'sim', icon: 'git-fork', label: 'Simulasi Keputusan', to: 'simulasi' }
         ])}
         ${UI.sec('Keluarga & cerdas')}${UI.tiles([
-          { id: 'rapat', icon: 'users', label: 'Rapat Keuangan', soon: true, act: 'soon' },
-          { id: 'ai', icon: 'sparkles', label: 'Tanya AI', soon: true, act: 'soon' },
-          { id: 'kilas', icon: 'history', label: 'Kilas Balik', soon: true, act: 'soon' },
-          { id: 'impor', icon: 'file-up', label: 'Impor CSV', soon: true, act: 'soon' }
+          { id: 'rapat', icon: 'users', label: 'Rapat Keuangan', to: 'rapat' },
+          { id: 'ai', icon: 'sparkles', label: 'Tanya AI', to: 'ai' },
+          { id: 'kilas', icon: 'history', label: 'Kilas Balik', to: 'kilas' },
+          { id: 'impor', icon: 'file-up', label: 'Impor CSV', to: 'impor' }
         ])}
         ${UI.sec('Pengaturan')}${UI.tiles([
           { id: 'kel', icon: 'heart-handshake', label: 'Keluarga', to: 'pengaturan/keluarga' },
@@ -186,7 +186,7 @@
     const th = localStorage.getItem('sa:theme') || 'system';
     return `<div class="card">${UI.field('Tema', UI.seg('theme', [['system', 'Ikuti sistem'], ['light', 'Terang'], ['dark', 'Gelap']], th).replace(/<input /g, '<input data-change="theme" '))}
       <label class="check"><input type="checkbox" data-change="hide-pref" ${UI.hide() ? 'checked' : ''}><span>Sembunyikan nominal saat aplikasi dibuka (mode privasi di tempat umum)</span></label>
-      ${UI.field('Bahasa', `<select disabled><option>Bahasa Indonesia</option><option>English (segera)</option></select>`)}</div>
+      ${UI.field('Bahasa / Language', `<select data-noi18n data-change="lang-set"><option value="id"${(window.I18N && I18N.lang) === 'en' ? '' : ' selected'}>Bahasa Indonesia</option><option value="en"${(window.I18N && I18N.lang) === 'en' ? ' selected' : ''}>English</option></select>`)}</div>
       <div class="note">${I('smartphone')} Pasang ke layar utama: buka menu browser › <b>Tambahkan ke layar utama</b> / <b>Instal aplikasi</b>.</div>`;
   }
   UI.act('theme', el => { localStorage.setItem('sa:theme', el.value); App.applyTheme(); });
@@ -197,14 +197,15 @@
     const on = Store.setting('notifEmail', 'true') !== 'false';
     return `<div class="card"><h4 class="mini-h">${I('bell-ring')} Pengingat tagihan</h4>
         <p class="small">Tagihan, cicilan & acara yang jatuh tempo ≤ 3 hari tampil di <b>Beranda</b>, lengkap dengan tombol bayar; jadwal lengkapnya ada di <b>Kalender</b>. Tagihan yang sudah lunas atau ditunda tidak ditampilkan.</p>
-        <p class="muted small">${I('message-circle')} Pengingat lewat Telegram / WhatsApp hadir di pembaruan berikutnya.</p></div>
+</div>
+      ${UI.notifKartu ? UI.notifKartu() : ''}
       ${needAdmin()}<div class="card" id="f-not">
       <label class="check"><input type="checkbox" name="notifEmail" ${on ? 'checked' : ''} ${Store.isAdminLike() ? '' : 'disabled'}><span><b>Email ringkasan bulanan</b><br><small class="muted">Laporan (bukan pengingat): pemasukan, pengeluaran, kategori terbesar & tujuan periode lalu untuk Admin & Pasangan — terkirim saat aplikasi pertama kali dibuka di periode baru.</small></span></label>
       ${Store.isAdminLike() ? `<button class="btn" data-act="save-not">Simpan</button>` : ''}</div>
-      <div class="card"><h4 class="mini-h">${I('calendar-plus')} Jadwal di Google Calendar <span class="pill">opsional</span></h4>
-        <p class="small">Ingin tagihan & cicilan muncul di Google Calendar (dengan notifikasi kalender sehari sebelumnya, bisa dibagikan ke pasangan)? Pasang <b>Skrip Pendamping</b> di akun Google Admin — sekitar 5 menit, ikuti Panduan Instalasi Bagian C.</p>
+      <div class="card"><h4 class="mini-h">${I('calendar-plus')} Skrip Pendamping <span class="pill">opsional</span></h4>
+        <p class="small">Agar pengingat tetap jalan walau aplikasi tidak dibuka: jadwal tagihan di <b>Google Calendar</b>, pengingat <b>Telegram</b> setiap pagi, dan (bila memakai Fonnte) <b>WhatsApp</b>. Dipasang sekali di akun Google Admin — sekitar 5 menit, ikuti Panduan Instalasi Bagian C.</p>
         <p class="muted small">Saat memasang, Google menampilkan layar "aplikasi belum diverifikasi" satu kali karena skrip berjalan di akun Anda sendiri.</p>
-        ${Store.mode === 'live' ? `<div class="kv-list"><div class="kv"><span>ID file keluarga</span><b><code class="wrap">${U.esc(Store.fileId)}</code></b></div></div><button class="btn ghost sm" data-act="copy-fileid">${I('copy')} Salin ID file</button>` : ''}</div>`;
+        ${UI.pendampingKartu ? UI.pendampingKartu() : ''}</div>`;
   }
   UI.act('save-not', () => { const f = UI.formData(document.getElementById('f-not')); Store.commit(Object.keys(f).map(k => ({ op: 'upsert', t: 'Pengaturan', row: { id: k, nilai: f[k] ? 'true' : 'false' } }))); UI.toast('Disimpan.'); });
   UI.act('copy-fileid', async () => { try { await navigator.clipboard.writeText(Store.fileId); UI.toast('ID file disalin.'); } catch (e) { prompt('Salin ID file:', Store.fileId); } });
@@ -254,6 +255,7 @@
       <p class="muted small">Aplikasi menyimpan salinan data di perangkat agar terbuka instan & tetap bisa dipakai saat sinyal lemah; perubahan dikirim otomatis saat online. Tab tabel di spreadsheet diperbarui otomatis sekali sehari dari perangkat Admin.</p>`;
   }
   UI.act('sync-now', async () => { await Store.flush(); const r = await Store.sync(); UI.toast(r && r.ok ? 'Sinkron selesai.' : (r && r.message) || 'Belum bisa sinkron.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
+  UI.act('lang-set', el => window.I18N && I18N.set(el.value));
   UI.act('sync-full', async () => { await Store.flush(); const r = await Store.sync(true); UI.toast(r && r.ok ? 'Data dimuat ulang dari Google Drive.' : (r && r.message) || 'Gagal.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
   UI.act('mirror-now', async el => { el.disabled = true; const r = await Cloud.mirror(Store.tablesWire()); el.disabled = false; UI.toast(r.ok ? 'Tab tabel di spreadsheet diperbarui.' : 'Gagal: ' + r.message, r.ok ? 'ok' : 'error'); if (r.ok) localStorage.setItem('sa:mir:' + Store.fileId, String(Date.now())); });
   UI.act('backup', () => {

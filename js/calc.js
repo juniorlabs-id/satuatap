@@ -190,6 +190,7 @@
     Store.t.Acara.forEach(a => {
       if (a.tanggal >= from && a.tanggal <= to) out.push({ id: 'a|' + a.id, ref: a, kind: 'acara', nama: a.nama, tanggal: a.tanggal, jumlah: a.estimasi || 0, arah: 'keluar', sisa: a.estimasi || 0, lunas: false, besar: a.besar });
     });
+    if (C.rapatJadwal) C.rapatJadwal(from, to).forEach(r => out.push(r));
     C.goals().forEach(g => { if (g.t.tenggat >= from && g.t.tenggat <= to && !g.t.arsip) out.push({ id: 'g|' + g.t.id, ref: g.t, kind: 'tujuan', nama: 'Tenggat: ' + g.t.nama, tanggal: g.t.tenggat, jumlah: 0, arah: 'info', sisa: 0, lunas: g.pct >= 1 }); });
     out.sort((a, b) => a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : 0);
     return out;
