@@ -20,7 +20,7 @@
   UI.ms = v => UI.hide() ? 'Rp •••' : U.rpShort(v);
   UI.amount = (v, jenis) => {
     const plus = jenis === 'masuk' || jenis === 'pinjam_kembali' || jenis === 'pinjam_terima' || jenis === 'tujuan_ambil';
-    const neutral = jenis === 'transfer' || jenis === 'tujuan' || jenis === 'penyesuaian';
+    const neutral = jenis === 'transfer' || jenis === 'tujuan' || jenis === 'penyesuaian' || jenis === 'aset_beli' || jenis === 'aset_jual';
     return `<span class="amt ${plus ? 'in' : neutral ? 'neu' : 'out'}">${plus ? '+' : neutral ? '' : '−'}${UI.m(Math.abs(v))}</span>`;
   };
 
@@ -93,7 +93,7 @@
         </aside>
         <main id="main"><header id="topbar"></header><div id="view" class="view"></div></main>
       </div>
-      <button id="fab" class="fab" data-act="catat" aria-label="Catat cepat (tahan untuk bicara)">${I('plus')}<span>Catat Cepat</span></button>
+      <button id="fab" class="fab" data-act="catat" aria-label="Catat cepat (tahan untuk bicara)">${I('plus')}</button>
       <nav id="bottomnav">${NAV.map(n => `<a href="#/${n[0]}" data-nav="${n[0]}">${I(n[1])}<span>${n[2]}</span></a>`).join('')}</nav>
       <div id="sheet-root"></div><div id="toast-root" aria-live="polite"></div>`;
     UI.bindGlobal();
@@ -149,7 +149,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'sheet-wrap';
     wrap.innerHTML = `<div class="sheet-bg"></div><div class="sheet ${opt.cls || ''}" role="dialog" aria-modal="true" aria-label="${U.esc(opt.title || '')}">
-      <div class="sheet-handle"></div><div class="sheet-head"><h2>${U.esc(opt.title || '')}</h2><button class="icon-btn" data-close aria-label="Tutup">${I('x')}</button></div>
+      <div class="sheet-grip"><div class="sheet-handle"></div><div class="sheet-head"><h2>${U.esc(opt.title || '')}</h2><button class="icon-btn" data-close aria-label="Tutup">${I('x')}</button></div></div>
       <div class="sheet-body">${opt.body || ''}</div>${opt.foot ? `<div class="sheet-foot">${opt.foot}</div>` : ''}</div>`;
     root.appendChild(wrap);
     document.body.classList.add('noscroll');
@@ -163,9 +163,46 @@
     wrap.querySelector('[data-close]').onclick = close;
     const el = wrap.querySelector('.sheet');
     el.close = close;
+    dragToClose(el, wrap, close);
     opt.mount && opt.mount(el, close);
     return { el, close };
   };
+  /** Geser lembar ke bawah untuk menutup — dari pegangan/judul, atau dari isi saat sudah di posisi paling atas. */
+  function dragToClose(el, wrap, close) {
+    const body = el.querySelector('.sheet-body'), bg = wrap.querySelector('.sheet-bg');
+    let y0 = 0, x0 = 0, dy = 0, t0 = 0, active = false, armed = false, fromBody = false;
+    const desktop = () => window.matchMedia('(min-width: 720px)').matches;
+    el.addEventListener('touchstart', e => {
+      if (desktop() || e.touches.length !== 1) return;
+      const tgt = e.target;
+      if (tgt.closest('input, textarea, select, [data-rp], .keypad, input[type=range], .env-drag, .swipe')) return;
+      fromBody = !tgt.closest('.sheet-grip');
+      if (fromBody && body.scrollTop > 0) return;
+      armed = true; active = false; y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; t0 = Date.now();
+    }, { passive: true });
+    el.addEventListener('touchmove', e => {
+      if (!armed) return;
+      const my = e.touches[0].clientY - y0, mx = e.touches[0].clientX - x0;
+      if (!active) {
+        if (my > 8 && my > Math.abs(mx) * 1.2 && (!fromBody || body.scrollTop <= 0)) { active = true; el.classList.add('dragging'); }
+        else if (my < -4 || Math.abs(mx) > 12) { armed = false; return; }
+        else return;
+      }
+      dy = Math.max(0, my);
+      e.preventDefault();
+      el.style.transform = `translateY(${dy}px)`;
+      bg.style.opacity = String(Math.max(0.15, 1 - dy / (el.offsetHeight || 600)));
+    }, { passive: false });
+    const end = () => {
+      if (!armed) return; armed = false;
+      if (!active) return; active = false;
+      el.classList.remove('dragging');
+      const v = dy / Math.max(1, Date.now() - t0);
+      if (dy > Math.min(140, el.offsetHeight * 0.25) || v > 0.6) { el.style.transition = 'transform .18s ease-in'; el.style.transform = 'translateY(100%)'; setTimeout(close, 120); }
+      else { el.style.transform = ''; bg.style.opacity = ''; }
+    };
+    el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
+  }
   UI.confirm = (title, text, okLabel, danger) => new Promise(res => {
     const s = UI.sheet({ title, body: `<p class="muted">${U.esc(text)}</p>`, foot: `<button class="btn ghost" data-no>Batal</button><button class="btn ${danger ? 'danger' : ''}" data-yes>${U.esc(okLabel || 'Ya')}</button>`,
       onClose: () => res(false) });

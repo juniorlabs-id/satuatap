@@ -10,10 +10,11 @@
     return memo[key];
   }
   C.clear = () => { memo = {}; };
+  C.M = M;
 
-  const NONEXP = { transfer: 1, tujuan: 1, tujuan_ambil: 1, pinjam_beri: 1, pinjam_kembali: 1, pinjam_terima: 1, penyesuaian: 1 };
+  const NONEXP = { transfer: 1, tujuan: 1, tujuan_ambil: 1, pinjam_beri: 1, pinjam_kembali: 1, pinjam_terima: 1, penyesuaian: 1, aset_beli: 1, aset_jual: 1 };
   C.JENIS_LABEL = { keluar: 'Pengeluaran', masuk: 'Pemasukan', transfer: 'Transfer', tujuan: 'Setor Tujuan', tujuan_ambil: 'Ambil dari Tujuan',
-    pinjam_beri: 'Beri Pinjaman', pinjam_kembali: 'Piutang Kembali', pinjam_terima: 'Terima Pinjaman', penyesuaian: 'Penyesuaian Saldo' };
+    pinjam_beri: 'Beri Pinjaman', pinjam_kembali: 'Piutang Kembali', pinjam_terima: 'Terima Pinjaman', penyesuaian: 'Penyesuaian Saldo', aset_beli: 'Beli Aset', aset_jual: 'Jual Aset' };
 
   // ---------- Periode anggaran ----------
   C.startDay = () => U.clamp(Number(Store.setting('periodeMulai', 1)) || 1, 1, 28);
@@ -50,6 +51,8 @@
       else keluar += C.expAmount(t);
       if (t.jenis === 'tujuan') tabung += t.jumlah;
       if (t.jenis === 'tujuan_ambil') tabung -= t.jumlah;
+      if (t.jenis === 'aset_beli') tabung += t.jumlah;
+      if (t.jenis === 'aset_jual') tabung -= t.jumlah;
     });
     return { masuk, keluar, tabung, net: masuk - keluar };
   });
@@ -71,6 +74,8 @@
         case 'pinjam_kembali': add(t.walletId, j); break;
         case 'pinjam_terima': add(t.walletId, j); break;
         case 'penyesuaian': add(t.walletId, j); break;
+        case 'aset_beli': add(t.walletId, -j); break;
+        case 'aset_jual': add(t.walletId, j); break;
       }
     });
     return b;
@@ -293,8 +298,9 @@
       sums[t.refId] = (sums[t.refId] || 0) + v;
       (logs[t.refId] = logs[t.refId] || []).push(t);
     });
+    const linked = C.linkedGoalValue ? C.linkedGoalValue() : {};
     return Store.t.Tujuan.map(g => {
-      const saldo = sums[g.id] || 0, target = g.target || 0;
+      const dana = sums[g.id] || 0, aset = linked[g.id] || 0, saldo = dana + aset, target = g.target || 0;
       const pct = target > 0 ? saldo / target : 0;
       const sisa = Math.max(0, target - saldo);
       const log = (logs[g.id] || []).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
@@ -305,7 +311,7 @@
       const laju = U.sum(log.filter(t => t.tanggal >= from), t => t.jenis === 'tujuan' ? t.jumlah : -t.jumlah) / 3;
       const per = g.setoranBulanan || laju;
       const estimasi = sisa <= 0 ? U.today() : per > 0 ? U.addMonths(U.today(), Math.ceil(sisa / per)) : '';
-      return { t: g, saldo, target, pct, sisa, log, perluPerBulan, laju, estimasi, bulanLagi };
+      return { t: g, saldo, dana, aset, target, pct, sisa, log, perluPerBulan, laju, estimasi, bulanLagi };
     }).sort((a, b) => (a.t.prioritas || 99) - (b.t.prioritas || 99));
   });
   C.goal = id => C.goals().find(g => g.t.id === id);
@@ -439,7 +445,7 @@
   };
   C.emergency = () => M('emerg', () => {
     const avgOut = U.sum(C.lastPeriods(3), p => C.periodTotals(p).keluar) / 3;
-    const liq = C.liquidTotal() + U.sum(C.goals().filter(g => /darurat/i.test(g.t.nama) && !g.t.walletId), g => g.saldo);
+    const liq = C.liquidTotal() + U.sum(C.goals().filter(g => /darurat/i.test(g.t.nama) && !g.t.walletId), g => g.dana);
     return { avgOut, liq, bulan: avgOut ? liq / avgOut : 0, target: Number(Store.setting('danaDaruratBulan', 6)) || 6 };
   });
   /** Skor kesehatan sederhana 0–100 (5 komponen × 20). */
@@ -459,11 +465,13 @@
   // ---------- Kekayaan ----------
   C.netWorth = () => M('nw', () => {
     const kas = C.walletTotal();
-    const danaTujuan = U.sum(C.goals().filter(g => !g.t.walletId), g => g.saldo);
+    const danaTujuan = U.sum(C.goals().filter(g => !g.t.walletId), g => g.dana);
     const loans = C.loans().filter(l => !l.lunas);
     const utang = U.sum(loans.filter(l => l.p.arah !== 'piutang'), l => l.sisa);
     const piutang = U.sum(loans.filter(l => l.p.arah === 'piutang'), l => l.sisa);
-    return { kas, danaTujuan, utang, piutang, aset: kas + danaTujuan + piutang, bersih: kas + danaTujuan + piutang - utang };
+    const inv = C.asetKelas ? C.asetKelas() : {};
+    const lain = U.sum(Object.keys(inv), k => inv[k]);
+    return { kas, danaTujuan, utang, piutang, kelas: inv, investasi: lain, aset: kas + danaTujuan + piutang + lain, bersih: kas + danaTujuan + piutang + lain - utang };
   });
 
   // ---------- Kategori pintar ----------

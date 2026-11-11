@@ -86,7 +86,7 @@
 
   // ---------- Salinan tabel yang mudah dibaca ----------
   const TITLE = { Anggota: 'Anggota', Pengaturan: 'Pengaturan', Wallet: 'Dompet', Kategori: 'Kategori', Transaksi: 'Transaksi', Template: 'Template', Rutin: 'Rutin',
-    Acara: 'Acara', GeserDana: 'Geser Dana', Tujuan: 'Tujuan', Pinjaman: 'Utang Piutang', Laporan: 'Laporan' };
+    Acara: 'Acara', GeserDana: 'Geser Dana', Tujuan: 'Tujuan', Pinjaman: 'Utang Piutang', Laporan: 'Laporan', Emas: 'Brankas Emas', Investasi: 'Investasi' };
   C.mirror = async (tables) => {
     const s = await G.req(`${G.SHEETS}/${enc(C.fileId)}?fields=${enc('sheets.properties(sheetId,title)')}`);
     if (!s.ok) return s;

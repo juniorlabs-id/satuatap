@@ -57,14 +57,14 @@
     { id: 'kas', icon: 'landmark', label: 'Kas & Bank', to: 'aset/kas' },
     { id: 'tujuan', icon: 'target', label: 'Tujuan', to: 'tujuan' },
     { id: 'utang', icon: 'scale', label: 'Utang & Piutang', to: 'utang' },
-    { id: 'emas', icon: 'gem', label: 'Brankas Emas', soon: true, act: 'soon', gold: true },
-    { id: 'saham', icon: 'chart-candlestick', label: 'Saham', soon: true, act: 'soon' },
-    { id: 'rd', icon: 'chart-pie', label: 'Reksa Dana', soon: true, act: 'soon' },
-    { id: 'sbn', icon: 'file-badge', label: 'SBN & Deposito', soon: true, act: 'soon' },
-    { id: 'prop', icon: 'house', label: 'Properti & Tanah', soon: true, act: 'soon' },
-    { id: 'lain', icon: 'car', label: 'Aset Lain', soon: true, act: 'soon' },
-    { id: 'zakat', icon: 'hand-heart', label: 'Zakat', soon: true, act: 'soon' },
-    { id: 'alok', icon: 'scale-3d', label: 'Target Alokasi', soon: true, act: 'soon' },
+    { id: 'emas', icon: 'gem', label: 'Brankas Emas', to: 'emas', gold: true },
+    { id: 'saham', icon: 'chart-candlestick', label: 'Saham', to: 'investasi/saham' },
+    { id: 'rd', icon: 'chart-pie', label: 'Reksa Dana', to: 'investasi/reksadana' },
+    { id: 'sbn', icon: 'file-badge', label: 'SBN & Deposito', to: 'investasi/sbn' },
+    { id: 'prop', icon: 'house', label: 'Properti & Tanah', to: 'investasi/properti' },
+    { id: 'lain', icon: 'car', label: 'Aset Lain', to: 'investasi/lain' },
+    { id: 'zakat', icon: 'hand-heart', label: 'Zakat', to: 'zakat', gold: true },
+    { id: 'alok', icon: 'scale', label: 'Target Alokasi', to: 'investasi/alokasi' },
     { id: 'skor', icon: 'heart-pulse', label: 'Skor Kesehatan', to: 'rapor/rasio' }
   ];
 
@@ -75,7 +75,12 @@
       if (!Store.can('aset', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Aset.');
       if (p === 'kas') return kas();
       const nw = Calc.netWorth(), b = Calc.balances();
-      const parts = [{ v: Math.max(0, nw.kas), color: 'var(--primary)', label: 'Kas & bank' }, { v: nw.danaTujuan, color: 'var(--gold)', label: 'Dana tujuan (di luar dompet)' }, { v: nw.piutang, color: 'var(--secondary)', label: 'Piutang' }].filter(x => x.v > 0);
+      const PAL = ['#2E7D9A', '#7A5BC7', '#C2185B', '#5D8A3A', '#8D6E63', '#00897B', '#6D4C41', '#546E7A'];
+      const kl = nw.kelas || {}, kk = Object.keys(kl).filter(k => k !== 'emas' && kl[k] > 0);
+      const parts = [{ v: Math.max(0, nw.kas), color: 'var(--primary)', label: 'Kas & bank', to: 'aset/kas' }, { v: nw.danaTujuan, color: 'var(--secondary)', label: 'Dana tujuan (di luar dompet)', to: 'tujuan' },
+        { v: kl.emas || 0, color: 'var(--gold)', label: 'Emas', to: 'emas' }]
+        .concat(kk.map((k, i) => ({ v: kl[k], color: PAL[i % PAL.length], label: (Calc.KELAS[k] || {}).label || k, to: 'investasi/' + k })))
+        .concat([{ v: nw.piutang, color: 'var(--muted)', label: 'Piutang', to: 'utang' }]).filter(x => x.v > 0);
       const ws = Store.wallets();
       return `
         <section class="hero card-primary"><div class="hero-top"><small>Kekayaan bersih keluarga</small><button class="icon-btn on-dark" data-act="toggle-hide">${I(UI.hide() ? 'eye-off' : 'eye')}</button></div>
@@ -83,7 +88,7 @@
           <div class="hero-split"><div><small>Total aset</small><b>${UI.ms(nw.aset)}</b></div><div><small>Total utang</small><b>${UI.ms(nw.utang)}</b></div></div></section>
         ${UI.tiles(TILES())}
         <div class="card donut-card">${Charts.donut(parts.length ? parts : [{ v: 1, color: 'var(--outline-variant)' }], ['Aset', UI.ms(nw.aset)])}
-          <ul class="legend">${parts.map(x => `<li><i style="background:${x.color}"></i>${x.label}<b>${UI.ms(x.v)}</b></li>`).join('')}<li class="muted small">Emas, saham, reksa dana & properti hadir di Fase 2.</li></ul></div>
+          <ul class="legend">${parts.map(x => `<li data-act="go" data-to="${x.to}"><i style="background:${x.color}"></i>${U.esc(x.label)}<b>${UI.ms(x.v)}</b></li>`).join('')}${nw.investasi ? '' : '<li class="muted small">Tambahkan emas, saham, reksa dana atau properti lewat ubin di atas.</li>'}</ul></div>
         ${UI.sec('Dompet & rekening', '<a class="link" href="#/aset/kas">Kelola</a>')}
         <div class="card list">${ws.map(w => `<div class="row" data-act="wallet-open" data-id="${w.id}"><span class="cat-ic">${I(wIcon(w))}</span><div class="tx-txt"><b>${U.esc(w.nama)}</b><small>${U.esc(ownerLabel(w))}${w.likuid === false ? ' · tidak likuid' : ''}</small></div><b class="${(b[w.id] || 0) < 0 ? 'bad' : ''}">${UI.m(b[w.id] || 0)}</b></div>`).join('') || `<div class="row muted">Belum ada dompet. <button class="link" data-act="wallet-add">Tambah</button></div>`}</div>
         <div class="spacer"></div>`;

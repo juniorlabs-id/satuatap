@@ -16,12 +16,14 @@
     if (t.jenis === 'transfer') return UI.note(t) || ('Transfer ke ' + (W[t.walletTujuan] ? W[t.walletTujuan].nama : '-'));
     if (t.jenis === 'tujuan' || t.jenis === 'tujuan_ambil') { const g = Store.byId.Tujuan[t.refId]; return (t.jenis === 'tujuan' ? 'Setor: ' : 'Ambil: ') + (g ? g.nama : 'Tujuan'); }
     if (t.jenis.indexOf('pinjam') === 0) { const p = Store.byId.Pinjaman[t.refId]; return Calc.JENIS_LABEL[t.jenis] + (p ? ' · ' + p.pihak : ''); }
+    if (t.jenis === 'aset_beli' || t.jenis === 'aset_jual') return UI.note(t) || Calc.JENIS_LABEL[t.jenis];
     return UI.note(t) || (k ? k.nama : Calc.JENIS_LABEL[t.jenis] || 'Transaksi');
   };
   UI.txIcon = t => {
     if (t.jenis === 'transfer') return 'arrow-left-right';
     if (t.jenis === 'tujuan' || t.jenis === 'tujuan_ambil') return (Store.byId.Tujuan[t.refId] || {}).ikon || 'target';
     if (t.jenis.indexOf('pinjam') === 0) return 'scale';
+    if (t.jenis === 'aset_beli' || t.jenis === 'aset_jual') return Store.byId.Emas[t.refId] ? 'gem' : ((Calc.KELAS[(Store.byId.Investasi[t.refId] || {}).kelas] || {}).ikon || 'briefcase');
     if (t.jenis === 'penyesuaian') return 'sliders-horizontal';
     const k = Store.byId.Kategori[t.kategoriId]; return (k && k.ikon) || 'circle-dot';
   };

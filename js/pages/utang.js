@@ -1,7 +1,7 @@
 /* Utang & Piutang — daftar, bayar cicilan, strategi pelunasan, simulasi cicilan & KPR */
 (function () {
   const I = UI.icon;
-  const JENIS = { kpr: ['KPR', 'house'], kendaraan: ['Kendaraan', 'car'], kartu: ['Kartu kredit', 'credit-card'], paylater: ['PayLater', 'smartphone'], kta: ['KTA / Bank', 'landmark'], keluarga: ['Keluarga / teman', 'users'], patungan: ['Patungan', 'users'], lain: ['Lainnya', 'scale'] };
+  const JENIS = { kpr: ['KPR', 'house'], kendaraan: ['Kendaraan', 'car'], kartu: ['Kartu kredit', 'credit-card'], paylater: ['PayLater', 'smartphone'], kta: ['KTA / Bank', 'landmark'], gadai: ['Gadai emas', 'gem'], keluarga: ['Keluarga / teman', 'users'], patungan: ['Patungan', 'users'], lain: ['Lainnya', 'scale'] };
   const S = { extra: 500000, strat: 'avalanche', sim: { pokok: 50000000, bunga: 10, tenor: 24, metode: 'anuitas' }, kpr: { harga: 500000000, dp: 20, bunga: 7.5, tahun: 15, biaya: 4 } };
 
   UI.loanForm = (p, pre) => {

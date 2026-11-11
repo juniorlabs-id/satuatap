@@ -66,8 +66,8 @@ code.wrap { word-break: break-all; }
 #bottomnav a .ic { width: 22px; height: 22px; }
 #bottomnav a.on { color: var(--primary); }
 #bottomnav a.on::before { content: ''; position: absolute; top: 6px; width: 48px; height: 30px; border-radius: 15px; background: var(--primary-c); z-index: -1; }
-.fab { position: fixed; right: 14px; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); z-index: 31; height: 58px; min-width: 58px; border-radius: 18px; background: var(--gold); color: #0E2B2C;
-  display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 8px 24px rgba(140, 90, 0, .35); padding: 0 18px; font-weight: 700; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.fab { position: fixed; right: 16px; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); z-index: 31; width: 60px; height: 60px; border-radius: 50%; background: var(--gold); color: #0E2B2C;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(140, 90, 0, .35); padding: 0; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform .12s; }
 .fab .ic { width: 26px; height: 26px; stroke-width: 2.6; }
 .fab span { display: none; }
 .fab:active { transform: scale(.96); }
@@ -93,7 +93,7 @@ code.wrap { word-break: break-all; }
   #topbar { padding: 14px 40px; }
   .view { padding: 4px 40px 0; max-width: 1080px; }
 }
-@media (min-width: 640px) and (max-width: 1023px) { .fab span { display: inline; } .view { padding: 4px 24px 0; } }
+@media (min-width: 640px) and (max-width: 1023px) { .view { padding: 4px 24px 0; } }
 
 /* ---------- Kartu & bagian ---------- */
 .card { background: var(--surface); border-radius: var(--r); box-shadow: var(--sh-1); border: 1px solid var(--line); padding: 16px; margin-bottom: 12px; }
@@ -156,7 +156,7 @@ code.wrap { word-break: break-all; }
 .cat-ic.sm { width: 32px; height: 32px; border-radius: 10px; } .cat-ic.sm .ic { width: 17px; height: 17px; }
 .cat-ic.lg { width: 56px; height: 56px; border-radius: 18px; } .cat-ic.lg .ic { width: 28px; height: 28px; }
 .cat-ic.masuk, .cat-ic.in, .cat-ic.pinjam_kembali, .cat-ic.pinjam_terima { background: var(--ok-c); color: var(--ok); }
-.cat-ic.tujuan, .cat-ic.tujuan_ambil { background: var(--gold-c); color: var(--gold-d); }
+.cat-ic.tujuan, .cat-ic.tujuan_ambil, .cat-ic.aset_beli, .cat-ic.aset_jual, .cat-ic.gold { background: var(--gold-c); color: var(--gold-d); }
 .cat-ic.transfer { background: var(--surface-3); color: var(--secondary); }
 .cat-ic.ok { background: var(--ok-c); color: var(--ok); } .cat-ic.bad { background: var(--bad-c); color: var(--bad); }
 .kebab { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); flex: none; margin-right: -8px; }
@@ -246,7 +246,9 @@ input[type=range] { width: 100%; accent-color: var(--primary); height: 32px; }
 .sheet-bg { position: absolute; inset: 0; background: rgba(5, 20, 19, .45); opacity: 0; transition: opacity .2s; }
 .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 92vh; background: var(--surface); border-radius: 24px 24px 0 0; box-shadow: var(--sh-3); display: flex; flex-direction: column; transform: translateY(100%); transition: transform .24s cubic-bezier(.2, .8, .2, 1); padding-bottom: env(safe-area-inset-bottom); }
 .sheet-wrap.show .sheet-bg { opacity: 1; } .sheet-wrap.show .sheet { transform: none; }
-.sheet-handle { width: 40px; height: 5px; border-radius: 3px; background: var(--outline-variant); margin: 8px auto 0; }
+.sheet-handle { width: 44px; height: 5px; border-radius: 3px; background: var(--outline-variant); margin: 8px auto 0; }
+.sheet-grip { touch-action: none; cursor: grab; padding-top: 2px; }
+.sheet.dragging { transition: none !important; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 4px 20px; } .sheet-head h2 { font-size: 18px; color: var(--ink); }
 .sheet-body { overflow-y: auto; padding: 8px 20px 12px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .sheet-foot { display: flex; gap: 8px; padding: 10px 20px 14px; border-top: 1px solid var(--line); } .sheet-foot .btn { flex: 1; }
@@ -426,3 +428,39 @@ table.ck, table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px;
 .steps { padding-left: 18px; margin: 8px 0; } .steps li { margin-bottom: 6px; }
 details.lap summary { list-style: none; } details.lap summary::-webkit-details-marker { display: none; }
 .lap-body { padding: 4px 16px 14px 68px; font-size: 13px; border-bottom: 1px solid var(--line); } .lap-body p { margin: 0 0 6px; }
+
+/* ---------- Fase 2: Brankas Emas, Investasi, Zakat, SPT ---------- */
+.hero.card-gold { background: linear-gradient(135deg, #8C5A00 0%, #B27A12 45%, #3d2a05 100%); box-shadow: 0 10px 28px rgba(140, 90, 0, .28); }
+[data-theme=dark] .hero.card-gold { background: linear-gradient(135deg, #6b4708, #2a1d05); }
+.hero.card-gold::after { background: radial-gradient(circle, rgba(255, 236, 180, .32), transparent 70%); }
+.hero.card-gold .hero-safe b { color: #FFE7A8; }
+.price-chip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 12px; border-radius: 12px; background: var(--gold-c); color: var(--gold-d); font-size: 12.5px; margin-bottom: 12px; }
+.price-chip .ic { width: 16px; height: 16px; flex: none; } .price-chip span { flex: 1; min-width: 160px; } .price-chip small { opacity: .8; }
+[data-theme=dark] .price-chip { color: var(--gold); }
+.price-chip.stale { background: var(--warn-c); color: var(--warn); }
+.keping { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.keping > div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 6px; text-align: center; }
+.keping b { display: block; font-size: 20px; color: var(--gold-d); } [data-theme=dark] .keping b { color: var(--gold); } .keping small { color: var(--muted); font-size: 11.5px; }
+.own-grid { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.own { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.own b { flex: 1; font-size: 13.5px; font-weight: 600; }
+.own input { width: 72px; text-align: right; } .own i { font-style: normal; color: var(--muted); font-size: 12.5px; }
+.own-err:empty { display: none; }
+.r { text-align: right; }
+.calc-hint { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.bar.alok { position: relative; overflow: visible; height: 10px; }
+.bar.alok i { border-radius: 6px; }
+.bar.alok em { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); opacity: .75; }
+.alok-edit { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
+.alok-edit label { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 12px; }
+.alok-edit label > span { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.alok-edit label > span .ic { width: 17px; height: 17px; color: var(--primary); }
+.alok-edit input { width: 72px; text-align: right; } .alok-edit i { font-style: normal; color: var(--muted); }
+.alok-edit label.muted { opacity: .6; }
+.tbl td:nth-child(2), .tbl th:nth-child(2) { text-align: left; }
+.tbl td:first-child { font-variant-numeric: tabular-nums; color: var(--muted); }
+@media print {
+  #topbar, #sidebar, .bnav, nav, .fab, .chips, .btn, .tiles, .demo-banner, .auth-chip { display: none !important; }
+  body { background: #fff; } .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+}
+.tbl td:last-child { white-space: nowrap; }

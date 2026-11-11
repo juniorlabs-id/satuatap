@@ -29,7 +29,7 @@
     { id: 'rasio', icon: 'heart-pulse', label: 'Rasio & Skor', to: 'rapor/rasio' },
     { id: 'tren', icon: 'trending-up', label: 'Tren 12 Bulan', to: 'rapor/tren' },
     { id: 'ekspor', icon: 'file-down', label: 'Ekspor PDF/Excel', to: 'rapor/ekspor' },
-    { id: 'spt', icon: 'file-text', label: 'Ringkasan SPT', soon: true, act: 'soon' },
+    { id: 'spt', icon: 'file-text', label: 'Ringkasan SPT', to: 'spt' },
     { id: 'kilas', icon: 'sparkles', label: 'Kilas Balik', soon: true, act: 'soon' }
   ], cur);
 

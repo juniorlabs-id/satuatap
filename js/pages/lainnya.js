@@ -21,8 +21,8 @@
           { id: 'tuj', icon: 'target', label: 'Tujuan', to: 'tujuan' },
           { id: 'utg', icon: 'scale', label: 'Utang & Piutang', to: 'utang' },
           { id: 'tag', icon: 'receipt', label: 'Tagihan', to: 'kalender/tagihan' },
-          { id: 'zak', icon: 'hand-heart', label: 'Zakat & Sedekah', soon: true, act: 'soon', gold: true },
-          { id: 'emas', icon: 'gem', label: 'Brankas Emas', soon: true, act: 'soon', gold: true },
+          { id: 'zak', icon: 'hand-heart', label: 'Zakat & Sedekah', to: 'zakat', gold: true },
+          { id: 'emas', icon: 'gem', label: 'Brankas Emas', to: 'emas', gold: true },
           { id: 'kpr', icon: 'house', label: 'Simulasi KPR', to: 'utang/kpr' },
           { id: 'sim', icon: 'git-fork', label: 'Simulasi Keputusan', soon: true, act: 'soon' }
         ])}

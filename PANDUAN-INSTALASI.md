@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.2 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.3 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -91,6 +91,10 @@ Keempat nilai ini memang publik karena dipakai oleh browser. Pengamannya adalah 
 - **Laporan Masuk:** laporan masalah dan usul fitur dari pengguna.
 - **Statistik:** jumlah keluarga aktif, akun pengguna, aktivasi per bulan, dan kuota email.
 
+- **Harga Emas:** status harga hari ini, sumbernya, pesan galat bila pengambilan terakhir gagal, tombol **Ambil harga sekarang**, dan isian manual harga beli/buyback per gram yang langsung dipakai semua keluarga.
+
+**Harga emas otomatis.** Relay mengambil harga tiap 2 jam berurutan dari: halaman harga Logam Mulia (Antam) → harga-emas.org → harga spot dunia (dikonversi ke Rupiah dengan rasio hari sebelumnya). Riwayat tersimpan di sheet **HargaEmas** pada spreadsheet relay. Kalau situs sumber berubah tampilan dan semua cara gagal, harga terakhir tetap dipakai, ubin **Harga Emas** di Konsol diberi tanda **!**, dan Anda cukup mengisi harga manual di Konsol sampai relay diperbaiki. Harga manual hari itu tidak ditimpa pengambilan otomatis.
+
 Superadmin juga bisa **membuat data keluarga tanpa kode lisensi**; lisensi internal dibuat otomatis. Untuk menambah superadmin lain, isi Script Property relay `SUPERADMIN` dengan email (pisahkan dengan koma).
 
 **Cara cadangan — dari editor relay:**
@@ -178,6 +182,14 @@ Untuk berhenti, jalankan fungsi `hentikanPendamping`.
 - **Relay:** tempel kode baru, lalu buka **Deploy › Manage deployments** › ✏️ › **Version: New version** › Deploy. URL `/exec` tetap sama.
 - **Data keluarga** tidak perlu migrasi. Format log tetap kompatibel.
 
+**Khusus pembaruan ke 1.3 (Fase 2):**
+1. Unggah semua file aplikasi baru (ada file baru: `js/calc2.js`, `js/pages/emas.js`, `js/pages/investasi.js`, `js/pages/zakat.js`).
+2. Relay: tempel `Relay.gs` baru, lalu **Deploy › Manage deployments › ✏️ › Version: New version › Deploy**.
+3. Jalankan sekali fungsi **`setupRelay`** dari editor relay. Ini memasang pemicu `perbaruiHargaEmas` (tiap 2 jam) dan mengambil harga pertama. Rahasia yang sudah ada tidak ditimpa.
+4. Buka aplikasi dengan akun superadmin › **Lainnya › JuniorLabs › Harga Emas** dan pastikan harga sudah tampil.
+
+**Yang baru di 1.3:** Brankas Emas (koleksi per keping & gramasi, multi-pemilik, tautan ke Tujuan, tren akumulasi, jual sebagian + PPh 22, gadai/tebus, peringatan harga, simulasi jual), Investasi & aset lain (saham, reksa dana, SBN, deposito, kripto, properti, kendaraan), Target Alokasi, Zakat & Sedekah (mal dengan nisab & haul, penghasilan, fitrah, qurban, sedekah/donasi), dan Ringkasan SPT per tahun (unduh CSV). Tombol Catat Cepat kini bulat, dan setiap panel yang muncul dari bawah bisa ditutup dengan menggesernya ke bawah.
+
 ---
 
 ## Bagian E — Masalah umum
@@ -193,6 +205,8 @@ Untuk berhenti, jalankan fungsi `hentikanPendamping`.
 | "Kode lisensi sudah dipakai akun Google lain" | Jalankan `lepasLisensi('SA-…')` di relay (A5), lalu minta pembeli mengaktifkan ulang. |
 | Tombol **Sinkronkan** muncul | Izin Google dicabut atau server lisensi sedang tidak bisa dihubungi. Ketuk tombolnya untuk login ulang. |
 | Data pasangan belum muncul | Sinkron otomatis berjalan tiap 1 menit dan saat aplikasi dibuka. Bisa juga dipaksa lewat **Pengaturan › Data & Sinkron › Sinkron sekarang**. |
+| Harga emas tidak muncul / bertanda "perlu diperbarui" | Superadmin: buka Konsol › Harga Emas › Ambil sekarang, atau isi manual. Keluarga juga bisa memakai harga sendiri di **Brankas Emas › Harga & Alert › Isi manual**. |
+| Pemicu harga emas belum jalan | Jalankan `setupRelay` sekali lagi di editor relay (D, langkah 3). |
 | Saldo tidak cocok dengan bank | Buka **Aset › Kas & Bank › (dompet) › Cocokkan saldo**. |
 
 ---

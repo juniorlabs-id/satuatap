@@ -61,6 +61,16 @@
     });
   });
 
+  UI.act('ks-emas-ambil', async el => {
+    el.disabled = true; const r = await Relay.call('konsol.emas', { aksi: 'ambil' }); el.disabled = false;
+    UI.toast(r.message || (r.success ? 'Diperbarui.' : 'Gagal.'), r.success ? '' : 'warn'); if (r.success) { Harga.fetch(true); load(true); }
+  });
+  UI.act('ks-emas-manual', async el => {
+    const f = UI.formData(document.getElementById('ks-emas'));
+    el.disabled = true; const r = await Relay.call('konsol.emas', { beli: f.beli, buyback: f.buyback }); el.disabled = false;
+    UI.toast(r.message || (r.success ? 'Tersimpan.' : 'Gagal.'), r.success ? '' : 'warn'); if (r.success) { Harga.fetch(true); load(true); }
+  });
+
   function listHtml() {
     const all = (K.data && K.data.lisensi) || [];
     const rows = all.filter(L => (!K.st || L.status === K.st) && (!K.q || (L.kode + ' ' + L.keluarga + ' ' + L.emailAdmin + ' ' + L.catatan + ' ' + L.anggota.join(' ')).toLowerCase().indexOf(K.q) > -1));
@@ -72,7 +82,7 @@
   }
 
   UI.page('konsol', {
-    head: p => ({ title: { buat: 'Buat Kode Lisensi', laporan: 'Laporan Masuk', statistik: 'Statistik' }[p] || 'Konsol Lisensi', crumb: 'JuniorLabs', back: p ? 'konsol' : 'lainnya',
+    head: p => ({ title: { buat: 'Buat Kode Lisensi', laporan: 'Laporan Masuk', statistik: 'Statistik', emas: 'Harga Emas' }[p] || 'Konsol Lisensi', crumb: 'JuniorLabs', back: p ? 'konsol' : 'lainnya',
       right: `<button class="icon-btn" data-act="ks-reload" aria-label="Muat ulang">${I('refresh-cw')}</button>` }),
     nav: () => 'lainnya', noFab: true,
     render(p) {
@@ -82,8 +92,20 @@
       const L = K.data.lisensi, n = st => L.filter(x => x.status === st).length;
       const tiles = UI.tiles([
         { id: '', icon: 'list', label: 'Lisensi', to: 'konsol' }, { id: 'buat', icon: 'key-round', label: 'Buat Kode', to: 'konsol/buat' },
-        { id: 'laporan', icon: 'inbox', label: 'Laporan', to: 'konsol/laporan', badge: K.data.laporan.length ? String(K.data.laporan.length) : '' }, { id: 'statistik', icon: 'chart-column', label: 'Statistik', to: 'konsol/statistik' }
+        { id: 'laporan', icon: 'inbox', label: 'Laporan', to: 'konsol/laporan', badge: K.data.laporan.length ? String(K.data.laporan.length) : '' }, { id: 'statistik', icon: 'chart-column', label: 'Statistik', to: 'konsol/statistik' },
+        { id: 'emas', icon: 'gem', label: 'Harga Emas', to: 'konsol/emas', gold: true, badge: K.data.emasGalat ? '!' : '' }
       ], p || '');
+      if (p === 'emas') {
+        const h = K.data.emas, rw = h && h.riwayat || [];
+        return tiles + `<div class="card"><div class="row-sp"><div><small class="muted">Harga beli / gram</small><h3>${h ? U.rp(h.beli) : '—'}</h3></div><div class="r"><small class="muted">Buyback / gram</small><h3>${h ? U.rp(h.buyback) : '—'}</h3></div></div>
+            <div class="kv-list"><div class="kv"><span>Sumber</span><b>${h ? U.esc(h.sumber) : '—'}</b></div><div class="kv"><span>Tanggal</span><b>${h ? U.tgl(h.tanggal) : '—'}</b></div><div class="kv"><span>Diambil</span><b>${h && h.waktu ? U.timeAgo(h.waktu) : '—'}</b></div><div class="kv"><span>Riwayat tersimpan</span><b>${rw.length} hari</b></div></div>
+            ${rw.length > 2 ? Charts.line(rw.slice(-60).map(r => ({ d: r[0], bal: r[2] })), { fit: true, aria: 'Riwayat buyback' }) : ''}</div>
+          ${K.data.emasGalat ? `<div class="alert warn">${I('triangle-alert')}<div><b>Pengambilan terakhir gagal</b><small>${U.esc(K.data.emasGalat)}</small></div></div>` : ''}
+          <button class="btn block" data-act="ks-emas-ambil">${I('refresh-cw')} Ambil harga sekarang</button>
+          ${UI.sec('Isi manual untuk hari ini')}<div class="card" id="ks-emas"><div class="grid2">${UI.field('Harga beli / gram', UI.rpInput('beli', h && h.beli))}${UI.field('Buyback / gram', UI.rpInput('buyback', h && h.buyback))}</div>
+            <button class="btn block ghost" data-act="ks-emas-manual">${I('save')} Simpan untuk semua keluarga</button></div>
+          <p class="muted small">Relay mengambil harga otomatis tiap 2 jam (Logam Mulia → harga-emas.org → harga spot dunia). Harga manual hari ini tidak ditimpa pengambilan otomatis. Keluarga juga bisa memakai harga manual sendiri di Brankas Emas › Harga.</p>`;
+      }
       if (p === 'buat') return tiles + `
         <div class="card" id="ks-form"><div class="grid2">${UI.field('Jumlah kode', '<input type="number" name="jumlah" min="1" max="50" value="1">')}${UI.field('Catatan', '<input name="catatan" maxlength="120" placeholder="mis. Shopee #12345 / nama pembeli">')}</div>
           <button class="btn block" data-act="ks-buat">${I('key-round')} Buat kode</button></div>

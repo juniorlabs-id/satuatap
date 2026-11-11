@@ -83,6 +83,7 @@
     if (!m || m.aktif === false) { if (Store.t.Anggota.length) App.blocked('Akses Anda ke data keluarga ini sudah dicabut oleh Admin.'); return; }
     Store.me = Object.assign({}, Store.me, { id: m.id, nama: m.nama, email: m.email, peran: m.peran, warna: m.warna, izin: m.izin || {} });
     App.license(); App.monthly(); App.syncMembers(); App.mirror();
+    if (window.Harga) Harga.fetch().catch(() => {});
     App.checkSuper().then(v => { if (v && UI.cur === 'lainnya' && !document.querySelector('[data-to="konsol"]')) UI.render(); }).catch(() => {});
   }, 1500);
 

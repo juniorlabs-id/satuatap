@@ -23,18 +23,23 @@
                 'walletId', 'arsip', 'catatan', 'dibuat'],
     Pinjaman:  ['id', 'arah', 'jenis', 'pihak', 'pokok', 'bunga', 'metode', 'tenor', 'mulai', 'tanggalBayar',
                 'cicilan', 'walletId', 'lunas', 'catatan', 'dibuat'],
-    Laporan:   ['id', 'tanggal', 'jenis', 'modul', 'judul', 'deskripsi', 'prioritas', 'status']
+    Laporan:   ['id', 'tanggal', 'jenis', 'modul', 'judul', 'deskripsi', 'prioritas', 'status'],
+    Emas:      ['id', 'tanggal', 'merek', 'bentuk', 'gramKeping', 'jumlah', 'kadar', 'hargaBeli', 'biaya', 'walletId', 'tujuanId',
+                'kepemilikan', 'status', 'zakat', 'tglJual', 'hargaJual', 'pinjamanId', 'sertifikat', 'catatan', 'dibuat'],
+    Investasi: ['id', 'kelas', 'nama', 'kode', 'unit', 'modal', 'nilai', 'tglNilai', 'tanggal', 'walletId', 'tujuanId',
+                'kepemilikan', 'jatuhTempo', 'imbal', 'zakat', 'status', 'tglJual', 'hargaJual', 'catatan', 'dibuat', 'riwayatNilai']
   };
   const NUM = { saldoAwal: 1, urutan: 1, batas: 1, jumlah: 1, biaya: 1, tanggal_r: 1, estimasi: 1, target: 1, prioritas: 1,
-                setoranBulanan: 1, pokok: 1, bunga: 1, tenor: 1, tanggalBayar: 1, cicilan: 1, rev: 1 };
-  const BOOL = { likuid: 1, arsip: 1, bawaSisa: 1, tetap: 1, langganan: 1, aktif: 1, besar: 1, lunas: 1 };
-  const JSONC = { izin: 1, riwayat: 1 };
+                setoranBulanan: 1, pokok: 1, bunga: 1, tenor: 1, tanggalBayar: 1, cicilan: 1, rev: 1,
+                gramKeping: 1, kadar: 1, hargaBeli: 1, hargaJual: 1, unit: 1, modal: 1, nilai: 1, imbal: 1 };
+  const BOOL = { likuid: 1, arsip: 1, bawaSisa: 1, tetap: 1, langganan: 1, aktif: 1, besar: 1, lunas: 1, zakat: 1 };
+  const JSONC = { izin: 1, riwayat: 1, kepemilikan: 1, riwayatNilai: 1 };
 
   function typed(t, col, v) {
     if (v === undefined || v === null) v = '';
-    if (JSONC[col]) { if (typeof v === 'object') return v; try { return v ? JSON.parse(v) : (col === 'riwayat' ? [] : {}); } catch (e) { return col === 'riwayat' ? [] : {}; } }
+    if (JSONC[col]) { const arr = col === 'riwayat' || col === 'riwayatNilai'; if (typeof v === 'object') return v; try { return v ? JSON.parse(v) : (arr ? [] : {}); } catch (e) { return arr ? [] : {}; } }
     if (BOOL[col]) return v === true || v === 'true';
-    if (NUM[col] || (t === 'Rutin' && (col === 'tanggal' || col === 'bulan'))) return v === '' ? 0 : Number(v) || 0;
+    if ((NUM[col] && t !== 'Pengaturan') || (t === 'Rutin' && (col === 'tanggal' || col === 'bulan'))) return v === '' ? 0 : Number(v) || 0;
     return String(v);
   }
   function rowFromArray(t, cols, arr) {

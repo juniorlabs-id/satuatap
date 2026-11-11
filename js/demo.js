@@ -6,7 +6,7 @@
     const R = rng(20261110), pick = a => a[Math.floor(R() * a.length)], between = (a, b) => Math.round((a + R() * (b - a)) / 500) * 500;
     const today = U.today(), now = new Date().toISOString();
     const D = 'dimas@contoh.id', N = 'rini@contoh.id';
-    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [] };
+    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [], Emas: [], Investasi: [] };
     T.Anggota.push({ id: 'm1', nama: 'Dimas', email: D, peran: 'admin', warna: '#0F5E59', izin: '{}', aktif: 'true', dibuat: now });
     T.Anggota.push({ id: 'm2', nama: 'Rini', email: N, peran: 'pasangan', warna: '#F2B33D', izin: '{}', aktif: 'true', dibuat: now });
     [['namaKeluarga', 'Keluarga Dimas & Rini'], ['periodeMulai', '1'], ['danaDaruratBulan', '6'], ['notifEmail', 'true'], ['kalenderSync', 'false'],
@@ -113,6 +113,33 @@
     // Geser dana contoh
     const pk = U.today().slice(0, 7);
     T.GeserDana.push({ id: 'gd1', tanggal: U.addDays(today, -2), periode: pk, dari: 'k_trp', ke: 'k_mkn', jumlah: '150000', catatan: 'Jajan martabak mertua' });
+    // ---- Fase 2: Brankas Emas & investasi ----
+    T.Tujuan.push({ id: 'g_qur', nama: 'Qurban Idul Adha', ikon: 'beef', target: '4000000', tenggat: U.addMonths(today, 6), prioritas: '5', jenis: 'bersama', pemilik: '', setoranBulanan: '500000', walletId: '', arsip: 'false', catatan: '', dibuat: start });
+    const E = (id, tgl, merek, bentuk, gram, n, kadar, harga, extra) => T.Emas.push(Object.assign({ id, tanggal: tgl, merek, bentuk, gramKeping: String(gram), jumlah: String(n), kadar: String(kadar), hargaBeli: String(harga), biaya: '0',
+      walletId: '', tujuanId: '', kepemilikan: '{}', status: 'simpan', zakat: bentuk === 'perhiasan' ? 'false' : 'true', tglJual: '', hargaJual: '0', pinjamanId: '', sertifikat: '', catatan: '', dibuat: now }, extra || {}));
+    E('e1', U.addMonths(today, -22), 'Antam', 'batangan', 5, 2, 24, 11300000, { kepemilikan: JSON.stringify({ [D]: 50, [N]: 50 }), sertifikat: 'CertiEye' });
+    E('e2', U.addMonths(today, -14), 'Antam', 'batangan', 10, 1, 24, 15600000 * 1.07, { tujuanId: 'g_pdd', catatan: 'Untuk uang pangkal SD Aisha' });
+    E('e3', U.addMonths(today, -9), 'Galeri24', 'batangan', 1, 6, 24, 6 * 1530000, { kepemilikan: JSON.stringify({ [N]: 100 }) });
+    E('e4', U.addMonths(today, -30), 'Perhiasan', 'perhiasan', 8, 1, 18, 7200000, { catatan: 'Cincin & gelang mahar', kepemilikan: JSON.stringify({ [N]: 100 }) });
+    E('e5', U.addMonths(today, -5), 'Antam', 'batangan', 2, 1, 24, 2 * 2380000, { tujuanId: 'g_qur' });
+    E('e6', U.addMonths(today, -26), 'UBS', 'batangan', 2, 1, 24, 2 * 1050000, { status: 'terjual', tglJual: U.addMonths(today, -3), hargaJual: String(2 * 2300000), catatan: 'Dijual untuk biaya rumah sakit' });
+    E('e7', U.addMonths(today, -2), 'Pegadaian (digital)', 'digital', 0.85, 1, 24, Math.round(0.85 * 2510000));
+    const IV = (id, kelas, nama, kode, unit, modal, nilai, tgl, extra) => T.Investasi.push(Object.assign({ id, kelas, nama, kode, unit: String(unit), modal: String(modal), nilai: String(nilai), tglNilai: U.addDays(today, -3), tanggal: tgl,
+      walletId: '', tujuanId: '', kepemilikan: '{}', jatuhTempo: '', imbal: '0', zakat: ['properti', 'kendaraan', 'lain'].indexOf(kelas) > -1 ? 'false' : 'true', status: 'aktif', tglJual: '', hargaJual: '0', catatan: '', dibuat: now,
+      riwayatNilai: JSON.stringify([[U.addMonths(today, -6), Math.round(modal * 0.97)], [U.addMonths(today, -3), Math.round((modal + nilai) / 2)], [U.addDays(today, -3), nilai]]) }, extra || {}));
+    IV('i1', 'saham', 'Bank Central Asia', 'BBCA', 1000, 8900000, 9650000, U.addMonths(today, -18), { kepemilikan: JSON.stringify({ [D]: 100 }) });
+    IV('i2', 'saham', 'Telkom Indonesia', 'TLKM', 2000, 7400000, 6100000, U.addMonths(today, -12));
+    IV('i3', 'reksadana', 'RD Pasar Uang Syariah', 'Bibit', 8350.5, 12000000, 12540000, U.addMonths(today, -10), { tujuanId: 'g_dar', imbal: '4.6' });
+    IV('i4', 'sbn', 'Sukuk Tabungan ST011', 'ST011', 10, 10000000, 10000000, U.addMonths(today, -16), { jatuhTempo: U.addMonths(today, 8), imbal: '6.35' });
+    IV('i5', 'deposito', 'Deposito BCA 6 bulan', '', 0, 20000000, 20380000, U.addMonths(today, -4), { jatuhTempo: U.addMonths(today, 2), imbal: '3.5' });
+    IV('i6', 'properti', 'Rumah Bekasi', 'SHM', 90, 650000000, 780000000, U.addMonths(today, -48), { catatan: 'Ditempati sendiri, KPR BTN' });
+    IV('i7', 'kendaraan', 'Toyota Avanza 2021', 'B 1234 XYZ', 0, 210000000, 165000000, U.addMonths(today, -40));
+    T.Pengaturan.push({ id: 'targetAlokasi', nilai: JSON.stringify({ kas: 25, emas: 25, saham: 15, reksadana: 20, tetap: 15, lain: 0 }) });
+    T.Pengaturan.push({ id: 'zakatHaul', nilai: U.addDays(today, -300) });
+    T.Pengaturan.push({ id: 'zakatJiwa', nilai: '4' });
+    T.Pengaturan.push({ id: 'hargaAlert', nilai: JSON.stringify({ jual: 2400000, beli: 2400000 }) });
+    tx(U.addDays(today, -6), 'keluar', 2500000, 'k_sdk', 'w_bca', 'Zakat penghasilan bulan lalu', D, { tag: 'zakat-penghasilan' });
+    tx(U.addDays(today, -4), 'keluar', 200000, 'k_sdk', 'w_gopay', 'Panti Asuhan Al-Ikhlas', N, { tag: 'sedekah' });
     return T;
   }
 
