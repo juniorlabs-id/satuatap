@@ -13,7 +13,9 @@
     const out = [], base = 2480000; let v = base;
     for (let i = 119; i >= 0; i--) { v = Math.round((v + (Math.sin(i / 9) * 9000) + 1500) / 1000) * 1000; out.push([U.addDays(U.today(), -i), v, Math.round(v * 0.918 / 1000) * 1000]); }
     const l = out[out.length - 1];
-    return { beli: l[1], buyback: l[2], tanggal: l[0], sumber: 'Contoh (mode demo)', waktu: new Date().toISOString(), riwayat: out, at: Date.now() };
+    const mk = (nama, fb, fj) => ({ nama, beli: Math.round(l[1] * fb / 1000) * 1000, buyback: Math.round(l[2] * fj / 1000) * 1000, tanggal: l[0] });
+    const merek = { UBS: mk('UBS', 0.972, 0.984), GALERI24: mk('GALERI 24', 0.986, 1.004), LOTUSARCHI: mk('LOTUS ARCHI', 0.976, 0.98), EMASKITA: mk('EMASKITA', 0.964, 0.986) };
+    return { beli: l[1], buyback: l[2], tanggal: l[0], sumber: 'Contoh (mode demo)', waktu: new Date().toISOString(), riwayat: out, merek, at: Date.now() };
   }
   /** Ambil harga terbaru dari relay (maks tiap 3 jam kecuali dipaksa). */
   Harga.fetch = async (force) => {
@@ -37,27 +39,35 @@
   C.hargaEmas = () => M('hargaEmas', () => {
     let man = null; try { man = JSON.parse(Store.setting('hargaEmasManual', '') || 'null'); } catch (e) {}
     const mode = Store.setting('hargaEmasMode', 'otomatis'), auto = Harga.data;
-    const pakaiManual = man && man.beli && (mode === 'manual' || !auto);
+    const pakaiManual = man && man.beli && (mode === 'manual' || !auto || !auto.beli);
     const h = pakaiManual ? { beli: man.beli, buyback: man.buyback, tanggal: man.tanggal, sumber: 'Diisi manual keluarga', riwayat: auto ? auto.riwayat : [] }
-      : auto ? { beli: auto.beli, buyback: auto.buyback, tanggal: auto.tanggal, sumber: auto.sumber, riwayat: auto.riwayat || [] } : null;
+      : auto && auto.beli ? { beli: auto.beli, buyback: auto.buyback, tanggal: auto.tanggal, sumber: auto.sumber, riwayat: auto.riwayat || [] } : null;
     if (h) { h.mode = pakaiManual ? 'manual' : 'otomatis'; h.basi = U.diffDays(h.tanggal, U.today()) > 3; }
     return h;
   });
   C.geserHarga = 0;                            // simulasi ± % (halaman Brankas Emas)
-  const bb = () => { const h = C.hargaEmas(); return h ? h.buyback * (1 + C.geserHarga / 100) : 0; };
+  /** Harga merek lain (UBS, Galeri24, Lotus Archi, Emaskita…) dari Galeri24. Antam selalu dari Logam Mulia. */
+  C.kunciMerek = m => String(m || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  C.hargaMerekList = () => { const d = Harga.data && Harga.data.merek; return d ? Object.keys(d).map(k => Object.assign({ key: k }, d[k])).sort((a, b) => a.nama.localeCompare(b.nama)) : []; };
+  /** Harga untuk satu keping: {beli, buyback, sumber, merek:true|false}. Perhiasan & merek tanpa data → harga Antam × kadar. */
+  C.hargaLot = (e) => {
+    const k = C.kunciMerek(e && e.merek), d = Harga.data && Harga.data.merek, x = d && k && k !== 'ANTAM' && e.bentuk !== 'perhiasan' ? d[k] : null;
+    if (x && x.buyback) return { beli: x.beli, buyback: x.buyback, sumber: x.nama + ' · Galeri24', merek: true, tanggal: x.tanggal };
+    const h = C.hargaEmas(); return h ? { beli: h.beli, buyback: h.buyback, sumber: h.sumber, merek: false, tanggal: h.tanggal } : null;
+  };
 
   // ---------- Brankas Emas ----------
   const gramOf = e => (e.gramKeping || 0) * (e.jumlah || 1);
   const murni = e => gramOf(e) * U.clamp((e.kadar || 24) / 24, 0, 1);
-  C.MEREK_EMAS = ['Antam', 'UBS', 'Galeri24', 'Lotus Archi', 'King Halim', 'Pegadaian (digital)', 'Perhiasan', 'Lainnya'];
+  C.MEREK_EMAS = ['Antam', 'UBS', 'Galeri24', 'Lotus Archi', 'Emaskita', 'King Halim', 'Pegadaian (digital)', 'Perhiasan', 'Lainnya'];
   C.GRAMASI = [0.5, 1, 2, 3, 5, 10, 25, 50, 100];
   C.emasLots = (all) => M('emasLots:' + !!all + ':' + C.geserHarga, () => {
-    const harga = bb();
+    const f = 1 + C.geserHarga / 100;
     return Store.t.Emas.filter(e => all || e.status !== 'terjual').map(e => {
-      const gram = gramOf(e), gm = murni(e), modal = (e.hargaBeli || 0) + (e.biaya || 0);
+      const gram = gramOf(e), gm = murni(e), modal = (e.hargaBeli || 0) + (e.biaya || 0), hl = C.hargaLot(e), harga = hl ? hl.buyback * f : 0;
       const nilai = e.status === 'terjual' ? (e.hargaJual || 0) : Math.round(gm * harga);
       const umur = U.diffDays(e.tanggal || U.today(), U.today());
-      return { e, gram, gramMurni: gm, modal, nilai, untung: nilai - modal, pct: modal ? (nilai - modal) / modal : 0, umur, haul: umur >= HAUL_HARI, perGram: gram ? modal / gram : 0 };
+      return { e, gram, gramMurni: gm, modal, nilai, hargaGram: harga, hargaSumber: hl ? hl.sumber : '', untung: nilai - modal, pct: modal ? (nilai - modal) / modal : 0, umur, haul: umur >= HAUL_HARI, perGram: gram ? modal / gram : 0 };
     }).sort((a, b) => (b.e.tanggal || '').localeCompare(a.e.tanggal || ''));
   });
   /** Bagian kepemilikan {email|'bersama': fraksi}. */
@@ -158,7 +168,7 @@
     Store.wallets().forEach(w => { const v = Math.max(0, b[w.id] || 0); if (v) items.push({ grup: 'Kas & tabungan', nama: w.nama, v }); });
     C.goals().filter(g => !g.t.walletId && g.dana > 0).forEach(g => items.push({ grup: 'Kas & tabungan', nama: 'Dana tujuan: ' + g.t.nama, v: g.dana }));
     const hb = h ? h.buyback : 0;
-    C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.fmtNum(l.gram) + ' g', v: Math.round(l.gramMurni * hb) }));
+    C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.fmtNum(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
     C.investasi().filter(i => i.x.zakat).forEach(i => items.push({ grup: (C.KELAS[i.x.kelas] || C.KELAS.lain).label, nama: i.x.nama, v: i.nilai }));
     if (Store.setting('zakatPiutang', 'true') !== 'false') C.loans().filter(l => !l.lunas && l.p.arah === 'piutang').forEach(l => items.push({ grup: 'Piutang', nama: l.p.pihak, v: l.sisa }));
     const modeUtang = Store.setting('zakatUtang', 'jatuhTempo');

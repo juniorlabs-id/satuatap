@@ -464,3 +464,4 @@ details.lap summary { list-style: none; } details.lap summary::-webkit-details-m
   body { background: #fff; } .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
 }
 .tbl td:last-child { white-space: nowrap; }
+.tbl.merek td:first-child { color: var(--ink); font-weight: 600; } .tbl.merek td:nth-child(2), .tbl.merek th:nth-child(2) { text-align: right; }

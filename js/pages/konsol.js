@@ -97,14 +97,15 @@
       ], p || '');
       if (p === 'emas') {
         const h = K.data.emas, rw = h && h.riwayat || [];
-        return tiles + `<div class="card"><div class="row-sp"><div><small class="muted">Harga beli / gram</small><h3>${h ? U.rp(h.beli) : '—'}</h3></div><div class="r"><small class="muted">Buyback / gram</small><h3>${h ? U.rp(h.buyback) : '—'}</h3></div></div>
+        return tiles + `<div class="card"><div class="row-sp"><div><small class="muted">Harga beli / gram</small><h3>${h && h.beli ? U.rp(h.beli) : '—'}</h3></div><div class="r"><small class="muted">Buyback / gram</small><h3>${h && h.buyback ? U.rp(h.buyback) : '—'}</h3></div></div>
             <div class="kv-list"><div class="kv"><span>Sumber</span><b>${h ? U.esc(h.sumber) : '—'}</b></div><div class="kv"><span>Tanggal</span><b>${h ? U.tgl(h.tanggal) : '—'}</b></div><div class="kv"><span>Diambil</span><b>${h && h.waktu ? U.timeAgo(h.waktu) : '—'}</b></div><div class="kv"><span>Riwayat tersimpan</span><b>${rw.length} hari</b></div></div>
             ${rw.length > 2 ? Charts.line(rw.slice(-60).map(r => ({ d: r[0], bal: r[2] })), { fit: true, aria: 'Riwayat buyback' }) : ''}</div>
+          ${h && h.merek ? `${UI.sec('Merek lain (Galeri24)', '<small class="muted">' + (h.merekWaktu ? U.timeAgo(h.merekWaktu) : '') + '</small>')}<div class="card"><table class="tbl merek"><thead><tr><th>Merek</th><th>Beli</th><th>Buyback</th></tr></thead><tbody>${Object.keys(h.merek).map(k => `<tr><td>${U.esc(h.merek[k].nama)}</td><td>${U.rp(h.merek[k].beli)}</td><td>${U.rp(h.merek[k].buyback)}</td></tr>`).join('')}</tbody></table></div>` : ''}
           ${K.data.emasGalat ? `<div class="alert warn">${I('triangle-alert')}<div><b>Pengambilan terakhir gagal</b><small>${U.esc(K.data.emasGalat)}</small></div></div>` : ''}
           <button class="btn block" data-act="ks-emas-ambil">${I('refresh-cw')} Ambil harga sekarang</button>
           ${UI.sec('Isi manual untuk hari ini')}<div class="card" id="ks-emas"><div class="grid2">${UI.field('Harga beli / gram', UI.rpInput('beli', h && h.beli))}${UI.field('Buyback / gram', UI.rpInput('buyback', h && h.buyback))}</div>
             <button class="btn block ghost" data-act="ks-emas-manual">${I('save')} Simpan untuk semua keluarga</button></div>
-          <p class="muted small">Relay mengambil harga 1 gram emas batangan Antam tiap 2 jam langsung dari logammulia.com (tab Beli untuk harga beli, tab Jual untuk buyback). Bila situs tidak terbaca, harga Antam terakhir tetap dipakai — tidak berpindah ke sumber lain. Harga manual hari ini tidak ditimpa pengambilan otomatis. Keluarga juga bisa memakai harga manual sendiri di Brankas Emas › Harga.</p>`;
+          <p class="muted small">Antam diambil tiap 2 jam dari logammulia.com lewat jembatan Vercel (cadangan: situs yang menyalin harga resmi Antam). Merek lain (UBS, Galeri24, Lotus Archi, Emaskita) dari galeri24.co.id. Bila gagal, harga terakhir tetap dipakai. Harga manual hari ini tidak ditimpa pengambilan otomatis. Keluarga juga bisa memakai harga manual sendiri di Brankas Emas › Harga.</p>`;
       }
       if (p === 'buat') return tiles + `
         <div class="card" id="ks-form"><div class="grid2">${UI.field('Jumlah kode', '<input type="number" name="jumlah" min="1" max="50" value="1">')}${UI.field('Catatan', '<input name="catatan" maxlength="120" placeholder="mis. Shopee #12345 / nama pembeli">')}</div>

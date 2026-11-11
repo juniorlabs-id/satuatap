@@ -1,4 +1,4 @@
 {
   "regions": ["sin1"],
-  "functions": { "api/emas.js": { "maxDuration": 30 } }
+  "functions": { "api/emas.js": { "maxDuration": 60 } }
 }

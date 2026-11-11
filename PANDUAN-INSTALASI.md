@@ -97,6 +97,12 @@ Keempat nilai ini memang publik karena dipakai oleh browser. Pengamannya adalah 
 
 **Jembatan Vercel (wajib).** Situs Logam Mulia menolak permintaan dari server Google (HTTP 403), jadi relay mengambil harga lewat fungsi kecil `api/emas.js` yang ikut di repo aplikasi dan berjalan gratis di Vercel (region Singapura, diatur `vercel.json`). Pastikan folder `api/` dan `vercel.json` ikut di-push. Cek di browser: `https://satuatap.vercel.app/api/emas` harus membalas `"success":true` dengan harga beli & buyback; tambahkan `?cek=1` untuk melihat diagnosis. Kalau alamat situs Anda berbeda, isi Script Property relay `EMAS_PROXY` dengan alamat lengkapnya.
 
+**Cadangan bila Logam Mulia memblokir semua server.** Jembatan Vercel dan relay lalu membaca situs yang menyalin harga resmi Antam setiap hari (Pusat Data Kontan, lalu harga-emas.org). Hanya baris Antam yang dibaca, jadi angkanya tetap angka resmi Antam — hanya bisa terlambat beberapa jam setelah Antam memperbarui. Sumber di aplikasi tertulis "Logam Mulia (Antam) · via Kontan".
+
+**Harga merek lain.** UBS, Galeri24, Lotus Archi, dan Emaskita diambil dari halaman resmi `galeri24.co.id/harga-emas` (harga 1 gram) lewat jembatan Vercel yang sama. Keping dengan merek itu dinilai memakai harganya sendiri; Antam tetap mengikuti logammulia.com, dan perhiasan atau merek lain memakai harga Antam × kadar.
+
+**Opsional — layanan perantara.** Bila Logam Mulia dan situs penyalin sama-sama menolak server, daftar di layanan perantara pengambil halaman (mis. ScraperAPI atau Scrape.do), lalu di Vercel buka **Settings › Environment Variables**, tambahkan `EMAS_FETCH_VIA` berisi templat alamat dari layanan itu dengan `{url}` di posisi alamat halaman, contoh `https://api.scraperapi.com/?api_key=KUNCI_ANDA&country_code=id&url={url}`. Kunci hanya disimpan di Vercel, tidak di repo. Redeploy, lalu cek `?cek=1`.
+
 **Memeriksa koneksi ke Logam Mulia:** di editor relay, pilih fungsi **`cekHargaEmas`** lalu ▶ Jalankan. Log menampilkan apakah kedua halaman terbuka, angka 1 gram yang terbaca, dan cuplikan teks halaman.
 
 Superadmin juga bisa **membuat data keluarga tanpa kode lisensi**; lisensi internal dibuat otomatis. Untuk menambah superadmin lain, isi Script Property relay `SUPERADMIN` dengan email (pisahkan dengan koma).

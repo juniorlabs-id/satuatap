@@ -58,12 +58,13 @@
       foot: `${isNew ? '' : `<button class="btn ghost danger" data-del>${I('trash-2')}</button>`}<button class="btn" data-ok>${I('check')} Simpan</button>` });
     UI.bindRp(s.el);
     const f = () => UI.formData(s.el), hint = s.el.querySelector('.calc-hint');
+    let hl = null;
     const sync = () => {
       const v = f(), gram = (Number(v.gramKeping) || 0) * (Number(v.jumlah) || 1);
       s.el.querySelector('[data-kadar]').hidden = v.bentuk !== 'perhiasan';
       s.el.querySelectorAll('[data-g]').forEach(c => c.classList.toggle('on', Number(c.dataset.g) === Number(v.gramKeping)));
       const tot = (v.hargaBeli || 0) + (v.biaya || 0);
-      hint.innerHTML = gram ? `Total ${g(gram)} gram${tot ? ' · ' + U.rp(Math.round(tot / gram)) + '/gram' : ''}${h && tot ? ' · nilai buyback hari ini ' + U.rp(Math.round(gram * (v.bentuk === 'perhiasan' ? Number(v.kadar) / 24 : 1) * h.buyback)) : ''}` : '';
+      hint.innerHTML = gram ? `Total ${g(gram)} gram${tot ? ' · ' + U.rp(Math.round(tot / gram)) + '/gram' : ''}${(hl = Calc.hargaLot(v)) && tot ? ' · nilai buyback hari ini ' + U.rp(Math.round(gram * (v.bentuk === 'perhiasan' ? Number(v.kadar) / 24 : 1) * hl.buyback)) + (hl.merek ? ' (harga ' + U.esc(v.merek) + ')' : '') : ''}` : '';
     };
     s.el.addEventListener('input', sync); s.el.addEventListener('change', e2 => {
       if (e2.target.name === 'bentuk') { const z = s.el.querySelector('[name=zakat]'); z.checked = e2.target.value !== 'perhiasan'; if (e2.target.value === 'perhiasan') s.el.querySelector('[name=merek]').value = 'Perhiasan'; else s.el.querySelector('[name=kadar]').value = '24'; }
@@ -71,7 +72,7 @@
     });
     s.el.querySelectorAll('[data-g]').forEach(c => c.onclick = () => { s.el.querySelector('[name=gramKeping]').value = c.dataset.g; sync(); });
     const hb = s.el.querySelector('[data-hari]');
-    if (hb) hb.onclick = () => { const v = f(); s.el.querySelector('[name=hargaBeli]').value = U.fmtNum(Math.round((Number(v.gramKeping) || 0) * (Number(v.jumlah) || 1) * h.beli)); sync(); };
+    if (hb) hb.onclick = () => { const v = f(), hx = Calc.hargaLot(v) || h; s.el.querySelector('[name=hargaBeli]').value = U.fmtNum(Math.round((Number(v.gramKeping) || 0) * (Number(v.jumlah) || 1) * hx.beli)); sync(); };
     sync();
     s.el.querySelector('[data-ok]').onclick = () => {
       const v = f(), kp = UI.readKepemilikan(s.el);
@@ -100,6 +101,7 @@
       <div class="kv-list">
         <div class="kv"><span>Berat</span><b>${e.jumlah > 1 ? e.jumlah + ' × ' + g(e.gramKeping) + ' g = ' : ''}${g(l.gram)} g${e.bentuk === 'perhiasan' ? ' (' + e.kadar + 'K ≈ ' + g(l.gramMurni) + ' g murni)' : ''}</b></div>
         <div class="kv"><span>Harga beli</span><b>${UI.m(l.modal)} · ${U.rp(Math.round(l.perGram))}/g</b></div>
+        ${aktif && l.hargaGram ? `<div class="kv"><span>Buyback dipakai</span><b>${U.rp(Math.round(l.hargaGram))}/g · ${U.esc(l.hargaSumber)}</b></div>` : ''}
         <div class="kv"><span>Dibeli</span><b>${U.tgl(e.tanggal)} · ${l.umur} hari</b></div>
         <div class="kv"><span>Haul zakat</span><b>${e.zakat ? (l.haul ? '✓ Sudah 1 tahun Hijriah' : 'Kurang ' + (354 - l.umur) + ' hari') : 'Tidak dihitung zakat'}</b></div>
         <div class="kv"><span>Pemilik</span><b>${U.esc(UI.ownLabel(e.kepemilikan))}</b></div>
@@ -116,7 +118,7 @@
 
   // ---------- Jual ----------
   function jualForm(l) {
-    const e = l.e, h = Calc.hargaEmas();
+    const e = l.e, h = Calc.hargaLot(e);
     const s = UI.sheet({ title: 'Jual emas', cls: 'small', body: `
       ${e.jumlah > 1 ? UI.field('Keping yang dijual', `<input type="number" name="n" min="1" max="${e.jumlah}" value="${e.jumlah}">`, 'Dari ' + e.jumlah + ' keping @ ' + g(e.gramKeping) + ' g') : ''}
       ${UI.field('Harga buyback per gram', UI.rpInput('hb', h ? h.buyback : 0))}
@@ -264,7 +266,9 @@
             ${h ? `<small class="muted">Selisih beli–buyback ${U.rp(h.beli - h.buyback)} (${U.pct((h.beli - h.buyback) / h.beli, 1)}) · ${U.esc(h.sumber)} · ${U.tgl(h.tanggal)}</small>` : ''}
             ${pts.length > 2 ? `<h4 class="mini-h">Buyback ${pts.length} hari terakhir <small class="${ch >= 0 ? 'ok' : 'bad'}">${ch >= 0 ? '▲' : '▼'} ${U.rp(Math.abs(ch))} / 30 hari</small></h4>${Charts.line(pts, { fit: true, aria: 'Riwayat harga buyback' })}` : ''}
             <div class="row-btns"><button class="btn ghost sm" data-act="emas-refresh">${I('refresh-cw')} Perbarui</button><button class="btn ghost sm" data-act="emas-manual">${I('pencil')} Isi manual</button></div></div>
-          <div class="card">${UI.field('Sumber harga yang dipakai', `<select data-change="emas-mode"><option value="otomatis" ${Store.setting('hargaEmasMode', 'otomatis') !== 'manual' ? 'selected' : ''}>Otomatis (harian, dari JuniorLabs)</option><option value="manual" ${Store.setting('hargaEmasMode', '') === 'manual' ? 'selected' : ''}>Manual (isian keluarga)</option></select>`, 'Harga otomatis mengacu pada emas Antam. Merek lain biasanya sedikit berbeda.')}</div>
+          ${(() => { const ml = Calc.hargaMerekList(); return ml.length ? `${UI.sec('Merek lain', '<small class="muted">harga per gram (1 g) · galeri24.co.id</small>')}<div class="card"><table class="tbl merek"><thead><tr><th>Merek</th><th>Beli</th><th>Buyback</th></tr></thead><tbody>${ml.map(x => `<tr><td>${U.esc(x.nama)}</td><td>${U.rp(x.beli)}</td><td>${U.rp(x.buyback)}</td></tr>`).join('')}</tbody></table>
+            <small class="muted">Dipakai otomatis untuk keping bermerek sama. Antam selalu mengikuti logammulia.com; perhiasan & merek lain memakai harga Antam × kadar.</small></div>` : ''; })()}
+          <div class="card">${UI.field('Sumber harga yang dipakai', `<select data-change="emas-mode"><option value="otomatis" ${Store.setting('hargaEmasMode', 'otomatis') !== 'manual' ? 'selected' : ''}>Otomatis (harian, dari JuniorLabs)</option><option value="manual" ${Store.setting('hargaEmasMode', '') === 'manual' ? 'selected' : ''}>Manual (isian keluarga)</option></select>`, 'Antam mengikuti logammulia.com; UBS, Galeri24, Lotus Archi & Emaskita mengikuti galeri24.co.id. Isian manual hanya mengganti harga Antam.')}</div>
           <div class="card"><div class="row-sp"><b>${I('bell')} Peringatan harga</b><button class="link" data-act="emas-alert">Atur</button></div>
             <small class="muted">${a.jual ? 'Jual bila buyback ≥ ' + U.rp(a.jual) : 'Target jual belum diatur'} · ${a.beli ? 'beli bila ≤ ' + U.rp(a.beli) : 'target beli belum diatur'}</small></div>
           <div class="card"><b>${I('receipt')} Pajak jual-beli emas</b>
