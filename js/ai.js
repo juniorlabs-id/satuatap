@@ -17,7 +17,9 @@
   AI.siap = () => AI.demo() || !!AI.cfg().key;
 
   /** Daftar model yang bisa dipakai kunci ini → pilih Flash stabil terbaru (bukan lite/preview/live/tts/image). */
+  const UTAMA = 'gemini-3.5-flash';   // terbukti cepat & stabil di kunci gratis (Nov 2026)
   AI.pilihModel = (names) => {
+    if ((names || []).indexOf(UTAMA) >= 0) return UTAMA;
     const ok = names.filter(n => /gemini/.test(n) && !/(tts|image|live|audio|embedding|vision|thinking|exp|learnlm|robotics|computer)/.test(n));
     const ver = n => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
     const rank = n => (/flash/.test(n) ? 100 : /pro/.test(n) ? 10 : 0) + (/lite/.test(n) ? -40 : 0) + (/preview/.test(n) ? -25 : 0) + (/latest/.test(n) ? -5 : 0) + ver(n);
@@ -62,21 +64,40 @@
     const c = AI.cfg(); if (!c.key) throw new Error('Kunci Gemini belum diisi. Buka Lainnya › Tanya AI.');
     const parts = [{ text: prompt }];
     if (opt.gambar) parts.push({ inline_data: { mime_type: opt.gambar.mime, data: opt.gambar.data } });
-    const body = { contents: [{ role: 'user', parts }], generationConfig: { temperature: opt.json ? 0.1 : 0.4, maxOutputTokens: opt.maks || 900 } };
+    const body = { contents: [{ role: 'user', parts }], generationConfig: { temperature: opt.json ? 0.1 : 0.4, maxOutputTokens: Math.max(2048, opt.maks || 0) } };
     if (opt.sistem) body.systemInstruction = { parts: [{ text: opt.sistem }] };
     if (opt.json) body.generationConfig.responseMimeType = 'application/json';
+    // Mode "berpikir" dibuat seminim mungkin: lebih cepat & token tidak habis untuk berpikir (jawaban terpotong).
+    const pikir = (model) => {
+      const v = /gemini-(\d+(?:\.\d+)?)/.exec(model), n = v ? parseFloat(v[1]) : 0;
+      if (n >= 3) return { thinkingLevel: 'low' };
+      if (n >= 2.5 && /flash/.test(model)) return { thinkingBudget: 0 };
+      return null;
+    };
+    const tanpaPikir = {};
     const coba = async (model) => {
-      const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(c.key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const b = JSON.parse(JSON.stringify(body)), tk = !tanpaPikir[model] && pikir(model);
+      if (tk) b.generationConfig.thinkingConfig = tk;
+      const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, batas = setTimeout(() => ac && ac.abort(), opt.gambar ? 45000 : 30000);
+      let r;
+      try { r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(c.key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b), signal: ac ? ac.signal : undefined }); }
+      catch (x) { const e = new Error(x && x.name === 'AbortError' ? 'Gemini terlalu lama menjawab. Coba lagi.' : 'Tidak bisa menghubungi Gemini. Periksa internet.'); e.status = 504; throw e; }
+      finally { clearTimeout(batas); }
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) { const e = new Error(pesanGalat(r.status, j)); e.status = r.status; throw e; }
+      if (!r.ok) {
+        if (r.status === 400 && tk && /thinking/i.test((j.error && j.error.message) || '')) { tanpaPikir[model] = 1; return coba(model); }   // model tidak mengenal pengaturan ini
+        const e = new Error(pesanGalat(r.status, j)); e.status = r.status; throw e;
+      }
       const cand = (j.candidates || [])[0];
-      const t = cand && cand.content && (cand.content.parts || []).map(p => p.text || '').join('').trim();
+      let t = cand && cand.content && (cand.content.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
       if (!t) throw new Error(cand && cand.finishReason === 'SAFETY' ? 'Gemini menolak menjawab pertanyaan ini.' : 'Gemini tidak memberi jawaban.');
+      if (cand.finishReason === 'MAX_TOKENS' && !opt.json) t += '… (jawaban terpotong — coba tanyakan lebih spesifik)';
       return t;
     };
     const tunggu = ms => new Promise(r => setTimeout(r, ms));
     const sibuk = e => [429, 500, 502, 503, 504].indexOf(e.status) >= 0 || e instanceof TypeError;
     let utama = c.model || CADANGAN[0];
+    if (!c.manual && c.models && c.models.length) { const p = AI.pilihModel(c.models); if (p !== utama) { utama = p; AI.simpanCfg(Object.assign(c, { model: p })); } }
     AI.terakhirModel = utama;
     try { return await coba(utama); }
     catch (e) {
@@ -89,7 +110,7 @@
       if (!sibuk(e)) throw e;
       // sibuk / kuota model ini habis → tunggu sebentar, coba sekali lagi, lalu model cadangan
       let akhir = e;
-      if (e.status !== 429) { await tunggu(1500); try { return await coba(utama); } catch (e2) { akhir = e2; if (!sibuk(e2)) throw e2; } }
+      if ([500, 502, 503].indexOf(e.status) >= 0) { await tunggu(1500); try { return await coba(utama); } catch (e2) { akhir = e2; if (!sibuk(e2)) throw e2; } }
       for (const m of AI.cadangan(c.models, utama)) {
         try { const t = await coba(m); AI.terakhirModel = m; return t; }
         catch (e3) { if (e3.status === 404) continue; akhir = e3; if (!sibuk(e3)) throw e3; }

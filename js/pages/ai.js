@@ -18,9 +18,9 @@
   UI.act('ai-putus', async () => { if (await UI.confirm('Hapus kunci Gemini dari HP ini?', 'Fitur AI berhenti di perangkat ini. Kunci di Google AI Studio tidak terhapus.', 'Hapus', true)) { AI.hapus(); UI.render(); } });
   UI.act('ai-model', () => {
     const c = AI.cfg(), list = (c.models || []).filter(n => /gemini/.test(n));
-    const s = UI.sheet({ title: 'Model Gemini', body: UI.field('Model', `<select name="model">${list.map(n => `<option ${n === c.model ? 'selected' : ''}>${U.esc(n)}</option>`).join('')}</select>`, 'Dipilih otomatis (Flash stabil terbaru). Ganti hanya bila sering gagal atau kuota habis.'),
+    const s = UI.sheet({ title: 'Model Gemini', body: UI.field('Model', `<select name="model">${list.map(n => `<option ${n === c.model ? 'selected' : ''}>${U.esc(n)}</option>`).join('')}</select>`, 'Bawaan: gemini-3.5-flash (cepat & stabil). Ganti hanya bila sering gagal atau kuota habis.'),
       foot: `<button class="btn" data-ok>Simpan</button>` });
-    s.el.querySelector('[data-ok]').onclick = () => { AI.simpanCfg(Object.assign(c, { model: UI.formData(s.el).model })); s.close(); UI.render(); };
+    s.el.querySelector('[data-ok]').onclick = () => { AI.simpanCfg(Object.assign(c, { model: UI.formData(s.el).model, manual: true })); s.close(); UI.render(); };
   });
 
   // ---------- Tanya AI ----------
