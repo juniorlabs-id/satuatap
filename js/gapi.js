@@ -15,7 +15,14 @@
   function save() { try { localStorage.setItem(TOK, JSON.stringify({ t: Auth.token, e: Auth.exp, m: Auth.email, r: Auth.rt })); } catch (e) {} }
   (function load() { try { const o = JSON.parse(localStorage.getItem(TOK) || 'null'); if (o) { Auth.token = o.t; Auth.exp = o.e; Auth.email = o.m; Auth.rt = o.r || ''; } } catch (e) {} })();
   const relayOn = () => !!(window.Relay && Relay.enabled());
-  Auth.redirect = () => location.origin + location.pathname.replace(/[^/]*$/, '') + 'oauth.html';
+  /** Alamat kembali login — harus SAMA PERSIS dengan "Authorized redirect URIs" di Google Cloud. */
+  Auth.redirect = () => {
+    if (APP_CONFIG.REDIRECT_URI) return APP_CONFIG.REDIRECT_URI;
+    let p = location.pathname;
+    if (/\.html?$/i.test(p)) p = p.replace(/[^/]*$/, '');      // /satuatap/index.html → /satuatap/
+    else if (!p.endsWith('/')) p += '/';                        // /satuatap → /satuatap/
+    return location.origin + p + 'oauth.html';
+  };
 
   Auth.valid = () => !!Auth.token && Auth.exp - Date.now() > 60000;
   Auth.clear = () => { Auth.token = ''; Auth.exp = 0; save(); };

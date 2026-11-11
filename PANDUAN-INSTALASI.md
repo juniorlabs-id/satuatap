@@ -85,6 +85,16 @@ Keempat nilai ini memang publik karena dipakai oleh browser. Pengamannya adalah 
 
 ### A5. Membuat & mengelola lisensi
 
+**Cara utama — Konsol di aplikasi (superadmin).** Akun `juniorlabs.id@gmail.com` adalah superadmin. Setelah masuk ke aplikasi, buka **Lainnya › JuniorLabs**. Di sana tersedia:
+- **Konsol Lisensi:** daftar semua kode beserta statusnya, keluarga, email Admin, dan anggota. Ketuk sebuah kode untuk menyalin, mengirim lewat WA, memberi catatan, mencabut, memulihkan, atau melepas ikatan.
+- **Buat Kode:** membuat 1–50 kode sekaligus dengan catatan (misalnya nomor pesanan). Tersedia tombol WA berisi pesan aktivasi siap kirim.
+- **Laporan Masuk:** laporan masalah dan usul fitur dari pengguna.
+- **Statistik:** jumlah keluarga aktif, akun pengguna, aktivasi per bulan, dan kuota email.
+
+Superadmin juga bisa **membuat data keluarga tanpa kode lisensi**; lisensi internal dibuat otomatis. Untuk menambah superadmin lain, isi Script Property relay `SUPERADMIN` dengan email (pisahkan dengan koma).
+
+**Cara cadangan — dari editor relay:**
+
 Semua fungsi di bawah dijalankan dari editor relay:
 
 | Fungsi | Kegunaan |

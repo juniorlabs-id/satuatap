@@ -424,3 +424,5 @@ table.ck, table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px;
 .login .btn small { font-weight: 500; opacity: .8; }
 .splash-in { text-align: center; color: var(--muted); padding: 24px 0; }
 .steps { padding-left: 18px; margin: 8px 0; } .steps li { margin-bottom: 6px; }
+details.lap summary { list-style: none; } details.lap summary::-webkit-details-marker { display: none; }
+.lap-body { padding: 4px 16px 14px 68px; font-size: 13px; border-bottom: 1px solid var(--line); } .lap-body p { margin: 0 0 6px; }

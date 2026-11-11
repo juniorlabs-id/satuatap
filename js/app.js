@@ -83,6 +83,7 @@
     if (!m || m.aktif === false) { if (Store.t.Anggota.length) App.blocked('Akses Anda ke data keluarga ini sudah dicabut oleh Admin.'); return; }
     Store.me = Object.assign({}, Store.me, { id: m.id, nama: m.nama, email: m.email, peran: m.peran, warna: m.warna, izin: m.izin || {} });
     App.license(); App.monthly(); App.syncMembers(); App.mirror();
+    App.checkSuper().then(v => { if (v && UI.cur === 'lainnya' && !document.querySelector('[data-to="konsol"]')) UI.render(); }).catch(() => {});
   }, 1500);
 
   App.blocked = (msg, opt) => {
@@ -189,7 +190,13 @@
         ${s && s.email ? 'Lanjutkan sebagai ' + U.esc(s.email) : 'Masuk dengan Google'}</button>
       <p class="muted small center">Anda akan diminta mengizinkan SatuAtap menyimpan file di Google Drive. SatuAtap <b>hanya</b> bisa membuka file yang ia buat sendiri.</p>
       <div class="or"><span>atau</span></div>
-      <button class="btn ghost block" id="btn-demo">${I('flask-conical')} Coba demo dengan data contoh</button>`);
+      <button class="btn ghost block" id="btn-demo">${I('flask-conical')} Coba demo dengan data contoh</button>
+      <details class="darurat"><summary>${I('info')} Info teknis login (untuk Admin JuniorLabs)</summary>
+        <p class="small">Daftarkan nilai berikut di Google Cloud › Google Auth Platform › Clients › (client Web):</p>
+        <div class="kv-list small"><div class="kv"><span>Authorized JavaScript origins</span><b><code class="wrap">${U.esc(location.origin)}</code></b></div>
+        <div class="kv"><span>Authorized redirect URIs</span><b><code class="wrap">${U.esc(Auth.redirect())}</code></b></div>
+        <div class="kv"><span>Client ID terpakai</span><b><code class="wrap">${U.esc(APP_CONFIG.GOOGLE_CLIENT_ID || '(kosong)')}</code></b></div>
+        <div class="kv"><span>Mode</span><b>${Relay.enabled() ? 'Relay (sinkron otomatis)' : 'Tanpa relay — RELAY_URL kosong'}</b></div></div></details>`);
     if (!Relay.enabled()) Auth.loadGIS().catch(e => say(U.esc(e.message), true));
     document.getElementById('btn-demo').onclick = () => App.demo();
     document.getElementById('btn-g').onclick = async () => {
@@ -202,8 +209,18 @@
     };
   };
 
+  /** Cek apakah akun ini superadmin JuniorLabs (disimpan lokal 1 hari). */
+  App.checkSuper = async (force) => {
+    if (!Relay.enabled() || Store.mode === 'demo') return false;
+    const k = 'sa:super:' + Auth.email, c = JSON.parse(localStorage.getItem(k) || 'null');
+    if (c && !force && Date.now() - c.at < 864e5) return (App.isSuper = c.v);
+    const r = await Relay.call('akun.info', {});
+    if (r.success) { localStorage.setItem(k, JSON.stringify({ v: !!r.data.superadmin, at: Date.now() })); App.isSuper = !!r.data.superadmin; }
+    return !!App.isSuper;
+  };
   App.afterLogin = async (user) => {
     say('Mencari data keluarga…');
+    App.checkSuper(true).catch(() => {});
     const remembered = fileFor(user.email);
     try {
       if (remembered) return await openFamily(remembered, user);
@@ -236,27 +253,36 @@
     };
   };
 
-  App.create = (user) => {
+  App.create = async (user) => {
+    const sup = await App.checkSuper().catch(() => false);
     shell(`<h2>Buat data keluarga</h2><p class="muted small">File "SatuAtap – Data …" akan dibuat di Google Drive Anda. Anda menjadi Admin dan bisa mengundang hingga 4 anggota.</p>
       <label class="field"><span>Nama keluarga</span><input id="c-fam" maxlength="40" placeholder="mis. Keluarga Dimas & Rini"></label>
       <label class="field"><span>Nama panggilan Anda</span><input id="c-nama" maxlength="30" value="${U.esc(user.nama)}"></label>
-      ${Relay.enabled() ? `<label class="field"><span>Kode lisensi</span><input id="c-kode" maxlength="24" autocomplete="off" placeholder="SA-XXXX-XXXX-XXXX" style="text-transform:uppercase"><small>Didapat saat pembelian dari JuniorLabs.</small></label>` : ''}
+      ${Relay.enabled() ? `<label class="field"><span>Kode lisensi${sup ? ' <span class="pill gold">Superadmin</span>' : ''}</span><input id="c-kode" maxlength="24" autocomplete="off" placeholder="${sup ? 'Kosongkan — lisensi internal dibuat otomatis' : 'SA-XXXX-XXXX-XXXX'}" style="text-transform:uppercase"><small>${sup ? 'Akun superadmin JuniorLabs tidak wajib memasukkan kode.' : 'Didapat saat pembelian dari JuniorLabs.'}</small></label>` : ''}
       <button class="btn block" id="c-go">${I('check')} Buat & mulai</button><button class="btn block ghost" id="c-back">Kembali</button>`);
     document.getElementById('c-back').onclick = () => App.afterLogin(user);
     document.getElementById('c-go').onclick = async (ev) => {
       const fam = document.getElementById('c-fam').value.trim(), nama = document.getElementById('c-nama').value.trim() || user.nama;
       const kodeEl = document.getElementById('c-kode'), kode = kodeEl ? kodeEl.value.trim().toUpperCase() : '';
       if (!fam) return say('Isi nama keluarga.', true);
-      if (kodeEl && !/^SA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(kode)) return say('Format kode lisensi: SA-XXXX-XXXX-XXXX', true);
+      const internal = !!(kodeEl && sup && !kode);
+      if (kodeEl && !internal && !/^SA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(kode)) return say('Format kode lisensi: SA-XXXX-XXXX-XXXX', true);
       ev.target.disabled = true;
       try {
         if (kode) { say('Memeriksa lisensi…'); const c = await Relay.call('lisensi.periksa', { kode }); if (!c.success) throw new Error(c.message || 'Lisensi tidak valid.'); }
         say('Membuat file di Google Drive…');
         const me = { email: user.email, nama };
         const ops = Cloud.seed(fam, me);
-        if (kode) ops.push({ op: 'upsert', t: 'Pengaturan', row: { id: 'lisensiAdmin', nilai: user.email } }, { op: 'upsert', t: 'Pengaturan', row: { id: 'lisensiKode', nilai: kode.slice(0, 8) + '-••••-••••' } });
+        if (kode || internal) ops.push({ op: 'upsert', t: 'Pengaturan', row: { id: 'lisensiAdmin', nilai: user.email } });
+        if (kode) ops.push({ op: 'upsert', t: 'Pengaturan', row: { id: 'lisensiKode', nilai: kode.slice(0, 8) + '-••••-••••' } });
         const id = await Cloud.create(fam, ops, me);
-        if (kode) { say('Mengaktifkan lisensi…'); const a = await Relay.call('lisensi.aktifkan', { kode, fileId: id, keluarga: fam }); if (!a.success) throw new Error(a.message || 'Aktivasi gagal.'); localStorage.setItem('sa:lic:' + id, JSON.stringify({ ok: true, at: Date.now() })); }
+        if (kode || internal) {
+          say('Mengaktifkan lisensi…');
+          const a = await Relay.call('lisensi.aktifkan', { kode, fileId: id, keluarga: fam });
+          if (!a.success) throw new Error(a.message || 'Aktivasi gagal.');
+          localStorage.setItem('sa:lic:' + id, JSON.stringify({ ok: true, at: Date.now() }));
+          if (internal && a.data && a.data.kode) await Cloud.push([{ op: 'upsert', t: 'Pengaturan', row: { id: 'lisensiKode', nilai: a.data.kode.slice(0, 8) + '-••••-••••' } }], user.email);
+        }
         await openFamily(id, { email: user.email, nama }, { fresh: true });
         setTimeout(() => UI.toast('Selamat datang! Mulai dengan menambah dompet di Aset › Kas & Bank.', 'ok', { ms: 6000 }), 600);
       } catch (e) { ev.target.disabled = false; say(U.esc(e.message), true); }
