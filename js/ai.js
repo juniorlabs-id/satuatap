@@ -23,6 +23,13 @@
     const rank = n => (/flash/.test(n) ? 100 : /pro/.test(n) ? 10 : 0) + (/lite/.test(n) ? -40 : 0) + (/preview/.test(n) ? -25 : 0) + (/latest/.test(n) ? -5 : 0) + ver(n);
     return ok.sort((a, b) => rank(b) - rank(a))[0] || CADANGAN[0];
   };
+  /** Model cadangan saat model utama sibuk: flash lain dulu, lalu flash-lite (urut versi terbaru). */
+  AI.cadangan = (names, utama) => {
+    const ok = (names || []).filter(n => n !== utama && /gemini/.test(n) && /flash/.test(n) && !/(tts|image|live|audio|embedding|vision|thinking|exp|learnlm|robotics|computer|preview|latest)/.test(n));
+    const ver = n => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
+    const r = ok.sort((a, b) => ((/lite/.test(a) ? 0 : 100) + ver(a) > (/lite/.test(b) ? 0 : 100) + ver(b) ? -1 : 1));
+    return r.concat(CADANGAN.filter(n => n !== utama && r.indexOf(n) < 0)).slice(0, 3);
+  };
   AI.models = async (key) => {
     const r = await fetch(API + '/models?pageSize=200&key=' + encodeURIComponent(key));
     const j = await r.json().catch(() => ({}));
@@ -35,6 +42,7 @@
     if (st === 403) return 'Kunci ditolak (403). Pastikan Gemini API aktif untuk kunci ini.';
     if (st === 429) return 'Kuota gratis Gemini sedang habis. Coba lagi beberapa menit lagi atau besok.';
     if (st === 404) return 'Model tidak tersedia untuk kunci ini.';
+    if (st === 503 || st === 500 || st === 502 || st === 504) return 'Server Gemini sedang sibuk. Coba lagi beberapa menit lagi.';
     return 'Gemini galat ' + st + (m ? ': ' + m.slice(0, 140) : '');
   };
   /** Sambungkan kunci baru: cek kunci + pilih model otomatis. */
@@ -66,13 +74,27 @@
       if (!t) throw new Error(cand && cand.finishReason === 'SAFETY' ? 'Gemini menolak menjawab pertanyaan ini.' : 'Gemini tidak memberi jawaban.');
       return t;
     };
-    try { return await coba(c.model || CADANGAN[0]); }
+    const tunggu = ms => new Promise(r => setTimeout(r, ms));
+    const sibuk = e => [429, 500, 502, 503, 504].indexOf(e.status) >= 0 || e instanceof TypeError;
+    let utama = c.model || CADANGAN[0];
+    AI.terakhirModel = utama;
+    try { return await coba(utama); }
     catch (e) {
-      if (e.status !== 404 && e.status !== 400) throw e;
-      // model sudah dihentikan Google → pilih ulang dari daftar terbaru
-      const list = await AI.models(c.key).catch(() => CADANGAN), m2 = AI.pilihModel(list.filter(n => n !== c.model));
-      AI.simpanCfg(Object.assign(c, { model: m2, models: list.slice(0, 60) }));
-      return coba(m2);
+      if (e.status === 404 || e.status === 400) {
+        // model sudah dihentikan Google → pilih ulang dari daftar terbaru
+        const list = await AI.models(c.key).catch(() => CADANGAN), m2 = AI.pilihModel(list.filter(n => n !== c.model));
+        AI.simpanCfg(Object.assign(c, { model: m2, models: list.slice(0, 60) }));
+        return coba(m2);
+      }
+      if (!sibuk(e)) throw e;
+      // sibuk / kuota model ini habis → tunggu sebentar, coba sekali lagi, lalu model cadangan
+      let akhir = e;
+      if (e.status !== 429) { await tunggu(1500); try { return await coba(utama); } catch (e2) { akhir = e2; if (!sibuk(e2)) throw e2; } }
+      for (const m of AI.cadangan(c.models, utama)) {
+        try { const t = await coba(m); AI.terakhirModel = m; return t; }
+        catch (e3) { if (e3.status === 404) continue; akhir = e3; if (!sibuk(e3)) throw e3; }
+      }
+      throw akhir;
     }
   };
 

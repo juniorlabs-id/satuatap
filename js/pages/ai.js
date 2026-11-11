@@ -69,7 +69,7 @@
       AI.insight().then(x => { A.insight = x; }).catch(e => { A.insightGagal = e.message; }).finally(() => { A.insightJalan = false; if (UI.cur === 'beranda') UI.render(); });
     }
     if (!o && A.insightJalan) return `<div class="card ai-card"><div class="row-sp"><b>${I('sparkles')} Insight minggu ini</b><small class="muted">menyusun…</small></div></div>`;
-    if (!o) return A.insightGagal ? `<div class="card ai-card"><b>${I('sparkles')} Insight minggu ini</b><small class="muted">${U.esc(A.insightGagal)}</small></div>` : '';
+    if (!o) return A.insightGagal ? `<div class="card ai-card"><div class="row-sp"><b>${I('sparkles')} Insight minggu ini</b><button class="icon-btn sm" data-act="ai-insight" aria-label="Coba lagi">${I('refresh-cw')}</button></div><small class="muted">${U.esc(A.insightGagal)}</small></div>` : '';
     return `<div class="card ai-card"><div class="row-sp"><b>${I('sparkles')} Insight minggu ini</b><button class="icon-btn sm" data-act="ai-insight" aria-label="Perbarui">${I(A.insightJalan ? 'loader' : 'refresh-cw')}</button></div>
       <div class="ai-out">${UI.aiTeks(o.teks)}</div><small class="muted">Dirangkum Gemini dari angka minggu ini · ${U.timeAgo(o.at)}</small></div>`;
   };
