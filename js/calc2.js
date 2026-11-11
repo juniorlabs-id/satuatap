@@ -20,7 +20,7 @@
   /** Ambil harga terbaru dari relay (maks tiap 3 jam kecuali dipaksa). */
   Harga.fetch = async (force) => {
     if (Store.mode === 'demo') { if (!Harga.data || Harga.data.sumber.indexOf('demo') < 0) { Harga.data = demoHarga(); C.clear(); } return Harga.data; }
-    if (!force && Harga.data && Date.now() - (Harga.data.at || 0) < 3 * 3600e3) return Harga.data;
+    if (!force && Harga.data && Harga.data.merek && Date.now() - (Harga.data.at || 0) < 3600e3) return Harga.data;   // data lama tanpa harga merek → ambil ulang
     if (Harga.loading) return Harga.loading;
     Harga.loading = (async () => {
       const r = await Relay.call('emas.harga', {});
