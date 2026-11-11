@@ -44,6 +44,7 @@
   U.tgl = (s, opt) => {
     if (!s) return '-';
     const d = U.parseDate(s);
+    if (!d || isNaN(d.getTime())) return String(s).slice(0, 16);   // jangan tampilkan "NaN undefined NaN"
     if (opt === 'long') return HARI[d.getDay()] + ', ' + d.getDate() + ' ' + BLN_L[d.getMonth()] + ' ' + d.getFullYear();
     if (opt === 'dm') return d.getDate() + ' ' + BLN[d.getMonth()];
     if (opt === 'my') return BLN_L[d.getMonth()] + ' ' + d.getFullYear();
