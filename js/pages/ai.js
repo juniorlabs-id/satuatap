@@ -90,8 +90,8 @@
       if (!AI.siap()) return `<div class="card"><h3>${I('sparkles')} Sambungkan Gemini (gratis)</h3>
           <p class="muted">Fitur AI memakai kunci Gemini milik keluarga Anda sendiri — tanpa biaya untuk pemakaian wajar, dan data tidak lewat server JuniorLabs.</p>
           <ol class="steps"><li>Buka <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> dan masuk dengan akun Google.</li>
-            <li>Ketuk <b>Create API key</b>, lalu salin kuncinya (diawali <code>AIza</code>).</li><li>Tempel di bawah, lalu ketuk Sambungkan.</li></ol>
-          ${UI.field('Kunci API Gemini', `<input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…">`)}
+            <li>Ketuk <b>Create API key</b>, lalu salin kuncinya (diawali <code>AQ.</code>, atau <code>AIza</code> untuk kunci lama).</li><li>Tempel di bawah, lalu ketuk Sambungkan.</li></ol>
+          ${UI.field('Kunci API Gemini', `<input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="AQ.… / AIza…">`)}
           <button class="btn block" data-act="ai-sambung">${I('plug')} Sambungkan</button></div>
         <div class="note">${I('shield-check')} Kunci disimpan hanya di HP ini (setiap anggota memasukkan sendiri bila ingin memakai AI). Yang dikirim ke Gemini hanya ringkasan angka — tanpa catatan transaksi dan tanpa kategori pribadi. Pada kunci gratis, Google dapat memakai isi permintaan untuk meningkatkan layanannya; aktifkan penagihan di AI Studio bila tidak ingin.</div>`;
       if (!A.chat.length) muatChat();

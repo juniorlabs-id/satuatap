@@ -40,7 +40,7 @@
   /** Sambungkan kunci baru: cek kunci + pilih model otomatis. */
   AI.sambung = async (key) => {
     key = String(key || '').trim();
-    if (!/^[A-Za-z0-9_\-]{30,60}$/.test(key)) throw new Error('Format kunci tidak dikenali. Kunci Gemini biasanya diawali "AIza".');
+    if (!/^[A-Za-z0-9._\-]{30,300}$/.test(key)) throw new Error('Format kunci tidak dikenali. Kunci Gemini diawali "AQ." (format baru) atau "AIza" (format lama).');
     const list = await AI.models(key);
     const model = AI.pilihModel(list);
     AI.simpanCfg({ key, model, models: list.slice(0, 60), at: new Date().toISOString() });
