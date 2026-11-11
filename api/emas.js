@@ -122,14 +122,17 @@ const MEREK_RE = /\b(Antam(?:\s+[A-Za-z]+){0,3}|UBS(?:\s+[A-Za-z]+){0,2}|Galeri\
 const BULAN = { jan: '01', feb: '02', mar: '03', apr: '04', mei: '05', may: '05', jun: '06', jul: '07', agu: '08', aug: '08', ags: '08', sep: '09', okt: '10', oct: '10', nov: '11', des: '12', dec: '12' };
 function tglTeks(s) { const m = /(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\s+(\d{4})/.exec(s || ''); return m && BULAN[m[2].toLowerCase()] ? m[3] + '-' + BULAN[m[2].toLowerCase()] + '-' + ('0' + m[1]).slice(-2) : ''; }
 function parseG24(html) {
-  const t = teks(html), tanda = [], out = {};
-  let m; MEREK_RE.lastIndex = 0;
-  while ((m = MEREK_RE.exec(t))) tanda.push({ nama: m[1].replace(/\s+/g, ' ').trim(), tgl: tglTeks(m[2]), i: m.index, akhir: MEREK_RE.lastIndex });
+  const t = teks(html), out = {}, tanda = [];
+  // Format situs: "Diperbarui Rabu, 11 November 2026 Harga GALERI 24 Berat Harga Jual Harga Buyback 0.5 Rp1.309.000 Rp1.172.000 1 Rp2.496.000 Rp2.349.000 …"
+  const reA = /(?:Diperbarui|Updated)\s*:?\s*(?:[A-Za-z]+,\s*)?(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})?\s*Harga\s+(.{2,40}?)\s+Berat\s+Harga\s+Jual\s+Harga\s+Buy\s*back/gi;
+  let m;
+  while ((m = reA.exec(t))) tanda.push({ nama: m[2].replace(/\s+/g, ' ').trim(), tgl: tglTeks(m[1]), i: m.index, akhir: reA.lastIndex });
+  if (!tanda.length) { MEREK_RE.lastIndex = 0; while ((m = MEREK_RE.exec(t))) tanda.push({ nama: m[1].replace(/\s+/g, ' ').trim(), tgl: tglTeks(m[2]), i: m.index, akhir: MEREK_RE.lastIndex }); }
   tanda.forEach((x, k) => {
     const seg = t.slice(x.akhir, k + 1 < tanda.length ? tanda[k + 1].i : x.akhir + 3000);
-    const r = /(?:^|\s)1(?:[.,]0+)?\s*(?:gr|gram)\s+(?:Rp\.?\s?)?([\d.]{6,13})\s+(?:Rp\.?\s?)?([\d.]{6,13})/i.exec(seg);
+    const r = /(?:^|\s)1(?:[.,]0+)?\s*(?:gr|gram)?\s+(?:Rp\.?\s?)?([\d.]{6,13})\s+(?:Rp\.?\s?)?([\d.]{6,13})/i.exec(seg);
     const key = kunciMerek(x.nama);
-    if (!r || out[key]) return;
+    if (!r || !key || out[key]) return;
     const beli = rupiah(r[1]), buyback = rupiah(r[2]);
     if (wajar(beli) && wajar(buyback) && buyback < beli && buyback > beli * 0.75) out[key] = { nama: x.nama, beli, buyback, tanggal: x.tgl };
   });
@@ -141,7 +144,7 @@ async function merekLain(log, cek, cuplikan) {
     log.push('Galeri24 → HTTP ' + r.status);
     if (!r.ok) return {};
     const h = await r.text(), o = parseG24(h);
-    if (cek) { const t = teks(h), i = t.search(/Updated|Diperbarui/i); cuplikan.Galeri24 = i >= 0 ? t.slice(Math.max(0, i - 120), i + 700) : t.slice(0, 700); }
+    if (cek) { const t = teks(h), i = t.search(/Updated|Diperbarui/i); cuplikan.Galeri24 = i >= 0 ? t.slice(Math.max(0, i - 120), i + 2500) : t.slice(0, 1500); }
     log.push('Galeri24: ' + (Object.keys(o).join(', ') || 'tabel merek tidak terbaca'));
     return o;
   } catch (e) { log.push('Galeri24 → ' + (e && e.message)); return {}; }
