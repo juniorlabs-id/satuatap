@@ -97,33 +97,56 @@
       <div class="card"><b>Cara anggota bergabung</b><ol class="steps small"><li>Admin menambahkan email di sini — Google Drive otomatis membagikan file keluarga & mengirim email undangan.</li><li>Anggota membuka aplikasi, <b>Masuk dengan Google</b>, lalu pilih <b>Saya diundang</b> dan pilih file "SatuAtap – Data …".</li></ol>
         <div class="row-btns"><button class="btn ghost" data-act="wa-invite">${I('message-circle')} Kirim petunjuk via WA</button></div></div>`;
   }
+  /** Apakah email anggota sudah dipakai di data (transaksi, kategori pribadi, tugas, dll.)? */
+  const dipakai = (email) => {
+    if (!email) return false;
+    if (email === Store.me.email) return true;
+    return Object.keys(Store.t).some(t => t !== 'Anggota' && t !== 'Pengaturan' && (Store.t[t] || []).some(r => r && Object.keys(r).some(k => r[k] === email)));
+  };
   UI.memberForm = (m) => {
     const isNew = !m;
+    const bisaUbahEmail = isNew || !dipakai(m.email), bisaHapus = !isNew && m.email !== Store.me.email;
     m = m || { id: U.uid('m'), nama: '', email: '', peran: 'anggota', warna: WARNA[Store.t.Anggota.length % WARNA.length], izin: { mutasi: 'ubah', kalender: 'lihat', anggaran: 'lihat', tujuan: 'ubah', utang: 'tidak', aset: 'tidak', rapor: 'lihat' }, aktif: true, dibuat: new Date().toISOString() };
     const iz = m.izin || {};
     const s = UI.sheet({ title: isNew ? 'Undang anggota' : 'Ubah anggota', body: `
       ${UI.field('Nama panggilan', `<input name="nama" maxlength="30" value="${U.esc(m.nama)}">`)}
-      ${UI.field('Email Google', `<input name="email" type="email" maxlength="80" value="${U.esc(m.email)}" ${isNew ? '' : 'readonly'} placeholder="nama@gmail.com">`)}
+      ${UI.field('Email Google', `<input name="email" type="email" maxlength="80" value="${U.esc(m.email)}" ${bisaUbahEmail ? '' : 'readonly'} placeholder="nama@gmail.com">`, isNew ? '' : bisaUbahEmail ? 'Salah ketik? Perbaiki di sini — akses file dipindah ke email baru.' : 'Email tidak bisa diubah karena sudah ada catatan atas nama anggota ini. Nonaktifkan lalu undang email yang benar.')}
       ${UI.field('Peran', `<select name="peran">${Object.keys(PERAN).map(k => `<option value="${k}" ${m.peran === k ? 'selected' : ''}>${PERAN[k]}</option>`).join('')}</select>`)}
       <div class="icon-pick colors">${WARNA.map(c => `<label><input type="radio" name="warna" value="${c}" ${m.warna === c ? 'checked' : ''}><span style="background:${c}"></span></label>`).join('')}</div>
       <div class="izin" ${m.peran !== 'anggota' ? 'hidden' : ''}><h4 class="mini-h">Izin per menu</h4>${MENU_IZIN.map(x => `<div class="izin-row"><span>${x[1]}</span>${UI.seg('iz_' + x[0], [['tidak', 'Tidak'], ['lihat', 'Lihat'], ['ubah', 'Ubah']], iz[x[0]] || 'tidak')}</div>`).join('')}
         <small class="muted">Anggota selalu bisa mencatat transaksinya sendiri lewat Catat Cepat.</small></div>
       <label class="check"><input type="checkbox" name="aktif" ${m.aktif !== false ? 'checked' : ''}><span>Aktif (bisa masuk)</span></label>`,
-      foot: `<button class="btn" data-ok>Simpan</button>` });
+      foot: `${bisaHapus ? `<button class="btn ghost danger" data-hapus>${I('trash-2')} Hapus</button>` : ''}<button class="btn" data-ok>Simpan</button>` });
+    const bh = s.el.querySelector('[data-hapus]');
+    if (bh) bh.onclick = async () => {
+      if (dipakai(m.email)) return UI.toast('Anggota ini sudah punya catatan, jadi tidak bisa dihapus. Hilangkan centang "Aktif" untuk mencabut aksesnya.', 'warn', { ms: 6000 });
+      if (!(await UI.confirm('Hapus ' + (m.nama || m.email) + '?', m.email + ' dihapus dari keluarga dan aksesnya ke file keluarga dicabut.', 'Hapus', true))) return;
+      Store.remove('Anggota', m.id); s.close();
+      if (Store.mode === 'live' && m.aktif !== false) Cloud.unshare(m.email).then(r => UI.toast(r.ok ? 'Anggota dihapus & akses file dicabut.' : 'Anggota dihapus, tapi gagal mencabut akses file: ' + r.message, r.ok ? 'ok' : 'warn'));
+      else UI.toast('Anggota dihapus.');
+      App.syncMembers && App.syncMembers();
+    };
     s.el.querySelector('[name=peran]').onchange = e => { s.el.querySelector('.izin').hidden = e.target.value !== 'anggota'; };
     s.el.querySelector('[data-ok]').onclick = () => {
       const f = UI.formData(s.el), izin = {};
       MENU_IZIN.forEach(x => { izin[x[0]] = f['iz_' + x[0]] || 'tidak'; delete f['iz_' + x[0]]; });
       f.email = String(f.email || '').toLowerCase().trim();
       if (!f.nama || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return UI.toast('Nama dan email valid wajib diisi.', 'warn');
-      if (isNew && Store.t.Anggota.some(x => x.email === f.email)) return UI.toast('Email sudah terdaftar.', 'warn');
+      if ((isNew || f.email !== m.email) && Store.t.Anggota.some(x => x.email === f.email)) return UI.toast('Email sudah terdaftar.', 'warn');
+      if (!bisaUbahEmail) f.email = m.email;
+      const gantiEmail = !isNew && f.email !== m.email;
       if (!isNew && m.email === Store.me.email && f.peran !== 'admin' && m.peran === 'admin') return UI.toast('Anda tidak bisa menurunkan peran Anda sendiri.', 'warn');
       if (f.aktif && (isNew || m.aktif === false) && Store.members().length >= 5) return UI.toast('Maksimal 5 akun aktif per keluarga.', 'warn');
       Store.upsert('Anggota', Object.assign({}, m, f, { izin }));
       s.close();
       if (Store.mode !== 'live') return UI.toast(isNew ? 'Mode demo: undangan tidak benar-benar dikirim.' : 'Tersimpan.');
       const wasOn = !isNew && m.aktif !== false;
-      if (f.aktif && !wasOn) Cloud.share(f.email, Store.me.nama).then(r => UI.toast(r.ok ? 'Undangan terkirim ke ' + f.email + '. Minta ia masuk & pilih "Saya diundang".' : 'Anggota tersimpan, tapi gagal membagikan file: ' + r.message, r.ok ? 'ok' : 'warn', { ms: 6000 }));
+      if (gantiEmail) {
+        // salah ketik: cabut akses email lama, bagikan ke email baru
+        if (wasOn) Cloud.unshare(m.email).catch(() => {});
+        if (f.aktif) Cloud.share(f.email, Store.me.nama).then(r => UI.toast(r.ok ? 'Email diperbaiki. Undangan terkirim ke ' + f.email + '.' : 'Email diperbaiki, tapi gagal membagikan file: ' + r.message, r.ok ? 'ok' : 'warn', { ms: 6000 }));
+        else UI.toast('Email diperbaiki.');
+      } else if (f.aktif && !wasOn) Cloud.share(f.email, Store.me.nama).then(r => UI.toast(r.ok ? 'Undangan terkirim ke ' + f.email + '. Minta ia masuk & pilih "Saya diundang".' : 'Anggota tersimpan, tapi gagal membagikan file: ' + r.message, r.ok ? 'ok' : 'warn', { ms: 6000 }));
       else if (!f.aktif && wasOn) Cloud.unshare(f.email).then(r => UI.toast(r.ok ? 'Akses ' + f.email + ' ke file keluarga dicabut.' : 'Gagal mencabut akses file: ' + r.message, r.ok ? 'ok' : 'warn'));
       else UI.toast('Tersimpan.');
       App.syncMembers && App.syncMembers();
