@@ -529,3 +529,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--primary); marg
 .ai-card .ai-out, .ai-out { font-size: 13.5px; line-height: 1.55; margin: 6px 0; }
 .icon-btn.sm { width: 32px; height: 32px; } .icon-btn.sm .ic { width: 16px; height: 16px; }
 .kotak-row { align-items: flex-start; gap: 10px; } .kotak-row .row-btns { gap: 4px; flex-wrap: nowrap; }
+/* Pasang aplikasi */
+.alert.pasang { background: linear-gradient(135deg, var(--primary), #0b4a46); color: #fff; }
+.alert.pasang > .ic:first-child { color: #F2B33D; }
+.alert.pasang small { color: rgba(255,255,255,.82); }
+.alert.pasang .icon-btn { color: #fff; background: rgba(255,255,255,.12); }
+.alert.pasang > .ic:last-child { color: rgba(255,255,255,.8); }
+ol.langkah { margin: 4px 0 14px; padding-left: 20px; line-height: 1.6; }
+ol.langkah li { margin-bottom: 6px; } ol.langkah .ic { width: 16px; height: 16px; vertical-align: -3px; }

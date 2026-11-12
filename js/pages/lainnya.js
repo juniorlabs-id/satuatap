@@ -10,6 +10,7 @@
       const adm = Store.isAdminLike();
       return `
         <div class="me-card"><span class="avatar lg" style="background:${Store.me.warna || '#0F5E59'}">${U.esc(U.initials(Store.me.nama))}</span><div><b>${U.esc(Store.me.nama)}</b><small>${U.esc(Store.me.email)} · ${U.esc(PERAN[Store.me.peran] || Store.me.peran)}</small></div></div>
+        ${UI.pasangKartu ? UI.pasangKartu('lainnya') : ''}
         ${App.isSuper ? `${UI.sec('JuniorLabs')}${UI.tiles([
           { id: 'konsol', icon: 'shield-check', label: 'Konsol Lisensi', to: 'konsol', gold: true },
           { id: 'kbuat', icon: 'key-round', label: 'Buat Kode', to: 'konsol/buat', gold: true },
