@@ -129,7 +129,18 @@
       riwayatNilai: JSON.stringify([[U.addMonths(today, -6), Math.round(modal * 0.97)], [U.addMonths(today, -3), Math.round((modal + nilai) / 2)], [U.addDays(today, -3), nilai]]) }, extra || {}));
     IV('i1', 'saham', 'Bank Central Asia', 'BBCA', 1000, 8900000, 9650000, U.addMonths(today, -18), { kepemilikan: JSON.stringify({ [D]: 100 }) });
     IV('i2', 'saham', 'Telkom Indonesia', 'TLKM', 2000, 7400000, 6100000, U.addMonths(today, -12));
-    IV('i3', 'reksadana', 'RD Pasar Uang Syariah', 'Bibit', 8350.5, 12000000, 12540000, U.addMonths(today, -10), { tujuanId: 'g_dar', imbal: '4.6' });
+    // Reksa dana dicatat per aplikasi: riwayat bulanan [tanggal, nilai, total setoran]
+    const RD = (id, nama, bulan, awal, setor, gerak, extra) => {
+      const rw = []; let m = awal, v = awal;
+      for (let k = bulan; k >= 0; k--) {
+        const d = k ? U.addDays(U.addMonths(today, -k), -2) : U.addDays(today, -3);
+        if (k !== bulan) { m += setor; v = Math.round((v + setor) * (1 + gerak[(bulan - k) % gerak.length])); }
+        rw.push([d, v, m]);
+      }
+      T.Investasi.push(Object.assign({ id, kelas: 'reksadana', nama, kode: 'aplikasi', unit: '0', modal: String(m), nilai: String(v), tglNilai: U.addDays(today, -3), tanggal: rw[0][0], walletId: '', tujuanId: '', kepemilikan: '{}', jatuhTempo: '', imbal: '0', zakat: 'true', status: 'aktif', tglJual: '', hargaJual: '0', catatan: '', dibuat: now, riwayatNilai: JSON.stringify(rw) }, extra || {}));
+    };
+    RD('i3', 'Bibit', 14, 5000000, 1000000, [0.008, 0.011, -0.006, 0.014, 0.004, 0.009, -0.012, 0.016, 0.007, 0.003, 0.012, -0.004, 0.01, 0.006], { tujuanId: 'g_dar', catatan: 'RD pasar uang + saham, autodebet tgl 5' });
+    RD('i8', 'Bareksa', 8, 3000000, 500000, [0.005, 0.004, 0.006, 0.003, 0.005, 0.004, 0.006, 0.005], { kepemilikan: JSON.stringify({ [N]: 100 }), catatan: 'RD obligasi' });
     IV('i4', 'sbn', 'Sukuk Tabungan ST011', 'ST011', 10, 10000000, 10000000, U.addMonths(today, -16), { jatuhTempo: U.addMonths(today, 8), imbal: '6.35' });
     IV('i5', 'deposito', 'Deposito BCA 6 bulan', '', 0, 20000000, 20380000, U.addMonths(today, -4), { jatuhTempo: U.addMonths(today, 2), imbal: '3.5' });
     IV('i6', 'properti', 'Rumah Bekasi', 'SHM', 90, 650000000, 780000000, U.addMonths(today, -48), { catatan: 'Ditempati sendiri, KPR BTN' });

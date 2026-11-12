@@ -537,3 +537,31 @@ details summary { cursor: pointer; font-weight: 600; color: var(--primary); marg
 .alert.pasang > .ic:last-child { color: rgba(255,255,255,.8); }
 ol.langkah { margin: 4px 0 14px; padding-left: 20px; line-height: 1.6; }
 ol.langkah li { margin-bottom: 6px; } ol.langkah .ic { width: 16px; height: 16px; vertical-align: -3px; }
+/* Reksa dana per aplikasi */
+.rd-hero .rd-big { font-size: 32px; font-weight: 800; letter-spacing: -.5px; margin: 6px 0 8px; position: relative; z-index: 1; }
+.rd-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.14); position: relative; z-index: 1; }
+.rd-pill .ic { width: 14px; height: 14px; } .rd-pill span { font-weight: 500; opacity: .8; }
+.rd-pill.naik { color: #9EF0C9; } .rd-pill.turun { color: #FFB4A8; }
+.rd-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,.08); position: relative; z-index: 1; }
+.rd-split b { display: block; font-size: 16px; margin-top: 2px; } .rd-split b.naik { color: #F2B33D; } .rd-split b.turun { color: #FFB4A8; }
+.rd-hero .btn { position: relative; z-index: 1; }
+.rd-trend .chips { margin: 8px 0 0; }
+.rd-legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--muted); margin: -2px 0 6px; }
+.rd-legend i { display: inline-block; width: 16px; height: 0; border-top: 2.5px solid var(--primary); vertical-align: middle; margin-right: 6px; }
+.rd-legend i.l2 { border-top: 2px dashed var(--muted); }
+.chart.rd-bars .naik { fill: var(--primary); } .chart.rd-bars .turun { fill: var(--bad); opacity: .85; }
+[data-theme=dark] .chart.rd-bars .naik { fill: #9fdcd5; }
+.rd-apps { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 12px; }
+@media (min-width: 700px) { .rd-apps { grid-template-columns: 1fr 1fr; } }
+.rd-app { margin: 0; padding: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rd-app-top { display: flex; align-items: center; gap: 8px; } .rd-app-top .grow { min-width: 0; }
+.rd-app-top b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .rd-app-top small { font-size: 11.5px; display: block; }
+.rd-app-mid { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; } .rd-app-mid b { font-size: 19px; font-weight: 800; } .rd-app-mid span { font-size: 12px; font-weight: 700; }
+.rd-app .bar { height: 6px; } .rd-app small.muted { font-size: 11px; }
+.rd-av { width: 36px; height: 36px; border-radius: 10px; color: #fff; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; font-size: 14px; }
+.rd-av.sm { width: 24px; height: 24px; border-radius: 8px; font-size: 12px; } .rd-av.lg { width: 48px; height: 48px; border-radius: 14px; font-size: 20px; }
+.rd-spark { width: 96px; height: 30px; flex: 0 0 auto; } .rd-spark path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.rd-app.rd-add { align-items: center; justify-content: center; border: 1.5px dashed var(--line); background: transparent; color: var(--primary); font: inherit; font-weight: 700; min-height: 120px; }
+.rd-upd { padding: 10px 0 4px; border-bottom: 1px solid var(--line-2); margin-bottom: 8px; }
+.rd-upd-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .rd-upd-h small { margin-left: auto; font-size: 11.5px; }
+.rd-upd .field { margin-bottom: 4px; } .rd-upd-hint { display: block; min-height: 14px; font-size: 12px; }

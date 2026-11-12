@@ -44,9 +44,10 @@
     const d = s.el.querySelector('[data-del]');
     if (d) d.onclick = async () => { if (await UI.confirm('Hapus aset?', 'Transaksi terkait tetap ada di Mutasi.', 'Hapus', true)) { Store.remove('Investasi', x.id); s.close(); } };
   };
-  UI.act('inv-add', el => UI.invForm(null, el.dataset.kelas));
+  UI.act('inv-add', el => el.dataset.kelas === 'reksadana' && UI.rdForm ? UI.rdForm() : UI.invForm(null, el.dataset.kelas));
   UI.act('inv-open', el => {
     const i = Calc.investasi('', true).find(z => z.x.id === el.dataset.id); if (!i) return;
+    if (i.x.kelas === 'reksadana' && i.x.status !== 'terjual' && UI.acts['rd-open']) return UI.acts['rd-open'](el);
     const x = i.x, def = K()[x.kelas] || K().lain, aktif = x.status !== 'terjual';
     const rw = (x.riwayatNilai || []).map(r => ({ d: r[0], bal: Number(r[1]) }));
     const s = UI.sheet({ title: x.nama, body: `
@@ -139,12 +140,13 @@
 
   UI.page('investasi', {
     head: p => ({ title: p === 'alokasi' ? 'Target Alokasi' : (K()[p] || { label: 'Investasi & Aset' }).label, crumb: 'Aset', back: 'aset',
-      right: p !== 'alokasi' ? `<button class="icon-btn" data-act="inv-add" data-kelas="${K()[p] ? p : 'saham'}" aria-label="Tambah">${I('plus')}</button>` : '' }),
+      right: p === 'reksadana' ? `<button class="icon-btn" data-act="rd-add" aria-label="Tambah aplikasi">${I('plus')}</button>` : p !== 'alokasi' ? `<button class="icon-btn" data-act="inv-add" data-kelas="${K()[p] ? p : 'saham'}" aria-label="Tambah">${I('plus')}</button>` : '' }),
     nav: () => 'aset',
     render(p) {
       if (!Store.can('aset', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Aset.');
       const tiles = UI.tiles(Object.keys(K()).map(k => ({ id: k, icon: K()[k].ikon, label: K()[k].label, to: 'investasi/' + k })).concat([{ id: 'alokasi', icon: 'scale', label: 'Target Alokasi', to: 'investasi/alokasi' }]), p, 'compact');
       if (p === 'alokasi') return tiles + alokasi() + '<div class="spacer"></div>';
+      if (p === 'reksadana' && UI.rdView) return tiles + UI.rdView();
       const kelas = K()[p] ? p : '', list = Calc.investasi(kelas), sold = Calc.investasi(kelas, true).filter(i => i.x.status === 'terjual');
       const nilai = U.sum(list, i => i.nilai), modal = U.sum(list, i => i.modal), u = nilai - modal;
       const jt = list.filter(i => i.x.jatuhTempo && U.diffDays(U.today(), i.x.jatuhTempo) <= 30 && i.x.jatuhTempo >= U.today());
