@@ -139,7 +139,8 @@
       }
       T.Investasi.push(Object.assign({ id, kelas: 'reksadana', nama, kode: 'aplikasi', unit: '0', modal: String(m), nilai: String(v), tglNilai: U.addDays(today, -3), tanggal: rw[0][0], walletId: '', tujuanId: '', kepemilikan: '{}', jatuhTempo: '', imbal: '0', zakat: 'true', status: 'aktif', tglJual: '', hargaJual: '0', catatan: '', dibuat: now, riwayatNilai: JSON.stringify(rw) }, extra || {}));
     };
-    RD('i3', 'Bibit', 14, 5000000, 1000000, [0.008, 0.011, -0.006, 0.014, 0.004, 0.009, -0.012, 0.016, 0.007, 0.003, 0.012, -0.004, 0.01, 0.006], { tujuanId: 'g_dar', catatan: 'RD pasar uang + saham, autodebet tgl 5' });
+    RD('i3', 'Bibit', 14, 5000000, 1000000, [0.004, 0.005, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004], { tujuanId: 'g_dar', kode: 'Dana Darurat', catatan: 'RD pasar uang, autodebet tgl 5' });
+    RD('i9', 'Bibit', 10, 2000000, 500000, [0.012, -0.018, 0.02, 0.009, -0.011, 0.017, 0.006, -0.008, 0.015, 0.01], { tujuanId: 'g_pdd', kode: 'Pendidikan Aisha', catatan: 'RD saham + campuran' });
     RD('i8', 'Bareksa', 8, 3000000, 500000, [0.005, 0.004, 0.006, 0.003, 0.005, 0.004, 0.006, 0.005], { kepemilikan: JSON.stringify({ [N]: 100 }), catatan: 'RD obligasi' });
     IV('i4', 'sbn', 'Sukuk Tabungan ST011', 'ST011', 10, 10000000, 10000000, U.addMonths(today, -16), { jatuhTempo: U.addMonths(today, 8), imbal: '6.35' });
     IV('i5', 'deposito', 'Deposito BCA 6 bulan', '', 0, 20000000, 20380000, U.addMonths(today, -4), { jatuhTempo: U.addMonths(today, 2), imbal: '3.5' });

@@ -565,3 +565,19 @@ ol.langkah li { margin-bottom: 6px; } ol.langkah .ic { width: 16px; height: 16px
 .rd-upd { padding: 10px 0 4px; border-bottom: 1px solid var(--line-2); margin-bottom: 8px; }
 .rd-upd-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .rd-upd-h small { margin-left: auto; font-size: 11.5px; }
 .rd-upd .field { margin-bottom: 4px; } .rd-upd-hint { display: block; min-height: 14px; font-size: 12px; }
+/* Reksa dana: per tujuan & portofolio */
+.rd-goals { display: grid; gap: 8px; margin-bottom: 14px; }
+.rd-goal { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-2); cursor: pointer; }
+.rd-goal-ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--gold-c, #FCF1DC); color: #B37A12; flex: 0 0 auto; }
+.rd-goal b { display: block; font-size: 14px; } .rd-goal small { color: var(--muted); font-size: 12px; } .rd-goal .bar { height: 6px; margin-top: 6px; } .rd-goal .bar i { background: #E0A23A; }
+.rd-app-sum { text-align: right; } .rd-app-sum b { display: block; font-size: 17px; font-weight: 800; } .rd-app-sum small { font-size: 12px; font-weight: 700; }
+.rd-portos { margin: 4px -4px 0; }
+.rd-porto { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-top: 1px solid var(--line-2); cursor: pointer; border-radius: 10px; }
+.rd-porto:active { background: var(--primary-c); }
+.rd-porto .grow { min-width: 0; } .rd-porto b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .rd-porto small { font-size: 11.5px; }
+.rd-porto .rd-spark { width: 64px; height: 24px; }
+.rd-porto-v { text-align: right; flex: 0 0 auto; } .rd-porto-v b { font-size: 14px; } .rd-porto-v small { font-size: 11.5px; font-weight: 700; display: block; }
+.rd-tag { display: inline-flex; align-items: center; gap: 3px; color: #9C6B1E; font-weight: 600; } .rd-tag .ic { width: 12px; height: 12px; }
+[data-theme=dark] .rd-tag { color: #F2B33D; }
+.rd-app .link.small { align-self: flex-start; font-size: 12.5px; margin-top: 2px; }
+.rd-upd-app { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 15px; }
