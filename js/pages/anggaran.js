@@ -101,11 +101,7 @@
     { id: '', icon: 'mail', label: 'Amplop', to: 'anggaran' },
     { id: 'bagi', icon: 'split', label: 'Bagi Gaji', to: 'anggaran/bagi' },
     { id: 'geser', icon: 'move-horizontal', label: 'Geser Dana', to: 'anggaran/geser' },
-    { id: 'sinking', icon: 'calendar-clock', label: 'Tagihan Tahunan', to: 'anggaran/sinking' },
-    { id: 'pribadi', icon: 'lock', label: 'Uang Pribadi', to: 'anggaran/pribadi' },
-    { id: 'kat', icon: 'tags', label: 'Kategori', to: 'pengaturan/kategori' },
-    { id: 'tujuan', icon: 'target', label: 'Tujuan', to: 'tujuan' },
-    { id: 'periode', icon: 'calendar-cog', label: 'Atur Periode', to: 'pengaturan/keluarga' }
+    { id: 'pribadi', icon: 'lock', label: 'Uang Pribadi', to: 'anggaran/pribadi' }
   ], cur);
 
   UI.page('anggaran', {
@@ -133,7 +129,9 @@
         ${['kebutuhan', 'keinginan', 'pribadi'].filter(k => g[k]).map(k => `${UI.sec(k === 'pribadi' ? 'Uang pribadi' : KEL[k], `<small class="muted">${UI.ms(U.sum(g[k], e => e.terpakai))} / ${UI.ms(U.sum(g[k], e => e.efektif))}</small>`)}
           <div class="env-list">${g[k].map(e => envCard(e, e.k.pribadi && e.k.pribadi !== me)).join('')}</div>`).join('')}
         ${none.length ? `${UI.sec('Belum dianggarkan', '<small class="muted">tap untuk beri batas</small>')}<div class="card list">${none.map(e => `<div class="row" data-act="env-edit" data-id="${e.k.id}"><span class="cat-ic sm">${I(e.k.ikon || 'circle-dot')}</span><div class="tx-txt"><b>${U.esc(e.k.nama)}</b></div><span>${UI.ms(e.terpakai)}</span></div>`).join('')}</div>` : ''}
-        <div class="row-btns"><button class="btn ghost" data-act="geser">${I('move-horizontal')} Geser dana</button><a class="btn ghost" href="#/anggaran/bagi">${I('split')} Bagi gaji</a></div>
+        <div class="card list">
+          <a class="row" href="#/anggaran/sinking"><span class="cat-ic sm">${I('calendar-clock')}</span><div class="tx-txt"><b>Tagihan tahunan dicicil</b><small>Pajak kendaraan, asuransi, uang sekolah tahunan</small></div>${I('chevron-right')}</a>
+          <a class="row" href="#/pengaturan/kategori"><span class="cat-ic sm">${I('tags')}</span><div class="tx-txt"><b>Atur kategori</b></div>${I('chevron-right')}</a></div>
         <div class="spacer"></div>`;
     }
   });

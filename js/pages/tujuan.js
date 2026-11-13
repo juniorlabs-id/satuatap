@@ -31,9 +31,23 @@
       ${UI.field('Disimpan di', `<select name="walletId"><option value="">Disisihkan (tidak di dompet manapun)</option>${UI.walletOpts(g.walletId)}</select>`, 'Pilih rekening tabungan bila uangnya benar-benar dipindah ke sana. Setiap setoran mengurangi saldo dompet asal.')}
       <div class="grid2">${UI.field('Jenis', `<select name="jenis"><option value="bersama" ${g.jenis !== 'pribadi' ? 'selected' : ''}>Bersama</option><option value="pribadi" ${g.jenis === 'pribadi' ? 'selected' : ''}>Pribadi saya</option></select>`)}
         ${UI.field('Catatan', `<input name="catatan" maxlength="100" value="${U.esc(g.catatan)}">`)}</div>
-      <p class="muted small">${I('info')} Hubungkan dengan emas, saham & reksa dana hadir di Fase 2 (Brankas Emas).</p>`,
-      foot: `${isNew ? '' : `<button class="btn ghost" data-arsip>${I('archive')} ${g.arsip ? 'Aktifkan' : 'Arsipkan'}</button>`}<button class="btn" data-ok>Simpan</button>` });
+      <p class="muted small">${I('info')} Emas & reksa dana bisa ditautkan ke tujuan ini dari Brankas Emas atau halaman Reksa Dana.</p>`,
+      foot: `${isNew ? '' : `<button class="btn ghost danger" data-hapus aria-label="Hapus">${I('trash-2')}</button><button class="btn ghost" data-arsip>${I('archive')} ${g.arsip ? 'Aktifkan' : 'Arsipkan'}</button>`}<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
+    const hp = s.el.querySelector('[data-hapus]');
+    if (hp) hp.onclick = async () => {
+      const tx = Store.t.Transaksi.filter(t => (t.jenis === 'tujuan' || t.jenis === 'tujuan_ambil') && t.refId === g.id);
+      const aset = [].concat((Store.t.Emas || []).filter(e => e.tujuanId === g.id).map(e => ['Emas', e.id]), (Store.t.Investasi || []).filter(e => e.tujuanId === g.id).map(e => ['Investasi', e.id]));
+      const rutin = (Store.t.Rutin || []).filter(r => r.refId === g.id || r.tujuanId === g.id);
+      const ket = [tx.length ? tx.length + ' setoran/penarikan dibatalkan (uangnya kembali ke dompet asal)' : '', aset.length ? aset.length + ' aset dilepas tautannya (asetnya tetap ada)' : '', rutin.length ? rutin.length + ' jadwal rutin terkait ikut dihapus' : ''].filter(Boolean);
+      if (!(await UI.confirm('Hapus tujuan ' + g.nama + '?', ket.length ? ket.map(x => '• ' + x).join('\n') : 'Tujuan ini belum punya setoran. Dihapus permanen.', 'Hapus tujuan', true))) return;
+      Store.commit(tx.map(t => ({ op: 'delete', t: 'Transaksi', id: t.id }))
+        .concat(aset.map(a => ({ op: 'upsert', t: a[0], row: { id: a[1], tujuanId: '' } })))
+        .concat(rutin.map(r => ({ op: 'delete', t: 'Rutin', id: r.id })))
+        .concat([{ op: 'delete', t: 'Tujuan', id: g.id }]));
+      s.close(); UI.toast('Tujuan dihapus.');
+      if (UI.cur === 'tujuan' && UI.param === g.id) UI.go('tujuan');
+    };
     const hint = s.el.querySelector('.calc-hint');
     const upd = () => {
       const f = UI.formData(s.el), cur = (Calc.goal(g.id) || { saldo: 0 }).saldo, sisa = Math.max(0, f.target - cur);
@@ -66,8 +80,12 @@
     const lastW = localStorage.getItem('sa:lastWallet');
     const def = wl.find(w => w.id === lastW) || wl[0];
     const sug = ambil ? 0 : Math.min(g.sisa, g.t.setoranBulanan || g.perluPerBulan || 0);
+    // portofolio reksa dana yang ditautkan ke tujuan ini → setoran bisa langsung menjadi pembelian reksa dana
+    const rd = ambil ? [] : Calc.investasi('reksadana').filter(i => i.x.tujuanId === g.t.id);
+    const namaRd = i => i.x.nama + (i.x.kode && i.x.kode !== 'aplikasi' ? ' · ' + i.x.kode : '');
     const s = UI.sheet({ title: (ambil ? 'Ambil dari ' : 'Setor ke ') + g.t.nama, cls: 'small', body: `
       ${ambil ? `<p class="muted">Dana terkumpul ${U.rp(g.saldo)}. Uang yang diambil masuk ke dompet pilihan.</p>` : `<p class="muted">Sisa menuju target ${U.rp(g.sisa)}.</p>`}
+      ${rd.length ? UI.field('Disimpan sebagai', `<div class="seg wrap" role="radiogroup">${rd.map((i, k) => `<label><input type="radio" name="ke" value="${i.x.id}" ${k === 0 ? 'checked' : ''}><span>${I('chart-pie')} Beli ${U.esc(namaRd(i))}</span></label>`).join('')}<label><input type="radio" name="ke" value=""><span>${I('piggy-bank')} Tabungan biasa</span></label></div>`, 'Beli reksa dana: saldo rekening berkurang, total setoran portofolio naik, dan checklist tujuan tercentang.') : ''}
       ${UI.field('Jumlah', UI.rpInput('jumlah', Math.round(sug)))}
       <div class="chips">${ambil ? '' : [g.t.setoranBulanan, 100000, 500000, 1000000].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map(v => `<button class="chip" data-q="${v}">${U.rpShort(v)}</button>`).join('')}</div>
       ${UI.field(ambil ? 'Masukkan ke dompet' : 'Ambil dari dompet', `<select name="walletId">${wl.map(w => `<option value="${w.id}" ${w.id === def.id ? 'selected' : ''}>${U.esc(w.nama)} — ${U.rpShort(bal[w.id] || 0)}</option>`).join('')}</select>`,
@@ -87,6 +105,13 @@
       if (ambil && f.jumlah > g.saldo) return UI.toast('Melebihi dana terkumpul ' + U.rp(g.saldo) + '.', 'warn');
       const before = g.pct, me = Store.me.email;
       localStorage.setItem('sa:lastWallet', f.walletId);
+      if (f.ke && UI.rdSetor) {
+        UI.rdSetor(f.ke, f.jumlah, f.tanggal || U.today(), f.walletId, f.dibayarOleh || me, f.catatan);
+        s.close();
+        const after = Calc.goal(id).pct, ms = [1, 0.75, 0.5, 0.25].find(m => before < m && after >= m);
+        if (ms) UI.celebrate(ms, g.t.nama); else UI.toast('Beli reksa dana ' + U.rp(f.jumlah) + ' · ' + U.pct(Math.min(1, after)));
+        return;
+      }
       Store.upsert('Transaksi', { id: U.uid('t'), tanggal: f.tanggal || U.today(), jenis: ambil ? 'tujuan_ambil' : 'tujuan', jumlah: f.jumlah, kategoriId: '', walletId: f.walletId, walletTujuan: g.t.walletId || '',
         biaya: 0, catatan: f.catatan || ((ambil ? 'Ambil dari ' : 'Setor ke ') + g.t.nama), dibayarOleh: f.dibayarOleh || me, tag: '', sumber: 'app', refId: g.t.id, periodeRef: (f.tanggal || U.today()).slice(0, 7), dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
       s.close();
@@ -110,7 +135,16 @@
     wrap.querySelector('button').onclick = close; setTimeout(close, 6000);
   };
 
-  UI.act('goal-sim', U.debounce(el => { T.sim = Number(el.value); const g = Calc.goal(el.dataset.id); const o = document.getElementById('sim-out'); if (o && g) o.innerHTML = simText(g, T.sim); const l = document.getElementById('sim-lb'); if (l) l.textContent = U.rp(T.sim); }, 30));
+  const simTampil = (id) => { const g = Calc.goal(id), o = document.getElementById('sim-out'); if (o && g) o.innerHTML = T.sim > 0 ? simText(g, T.sim) : '<span class="muted">Ketik nominal setoran per bulan.</span>'; };
+  UI.act('goal-sim', U.debounce(el => { T.sim = Number(el.value); const n = document.getElementById('sim-n'); if (n) n.value = U.fmtNum(T.sim); simTampil(el.dataset.id); }, 30));
+  UI.act('goal-sim-n', el => {
+    const v = Number(String(el.value).replace(/\D/g, '')) || 0;
+    el.value = v ? U.fmtNum(v) : '';
+    T.sim = v;
+    const r = document.getElementById('sim-r');
+    if (r) { if (v > Number(r.max)) r.max = String(Math.ceil(v / 100000) * 100000); r.value = String(Math.max(Number(r.min), v)); }
+    simTampil(el.dataset.id);
+  });
   function simText(g, v) {
     if (g.sisa <= 0) return 'Target sudah tercapai 🎉';
     if (!v) return 'Geser untuk mencoba jumlah setoran.';
@@ -123,6 +157,7 @@
     head: p => p ? { title: (Store.byId.Tujuan[p] || {}).nama || 'Tujuan', crumb: 'Tujuan', back: 'tujuan', right: Store.byId.Tujuan[p] ? `<button class="icon-btn" data-act="goal-edit" data-id="${p}" aria-label="Ubah">${I('pencil')}</button>` : '' }
       : { title: 'Tujuan', crumb: 'Lainnya', back: 'lainnya', right: `<button class="icon-btn" data-act="goal-new" aria-label="Tujuan baru">${I('plus')}</button>` },
     nav: () => 'lainnya',
+    after(v, p) { if (!p) pasangUrut(); },
     render(p) {
       if (!Store.can('tujuan', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Tujuan.');
       if (p) return detail(p);
@@ -134,20 +169,52 @@
         <section class="hero card-primary compact"><div class="hero-top"><small>Total dana tujuan</small></div><div class="hero-amt">${UI.m(tot)}</div>
           <div class="bar light"><i style="width:${(tgt ? Math.min(1, tot / tgt) * 100 : 0).toFixed(0)}%"></i></div><small>${U.pct(tgt ? tot / tgt : 0)} dari total target ${UI.ms(tgt)}</small></section>
         <div class="goal-list">${act.map(g => {
-          if (!canSee(g)) return `<div class="goal-card locked"><span class="cat-ic">${I('lock')}</span><div class="grow"><b>Tujuan pribadi ${U.esc(Store.memberName(g.t.pemilik))}</b>${UI.bar(g.pct, 'aman')}<small class="muted">${U.pct(Math.min(1, g.pct))}</small></div></div>`;
-          const bulanIni = U.sum(g.log.filter(t => t.jenis === 'tujuan' && t.tanggal.slice(0, 7) === ym), t => t.jumlah);
+          if (!canSee(g)) return `<div class="goal-card locked" data-id="${g.t.id}"><button class="grip" data-grip data-act="noop" aria-label="Seret untuk mengubah prioritas">${I('grip-vertical')}</button><span class="cat-ic">${I('lock')}</span><div class="grow"><b>Tujuan pribadi ${U.esc(Store.memberName(g.t.pemilik))}</b>${UI.bar(g.pct, 'aman')}<small class="muted">${U.pct(Math.min(1, g.pct))}</small></div></div>`;
+          const bulanIni = U.sum(g.log.filter(t => (t.jenis === 'tujuan' || t.jenis === 'aset_beli') && t.tanggal.slice(0, 7) === ym), t => t.jumlah);
           const done = g.t.setoranBulanan && bulanIni >= g.t.setoranBulanan;
-          return `<div class="goal-card" data-act="go" data-to="tujuan/${g.t.id}">${Charts.jar(g.pct, true)}
+          return `<div class="goal-card" data-id="${g.t.id}" data-act="go" data-to="tujuan/${g.t.id}"><button class="grip" data-grip data-act="noop" aria-label="Seret untuk mengubah prioritas">${I('grip-vertical')}</button>${Charts.jar(g.pct, true)}
             <div class="grow"><div class="row-sp"><b>${U.esc(g.t.nama)}</b>${g.pct >= 1 ? UI.pill('Tercapai', 'ok') : g.t.jenis === 'pribadi' ? UI.pill('Pribadi', '') : ''}</div>
               <div class="row-sp"><span>${UI.ms(g.saldo)} <small class="muted">/ ${UI.ms(g.target)}</small></span><b>${U.pct(Math.min(1, g.pct))}</b></div>${UI.bar(g.pct, 'aman')}
               <small class="muted">${g.t.walletId ? I('landmark') + ' ' + U.esc((Store.byId.Wallet[g.t.walletId] || {}).nama) + ' · ' : ''}${g.estimasi ? 'Estimasi ' + U.tgl(g.estimasi, 'mys') : 'Atur rencana setoran'}${g.t.setoranBulanan ? ' · bulan ini ' + (done ? '✓' : UI.ms(bulanIni) + '/' + UI.ms(g.t.setoranBulanan)) : ''}</small></div>
             ${g.pct < 1 ? `<button class="btn xs" data-act="goal-setor" data-id="${g.t.id}">${I('plus')} Setor</button>` : ''}</div>`;
         }).join('') || UI.empty('target', 'Belum ada tujuan', 'Mulai dari Dana Darurat — fondasi keuangan keluarga.', `<button class="btn" data-act="goal-new">${I('plus')} Buat tujuan</button>`)}</div>
+        ${act.length > 1 ? `<small class="muted center-note">${I('grip-vertical')} Seret untuk mengurutkan prioritas — paling atas didahulukan.</small>` : ''}
         ${act.length ? `<button class="btn block ghost" data-act="goal-new">${I('plus')} Tujuan baru</button>` : ''}
         ${arsip.length ? UI.sec('Arsip') + `<div class="card list">${arsip.map(g => `<div class="row muted" data-act="go" data-to="tujuan/${g.t.id}"><span class="cat-ic">${I(g.t.ikon || 'target')}</span><div class="tx-txt"><b>${U.esc(g.t.nama)}</b><small>${UI.ms(g.saldo)}</small></div></div>`).join('')}</div>` : ''}
         <div class="spacer"></div>`;
     }
   });
+
+  UI.act('noop', () => {});
+  /** Seret kartu tujuan (lewat pegangan) untuk mengubah urutan prioritas. */
+  function pasangUrut() {
+    const list = document.querySelector('#view .goal-list'); if (!list || list.dataset.urut) return; list.dataset.urut = '1';
+    list.querySelectorAll('[data-grip]').forEach(h => h.addEventListener('pointerdown', e => {
+      const card = h.closest('.goal-card'); if (!card) return;
+      e.preventDefault(); e.stopPropagation();
+      const rect = card.getBoundingClientRect(), y0 = e.clientY;
+      const ph = document.createElement('div'); ph.className = 'goal-ph'; ph.style.height = rect.height + 'px';
+      card.after(ph); card.classList.add('dragging');
+      Object.assign(card.style, { position: 'fixed', left: rect.left + 'px', top: rect.top + 'px', width: rect.width + 'px', zIndex: 60 });
+      try { h.setPointerCapture(e.pointerId); } catch (x) {}
+      if (navigator.vibrate) try { navigator.vibrate(12); } catch (x) {}
+      const move = ev => {
+        card.style.top = (rect.top + ev.clientY - y0) + 'px';
+        let taruh = false;
+        for (const sb of list.querySelectorAll('.goal-card:not(.dragging)')) { const r = sb.getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { list.insertBefore(ph, sb); taruh = true; break; } }
+        if (!taruh) list.appendChild(ph);
+        if (ev.clientY < 90) window.scrollBy(0, -10); else if (ev.clientY > innerHeight - 140) window.scrollBy(0, 10);
+      };
+      const up = () => {
+        h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+        card.classList.remove('dragging'); card.removeAttribute('style'); list.insertBefore(card, ph); ph.remove();
+        const ops = [];
+        list.querySelectorAll('.goal-card[data-id]').forEach((c, i) => { const g = Store.byId.Tujuan[c.dataset.id]; if (g && Number(g.prioritas) !== i + 1) ops.push({ op: 'upsert', t: 'Tujuan', row: { id: g.id, prioritas: i + 1 } }); });
+        if (ops.length) { Store.commit(ops); UI.toast('Urutan prioritas disimpan.'); }
+      };
+      h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+    }));
+  }
 
   function detail(id) {
     const g = Calc.goal(id);
@@ -165,8 +232,8 @@
       <div class="stat3"><div class="stat"><small>Sisa</small><b>${UI.ms(g.sisa)}</b></div><div class="stat"><small>Perlu/bulan</small><b>${g.t.tenggat ? UI.ms(g.perluPerBulan) : '—'}</b><small>${g.t.tenggat ? 'tenggat ' + U.tgl(g.t.tenggat, 'mys') : 'tanpa tenggat'}</small></div><div class="stat"><small>Laju 3 bln</small><b>${UI.ms(g.laju)}</b><small>/bulan</small></div></div>
       ${g.t.walletId ? `<div class="note">${I('landmark')} Disimpan di <b>${U.esc((Store.byId.Wallet[g.t.walletId] || {}).nama || '-')}</b> — setiap setoran memindahkan uang dari dompet asal ke rekening ini.</div>` : `<div class="note">${I('info')} Setiap setoran mengurangi saldo dompet asal dan dicatat sebagai dana yang disisihkan.</div>`}
       ${UI.sec('Simulasi setoran')}
-      <div class="card"><div class="row-sp"><span>Setoran per bulan</span><b id="sim-lb">${U.rp(sim)}</b></div>
-        <input type="range" min="50000" max="${maxSim}" step="50000" value="${sim}" data-input="goal-sim" data-id="${id}" aria-label="Setoran per bulan">
+      <div class="card"><div class="row-sp sim-row"><span>Setoran per bulan</span><div class="rp-input sim-rp"><b>Rp</b><input id="sim-n" inputmode="numeric" autocomplete="off" value="${U.fmtNum(sim)}" data-input="goal-sim-n" data-id="${id}" aria-label="Ketik setoran per bulan"></div></div>
+        <input type="range" id="sim-r" min="50000" max="${maxSim}" step="50000" value="${sim}" data-input="goal-sim" data-id="${id}" aria-label="Geser setoran per bulan">
         <p id="sim-out">${simText(g, sim)}</p></div>
       ${UI.sec('Checklist setoran', '<small class="muted">6 bulan terakhir</small>')}
       <div class="card"><table class="ck"><thead><tr><th>Bulan</th>${ck.members.map(m => `<th>${U.esc(m.nama)}</th>`).join('')}</tr></thead>

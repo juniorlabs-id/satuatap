@@ -1,26 +1,39 @@
 /* Aset — kekayaan bersih, Kas & Bank (dompet), pintasan Tujuan/Utang */
 (function () {
   const I = UI.icon;
-  const JENIS_W = { bank: ['Rekening bank', 'landmark'], ewallet: ['Dompet digital', 'smartphone'], tunai: ['Tunai', 'banknote'], kartu: ['Kartu kredit', 'credit-card'], lain: ['Lainnya', 'wallet'] };
+  const JENIS_W = { bank: ['Rekening bank', 'landmark'], rdn: ['RDN / rekening saham', 'chart-candlestick'], ewallet: ['Dompet digital', 'smartphone'], tunai: ['Tunai', 'banknote'], kartu: ['Kartu kredit', 'credit-card'], lain: ['Lainnya', 'wallet'] };
   const wIcon = w => (JENIS_W[w.jenis] || JENIS_W.lain)[1];
   const ownerLabel = w => w.pemilik && w.pemilik !== 'bersama' ? Store.memberName(w.pemilik) : 'Bersama';
 
   UI.walletForm = (w) => {
     const isNew = !w; w = w || { id: U.uid('w'), nama: '', jenis: 'bank', pemilik: 'bersama', saldoAwal: 0, ikon: '', likuid: true, urutan: Store.t.Wallet.length, arsip: false, catatan: '' };
     const bal = isNew ? 0 : Calc.balances()[w.id] || 0;
+    const txW = isNew ? [] : Store.t.Transaksi.filter(t => t.walletId === w.id || t.walletTujuan === w.id);
+    const bisaSaldo = isNew || !txW.length;   // belum ada transaksi → saldo awal masih boleh dikoreksi langsung
     const s = UI.sheet({ title: isNew ? 'Tambah dompet / rekening' : 'Ubah dompet', body: `
       ${UI.field('Nama', `<input name="nama" maxlength="40" value="${U.esc(w.nama)}" placeholder="mis. BCA Bersama, GoPay Rini">`)}
       <div class="grid2">${UI.field('Jenis', `<select name="jenis">${Object.keys(JENIS_W).map(k => `<option value="${k}" ${w.jenis === k ? 'selected' : ''}>${JENIS_W[k][0]}</option>`).join('')}</select>`)}
         ${UI.field('Pemilik', `<select name="pemilik"><option value="bersama">Bersama</option>${Store.members().map(m => `<option value="${m.email}" ${w.pemilik === m.email ? 'selected' : ''}>${U.esc(m.nama)}</option>`).join('')}</select>`)}</div>
-      ${isNew ? UI.field('Saldo saat ini', UI.rpInput('saldoAwal', 0), 'Isi sesuai saldo hari ini. Kartu kredit: isi 0.') : `<div class="note">${I('info')} Saldo sekarang ${U.rp(bal)}. Untuk mengoreksi saldo, gunakan <b>Cocokkan saldo</b>.</div>`}
+      ${bisaSaldo ? UI.field(isNew ? 'Saldo saat ini' : 'Saldo awal', UI.rpInput('saldoAwal', isNew ? 0 : w.saldoAwal), isNew ? 'Isi sesuai saldo hari ini. Kartu kredit: isi 0.' : 'Salah ketik? Perbaiki di sini — dompet ini belum punya transaksi.') : `<div class="note">${I('info')} Saldo sekarang ${U.rp(bal)}. Untuk mengoreksi saldo, gunakan <b>Cocokkan saldo</b>.</div>`}
       <label class="check"><input type="checkbox" name="likuid" ${w.likuid !== false ? 'checked' : ''}><span>Hitung sebagai kas likuid (dipakai untuk "aman dibelanjakan" & proyeksi)</span></label>
       ${UI.field('Catatan', `<input name="catatan" maxlength="100" value="${U.esc(w.catatan)}" placeholder="mis. 4 digit akhir 1234">`, 'Jangan simpan nomor rekening lengkap, PIN, atau kata sandi.')}`,
-      foot: `${isNew ? '' : `<button class="btn ghost" data-arsip>${I(w.arsip ? 'archive-restore' : 'archive')} ${w.arsip ? 'Aktifkan' : 'Arsipkan'}</button>`}<button class="btn" data-ok>Simpan</button>` });
+      foot: `${isNew ? '' : `<button class="btn ghost danger" data-hapus aria-label="Hapus">${I('trash-2')}</button><button class="btn ghost" data-arsip>${I(w.arsip ? 'archive-restore' : 'archive')} ${w.arsip ? 'Aktifkan' : 'Arsipkan'}</button>`}<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
     s.el.querySelector('[data-ok]').onclick = () => {
       const f = UI.formData(s.el); if (!f.nama) return UI.toast('Nama wajib diisi.', 'warn');
-      if (!isNew) delete f.saldoAwal;
+      if (!bisaSaldo) delete f.saldoAwal;
       Store.upsert('Wallet', Object.assign({}, w, f)); s.close(); UI.toast('Dompet disimpan.');
+    };
+    const hp = s.el.querySelector('[data-hapus]');
+    if (hp) hp.onclick = async () => {
+      const dipakai = [['Rutin', 'jadwal rutin'], ['Template', 'template'], ['Tujuan', 'tujuan']].filter(([t]) => (Store.t[t] || []).some(r => r.walletId === w.id || r.walletTujuan === w.id)).map(x => x[1]);
+      if (dipakai.length) return UI.toast('Dompet ini masih dipakai di ' + dipakai.join(', ') + '. Ganti dompetnya di sana dulu.', 'warn', { ms: 6000 });
+      if (Store.t.Wallet.filter(x => !x.arsip).length <= 1) return UI.toast('Minimal harus ada satu dompet.', 'warn');
+      const ok = await UI.confirm('Hapus ' + w.nama + '?', txW.length ? `Dompet ini punya ${txW.length} transaksi. Semuanya ikut terhapus (termasuk transfer dari/ke dompet lain). Pakai ini hanya untuk membatalkan salah input.` : 'Dompet dihapus permanen.', txW.length ? 'Hapus beserta ' + txW.length + ' transaksi' : 'Hapus', true);
+      if (!ok) return;
+      Store.commit(txW.map(t => ({ op: 'delete', t: 'Transaksi', id: t.id })).concat([{ op: 'delete', t: 'Wallet', id: w.id }]));
+      s.close(); UI.toast(w.nama + ' dihapus.');
+      if (UI.cur === 'aset' && UI.param === 'kas') UI.render(); 
     };
     const ar = s.el.querySelector('[data-arsip]');
     if (ar) ar.onclick = () => { if (!w.arsip && Math.abs(bal) > 0) return UI.toast('Kosongkan saldo dulu (transfer ke dompet lain) sebelum diarsipkan.', 'warn'); Store.upsert('Wallet', { id: w.id, arsip: !w.arsip }); s.close(); };
@@ -55,18 +68,15 @@
 
   const TILES = () => [
     { id: 'kas', icon: 'landmark', label: 'Kas & Bank', to: 'aset/kas' },
-    { id: 'tujuan', icon: 'target', label: 'Tujuan', to: 'tujuan' },
-    { id: 'utang', icon: 'scale', label: 'Utang & Piutang', to: 'utang' },
     { id: 'emas', icon: 'gem', label: 'Brankas Emas', to: 'emas', gold: true },
-    { id: 'saham', icon: 'chart-candlestick', label: 'Saham', to: 'investasi/saham' },
+    { id: 'saham', icon: 'chart-candlestick', label: 'Saham', to: 'saham' },
     { id: 'rd', icon: 'chart-pie', label: 'Reksa Dana', to: 'investasi/reksadana' },
     { id: 'sbn', icon: 'file-badge', label: 'SBN & Deposito', to: 'investasi/sbn' },
     { id: 'prop', icon: 'house', label: 'Properti & Tanah', to: 'investasi/properti' },
-    { id: 'lain', icon: 'car', label: 'Aset Lain', to: 'investasi/lain' },
-    { id: 'zakat', icon: 'hand-heart', label: 'Zakat', to: 'zakat', gold: true },
-    { id: 'alok', icon: 'scale', label: 'Target Alokasi', to: 'investasi/alokasi' },
-    { id: 'skor', icon: 'heart-pulse', label: 'Skor Kesehatan', to: 'rapor/rasio' }
+    { id: 'lain', icon: 'package', label: 'Aset Lain', to: 'investasi/lain' },
+    { id: 'utang', icon: 'scale', label: 'Utang & Piutang', to: 'utang' }
   ];
+  UI.asetTiles = TILES;
 
   UI.page('aset', {
     head: p => p === 'kas' ? { title: 'Kas & Bank', crumb: 'Aset', back: 'aset', right: `<button class="icon-btn" data-act="wallet-add" aria-label="Tambah">${I('plus')}</button>` } : null,
@@ -79,7 +89,7 @@
       const kl = nw.kelas || {}, kk = Object.keys(kl).filter(k => k !== 'emas' && kl[k] > 0);
       const parts = [{ v: Math.max(0, nw.kas), color: 'var(--primary)', label: 'Kas & bank', to: 'aset/kas' }, { v: nw.danaTujuan, color: 'var(--secondary)', label: 'Dana tujuan (di luar dompet)', to: 'tujuan' },
         { v: kl.emas || 0, color: 'var(--gold)', label: 'Emas', to: 'emas' }]
-        .concat(kk.map((k, i) => ({ v: kl[k], color: PAL[i % PAL.length], label: (Calc.KELAS[k] || {}).label || k, to: 'investasi/' + k })))
+        .concat(kk.map((k, i) => ({ v: kl[k], color: PAL[i % PAL.length], label: (Calc.KELAS[k] || {}).label || k, to: UI.rutKelas(k) })))
         .concat([{ v: nw.piutang, color: 'var(--muted)', label: 'Piutang', to: 'utang' }]).filter(x => x.v > 0);
       const ws = Store.wallets();
       return `

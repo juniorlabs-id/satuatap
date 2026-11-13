@@ -47,6 +47,7 @@
   UI.act('inv-add', el => el.dataset.kelas === 'reksadana' && UI.rdForm ? UI.rdForm() : UI.invForm(null, el.dataset.kelas));
   UI.act('inv-open', el => {
     const i = Calc.investasi('', true).find(z => z.x.id === el.dataset.id); if (!i) return;
+    if (String(el.dataset.id).indexOf('sh:') === 0) return UI.go('saham');
     if (i.x.kelas === 'reksadana' && i.x.status !== 'terjual' && UI.acts['rd-open']) return UI.acts['rd-open'](el);
     const x = i.x, def = K()[x.kelas] || K().lain, aktif = x.status !== 'terjual';
     const rw = (x.riwayatNilai || []).map(r => ({ d: r[0], bal: Number(r[1]) }));
@@ -138,16 +139,25 @@
       <button class="btn block ghost" data-act="alok-edit">${I('sliders-horizontal')} Ubah target</button>`;
   }
 
+  /** Kelompok tampilan: SBN & Deposito digabung; kripto & kendaraan masuk Aset Lain. */
+  const GRUP = { sbn: ['sbn', 'deposito'], deposito: ['sbn', 'deposito'], lain: ['lain', 'kripto', 'kendaraan'], kripto: ['lain', 'kripto', 'kendaraan'], kendaraan: ['lain', 'kripto', 'kendaraan'] };
+  const JUDUL = { sbn: 'SBN & Deposito', deposito: 'SBN & Deposito', lain: 'Aset Lain', kripto: 'Aset Lain', kendaraan: 'Aset Lain' };
+  UI.rutKelas = k => k === 'saham' ? 'saham' : ({ deposito: 'investasi/sbn', kripto: 'investasi/lain', kendaraan: 'investasi/lain' })[k] || 'investasi/' + k;
+  const INV_TILES = () => [{ id: 'saham', icon: 'chart-candlestick', label: 'Saham', to: 'saham' }, { id: 'reksadana', icon: 'chart-pie', label: 'Reksa Dana', to: 'investasi/reksadana' }, { id: 'sbn', icon: 'file-badge', label: 'SBN & Deposito', to: 'investasi/sbn' }, { id: 'properti', icon: 'house', label: 'Properti & Tanah', to: 'investasi/properti' }, { id: 'lain', icon: 'package', label: 'Aset Lain', to: 'investasi/lain' }];
+  /** Pindah antarkelas aset: strip geser horizontal agar tidak memakan layar. */
+  UI.invTiles = (sel) => `<nav class="inv-strip" aria-label="Kelas aset">${INV_TILES().map(t => `<a class="inv-pill ${t.id === sel ? 'on' : ''}" href="#/${t.to}">${I(t.icon)}<span>${U.esc(t.label)}</span></a>`).join('')}</nav>`;
   UI.page('investasi', {
-    head: p => ({ title: p === 'alokasi' ? 'Target Alokasi' : (K()[p] || { label: 'Investasi & Aset' }).label, crumb: 'Aset', back: 'aset',
+    head: p => ({ title: p === 'alokasi' ? 'Target Alokasi' : JUDUL[p] || (K()[p] || { label: 'Investasi & Aset' }).label, crumb: 'Aset', back: 'aset',
       right: p === 'reksadana' ? `<button class="icon-btn" data-act="rd-add" aria-label="Tambah aplikasi">${I('plus')}</button>` : p !== 'alokasi' ? `<button class="icon-btn" data-act="inv-add" data-kelas="${K()[p] ? p : 'saham'}" aria-label="Tambah">${I('plus')}</button>` : '' }),
     nav: () => 'aset',
     render(p) {
       if (!Store.can('aset', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Aset.');
-      const tiles = UI.tiles(Object.keys(K()).map(k => ({ id: k, icon: K()[k].ikon, label: K()[k].label, to: 'investasi/' + k })).concat([{ id: 'alokasi', icon: 'scale', label: 'Target Alokasi', to: 'investasi/alokasi' }]), p, 'compact');
+      const sel = GRUP[p] ? (p === 'deposito' ? 'sbn' : ['kripto', 'kendaraan'].indexOf(p) > -1 ? 'lain' : p) : p;
+      const tiles = p === 'alokasi' ? '' : UI.invTiles(sel);
       if (p === 'alokasi') return tiles + alokasi() + '<div class="spacer"></div>';
       if (p === 'reksadana' && UI.rdView) return tiles + UI.rdView();
-      const kelas = K()[p] ? p : '', list = Calc.investasi(kelas), sold = Calc.investasi(kelas, true).filter(i => i.x.status === 'terjual');
+      const kelas = K()[p] ? p : '', grp = GRUP[kelas], pilih = arr => grp ? arr.filter(i => grp.indexOf(i.x.kelas) > -1) : arr;
+      const list = grp ? pilih(Calc.investasi('')) : Calc.investasi(kelas), sold = (grp ? pilih(Calc.investasi('', true)) : Calc.investasi(kelas, true)).filter(i => i.x.status === 'terjual');
       const nilai = U.sum(list, i => i.nilai), modal = U.sum(list, i => i.modal), u = nilai - modal;
       const jt = list.filter(i => i.x.jatuhTempo && U.diffDays(U.today(), i.x.jatuhTempo) <= 30 && i.x.jatuhTempo >= U.today());
       const basi = list.filter(i => i.basi && ['saham', 'reksadana', 'kripto'].indexOf(i.x.kelas) > -1);

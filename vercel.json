@@ -1,4 +1,16 @@
 {
-  "regions": ["sin1"],
-  "functions": { "api/emas.js": { "maxDuration": 60 }, "api/tg.js": { "maxDuration": 30 } }
+  "regions": [
+    "sin1"
+  ],
+  "functions": {
+    "api/emas.js": {
+      "maxDuration": 60
+    },
+    "api/tg.js": {
+      "maxDuration": 30
+    },
+    "api/saham.js": {
+      "maxDuration": 30
+    }
+  }
 }

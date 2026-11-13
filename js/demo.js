@@ -6,7 +6,7 @@
     const R = rng(20261110), pick = a => a[Math.floor(R() * a.length)], between = (a, b) => Math.round((a + R() * (b - a)) / 500) * 500;
     const today = U.today(), now = new Date().toISOString();
     const D = 'dimas@contoh.id', N = 'rini@contoh.id';
-    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [], Emas: [], Investasi: [], Skenario: [], Rapat: [], Tugas: [] };
+    const T = { Anggota: [], Pengaturan: [], Wallet: [], Kategori: [], Transaksi: [], Template: [], Rutin: [], Acara: [], GeserDana: [], Tujuan: [], Pinjaman: [], Laporan: [], Emas: [], Investasi: [], Skenario: [], Rapat: [], Tugas: [], Saham: [] };
     T.Anggota.push({ id: 'm1', nama: 'Dimas', email: D, peran: 'admin', warna: '#0F5E59', izin: '{}', aktif: 'true', dibuat: now });
     T.Anggota.push({ id: 'm2', nama: 'Rini', email: N, peran: 'pasangan', warna: '#F2B33D', izin: '{}', aktif: 'true', dibuat: now });
     [['namaKeluarga', 'Keluarga Dimas & Rini'], ['periodeMulai', '1'], ['danaDaruratBulan', '6'], ['notifEmail', 'true'], ['kalenderSync', 'false'],
@@ -127,8 +127,17 @@
     const IV = (id, kelas, nama, kode, unit, modal, nilai, tgl, extra) => T.Investasi.push(Object.assign({ id, kelas, nama, kode, unit: String(unit), modal: String(modal), nilai: String(nilai), tglNilai: U.addDays(today, -3), tanggal: tgl,
       walletId: '', tujuanId: '', kepemilikan: '{}', jatuhTempo: '', imbal: '0', zakat: ['properti', 'kendaraan', 'lain'].indexOf(kelas) > -1 ? 'false' : 'true', status: 'aktif', tglJual: '', hargaJual: '0', catatan: '', dibuat: now,
       riwayatNilai: JSON.stringify([[U.addMonths(today, -6), Math.round(modal * 0.97)], [U.addMonths(today, -3), Math.round((modal + nilai) / 2)], [U.addDays(today, -3), nilai]]) }, extra || {}));
-    IV('i1', 'saham', 'Bank Central Asia', 'BBCA', 1000, 8900000, 9650000, U.addMonths(today, -18), { kepemilikan: JSON.stringify({ [D]: 100 }) });
-    IV('i2', 'saham', 'Telkom Indonesia', 'TLKM', 2000, 7400000, 6100000, U.addMonths(today, -12));
+    // Jurnal saham: akun RDN Dimas
+    T.Wallet.push({ id: 'w_rdn', nama: 'RDN Ajaib Dimas', jenis: 'rdn', pemilik: D, saldoAwal: '0', ikon: '', likuid: 'false', urutan: '9', arsip: 'false', catatan: '' });
+    const SH = (id, hari, kode, aksi, lot, harga, nominal) => { const tg = U.addDays(today, -hari), f = aksi === 'dividen' ? 0 : Math.round(lot * 100 * harga * (aksi === 'jual' ? 0.0025 : 0.0015)), txId = 'tsh' + id;
+      T.Saham.push({ id: 'sh' + id, tanggal: tg, kode, aksi, lot: String(lot), harga: String(harga), fee: String(f), nominal: String(nominal || 0), walletId: 'w_rdn', catatan: '', dibuat: now, txId, oleh: D });
+      const j = aksi === 'beli' ? lot * 100 * harga + f : aksi === 'jual' ? lot * 100 * harga - f : nominal;
+      T.Transaksi.push({ id: txId, tanggal: tg, jenis: aksi === 'beli' ? 'aset_beli' : aksi === 'jual' ? 'aset_jual' : 'masuk', jumlah: String(Math.round(j)), kategoriId: aksi === 'dividen' ? 'k_lain' : '', walletId: 'w_rdn', walletTujuan: '', biaya: '0', catatan: (aksi === 'dividen' ? 'Dividen ' : aksi === 'beli' ? 'Beli ' : 'Jual ') + kode, dibayarOleh: D, tag: 'saham', sumber: 'saham', refId: 'sh' + id, periodeRef: tg.slice(0, 7), dicatatOleh: D, dibuat: now, riwayat: '[]' }); };
+    T.Transaksi.push({ id: 'trdn1', tanggal: U.addDays(today, -400), jenis: 'transfer', jumlah: '30000000', kategoriId: '', walletId: 'w_mdr', walletTujuan: 'w_rdn', biaya: '0', catatan: 'Top up RDN', dibayarOleh: D, tag: '', sumber: 'app', refId: '', periodeRef: '', dicatatOleh: D, dibuat: now, riwayat: '[]' });
+    SH(1, 380, 'BBCA', 'beli', 10, 8800); SH(2, 300, 'TLKM', 'beli', 20, 3700); SH(3, 260, 'BBRI', 'beli', 15, 5100); SH(4, 200, 'BBRI', 'jual', 15, 5450);
+    SH(5, 180, 'ASII', 'beli', 10, 5200); SH(6, 150, 'BBCA', 'beli', 5, 9300); SH(7, 120, 'ASII', 'jual', 10, 4900); SH(8, 95, 'BBCA', 'dividen', 0, 0, 405000);
+    SH(9, 70, 'ANTM', 'beli', 30, 1450); SH(10, 40, 'ANTM', 'jual', 15, 1690); SH(11, 20, 'TLKM', 'dividen', 0, 0, 340000); SH(12, 8, 'UNVR', 'beli', 20, 1900);
+    T.Pengaturan.push({ id: 'hargaSaham', nilai: JSON.stringify({ BBCA: [9675, U.addDays(today, -1), 'Contoh', 9600], TLKM: [3180, U.addDays(today, -1), 'Contoh', 3210], ANTM: [1725, U.addDays(today, -1), 'Contoh', 1700], UNVR: [1885, U.addDays(today, -1), 'Contoh', 1900] }) });
     // Reksa dana dicatat per aplikasi: riwayat bulanan [tanggal, nilai, total setoran]
     const RD = (id, nama, bulan, awal, setor, gerak, extra) => {
       const rw = []; let m = awal, v = awal;
@@ -139,9 +148,9 @@
       }
       T.Investasi.push(Object.assign({ id, kelas: 'reksadana', nama, kode: 'aplikasi', unit: '0', modal: String(m), nilai: String(v), tglNilai: U.addDays(today, -3), tanggal: rw[0][0], walletId: '', tujuanId: '', kepemilikan: '{}', jatuhTempo: '', imbal: '0', zakat: 'true', status: 'aktif', tglJual: '', hargaJual: '0', catatan: '', dibuat: now, riwayatNilai: JSON.stringify(rw) }, extra || {}));
     };
-    RD('i3', 'Bibit', 14, 5000000, 1000000, [0.004, 0.005, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004], { tujuanId: 'g_dar', kode: 'Dana Darurat', catatan: 'RD pasar uang, autodebet tgl 5' });
-    RD('i9', 'Bibit', 10, 2000000, 500000, [0.012, -0.018, 0.02, 0.009, -0.011, 0.017, 0.006, -0.008, 0.015, 0.01], { tujuanId: 'g_pdd', kode: 'Pendidikan Aisha', catatan: 'RD saham + campuran' });
-    RD('i8', 'Bareksa', 8, 3000000, 500000, [0.005, 0.004, 0.006, 0.003, 0.005, 0.004, 0.006, 0.005], { kepemilikan: JSON.stringify({ [N]: 100 }), catatan: 'RD obligasi' });
+    RD('i3', 'Bibit', 14, 5000000, 1000000, [0.004, 0.005, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004, 0.004, 0.005, 0.004], { tujuanId: 'g_dar', kode: 'Dana Darurat', catatan: 'RD pasar uang, autodebet tgl 5', kepemilikan: JSON.stringify({ [D]: 100 }) });
+    RD('i9', 'Bibit', 10, 2000000, 500000, [0.012, -0.018, 0.02, 0.009, -0.011, 0.017, 0.006, -0.008, 0.015, 0.01], { tujuanId: 'g_pdd', kode: 'Pendidikan Aisha', catatan: 'RD saham + campuran', kepemilikan: JSON.stringify({ [D]: 100 }) });
+    RD('i8', 'Bibit', 8, 3000000, 500000, [0.005, 0.004, 0.006, 0.003, 0.005, 0.004, 0.006, 0.005], { kepemilikan: JSON.stringify({ [N]: 100 }), tujuanId: 'g_dar', kode: 'Dana Darurat Rini', catatan: 'RD obligasi' });
     IV('i4', 'sbn', 'Sukuk Tabungan ST011', 'ST011', 10, 10000000, 10000000, U.addMonths(today, -16), { jatuhTempo: U.addMonths(today, 8), imbal: '6.35' });
     IV('i5', 'deposito', 'Deposito BCA 6 bulan', '', 0, 20000000, 20380000, U.addMonths(today, -4), { jatuhTempo: U.addMonths(today, 2), imbal: '3.5' });
     IV('i6', 'properti', 'Rumah Bekasi', 'SHM', 90, 650000000, 780000000, U.addMonths(today, -48), { catatan: 'Ditempati sendiri, KPR BTN' });

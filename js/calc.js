@@ -292,12 +292,15 @@
 
   // ---------- Tujuan ----------
   C.goals = () => M('goals', () => {
-    const sums = {}, logs = {};
+    const sums = {}, logs = {}, asetTujuan = {};
+    // pembelian/penjualan aset (reksa dana, emas) yang ditautkan ke tujuan ikut tercatat di riwayat & checklist tujuan
+    (Store.t.Investasi || []).concat(Store.t.Emas || []).forEach(a => { if (a.tujuanId) asetTujuan[a.id] = a.tujuanId; });
     Store.t.Transaksi.forEach(t => {
-      if ((t.jenis !== 'tujuan' && t.jenis !== 'tujuan_ambil') || !t.refId) return;
-      const v = t.jenis === 'tujuan' ? t.jumlah : -t.jumlah;
-      sums[t.refId] = (sums[t.refId] || 0) + v;
-      (logs[t.refId] = logs[t.refId] || []).push(t);
+      if (!t.refId) return;
+      if (t.jenis === 'tujuan' || t.jenis === 'tujuan_ambil') {
+        sums[t.refId] = (sums[t.refId] || 0) + (t.jenis === 'tujuan' ? t.jumlah : -t.jumlah);
+        (logs[t.refId] = logs[t.refId] || []).push(t);
+      } else if ((t.jenis === 'aset_beli' || t.jenis === 'aset_jual') && asetTujuan[t.refId]) (logs[asetTujuan[t.refId]] = logs[asetTujuan[t.refId]] || []).push(t);
     });
     const linked = C.linkedGoalValue ? C.linkedGoalValue() : {};
     return Store.t.Tujuan.map(g => {
@@ -309,13 +312,15 @@
       const perluPerBulan = g.tenggat ? sisa / Math.max(1, bulanLagi) : 0;
       // laju aktual 3 bulan terakhir
       const from = U.addMonths(U.today(), -3);
-      const laju = U.sum(log.filter(t => t.tanggal >= from), t => t.jenis === 'tujuan' ? t.jumlah : -t.jumlah) / 3;
+      const laju = U.sum(log.filter(t => t.tanggal >= from), t => C.setorTujuan(t)) / 3;
       const per = g.setoranBulanan || laju;
       const estimasi = sisa <= 0 ? U.today() : per > 0 ? U.addMonths(U.today(), Math.ceil(sisa / per)) : '';
       return { t: g, saldo, dana, aset, target, pct, sisa, log, perluPerBulan, laju, estimasi, bulanLagi };
     }).sort((a, b) => (a.t.prioritas || 99) - (b.t.prioritas || 99));
   });
   C.goal = id => C.goals().find(g => g.t.id === id);
+  /** Nilai setoran bersih sebuah baris riwayat tujuan (+ setor/beli aset, − ambil/jual aset). */
+  C.setorTujuan = t => (t.jenis === 'tujuan' || t.jenis === 'aset_beli') ? t.jumlah : -t.jumlah;
   /** Checklist setoran: 6 bulan terakhir × anggota */
   C.goalChecklist = (g, months) => {
     months = months || 6;
@@ -324,7 +329,7 @@
       const ym = U.addMonths(U.today(), -i).slice(0, 7);
       const row = { ym, label: U.BLN_L[Number(ym.slice(5)) - 1], cells: [] };
       members.forEach(m => {
-        const v = U.sum(g.log.filter(t => t.jenis === 'tujuan' && t.tanggal.slice(0, 7) === ym && (t.dibayarOleh || t.dicatatOleh) === m.email), t => t.jumlah);
+        const v = U.sum(g.log.filter(t => (t.jenis === 'tujuan' || t.jenis === 'aset_beli') && t.tanggal.slice(0, 7) === ym && (t.dibayarOleh || t.dicatatOleh) === m.email), t => t.jumlah);
         row.cells.push({ m, v });
       });
       out.push(row);

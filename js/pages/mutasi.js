@@ -112,7 +112,8 @@
           <div class="chips scroll">
             ${[['keluar', 'Keluar'], ['masuk', 'Masuk'], ['transfer', 'Transfer'], ['tujuan', 'Tabungan'], ['lain', 'Lainnya']].map(j => `<button class="chip ${F.jenis === j[0] ? 'on' : ''}" data-act="mut-jenis" data-v="${j[0]}">${j[1]}</button>`).join('')}
             <button class="chip ${nf ? 'on' : ''}" data-act="mut-filter">${I('sliders-horizontal')} Filter${nf ? ' · ' + nf : ''}</button>
-            <button class="chip" data-act="mut-export">${I('download')} CSV</button>
+            <button class="chip" data-act="go" data-to="impor">${I('file-up')} Impor CSV</button>
+            <button class="chip" data-act="mut-export">${I('download')} Ekspor CSV</button>
           </div>
           <div class="sumline" id="mut-sum"></div>
         </div>

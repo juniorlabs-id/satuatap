@@ -581,3 +581,63 @@ ol.langkah li { margin-bottom: 6px; } ol.langkah .ic { width: 16px; height: 16px
 [data-theme=dark] .rd-tag { color: #F2B33D; }
 .rd-app .link.small { align-self: flex-start; font-size: 12.5px; margin-top: 2px; }
 .rd-upd-app { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 15px; }
+/* Foto profil */
+.avatar.has-foto { background-size: cover !important; background-position: center !important; color: transparent; }
+.avatar.xl { width: 112px; height: 112px; font-size: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; }
+.ava-edit { position: relative; background: none; border: 0; padding: 0; cursor: pointer; flex: 0 0 auto; }
+.ava-edit > i { position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: var(--gold); color: #1d1d1b; display: flex; align-items: center; justify-content: center; border: 2px solid var(--surface); }
+.ava-edit > i .ic { width: 13px; height: 13px; }
+.ava-preview { display: flex; justify-content: center; padding: 6px 0 12px; }
+/* Tujuan: seret prioritas & input simulasi */
+.goal-card { position: relative; }
+.goal-card .grip { border: 0; background: none; color: var(--muted); padding: 6px 2px; margin: -6px 0 -6px -6px; cursor: grab; touch-action: none; display: flex; align-items: center; align-self: stretch; }
+.goal-card .grip .ic { width: 18px; height: 18px; }
+.goal-card.dragging { box-shadow: 0 16px 36px rgba(0,0,0,.18); transform: scale(1.02); opacity: .97; cursor: grabbing; }
+.goal-ph { border: 2px dashed var(--primary); border-radius: 18px; background: var(--primary-c); margin-bottom: 10px; }
+.center-note { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 10px; text-align: center; } .center-note .ic { width: 14px; height: 14px; }
+.sim-row { align-items: center; gap: 10px; } .sim-rp { max-width: 190px; } .sim-rp input { text-align: right; font-weight: 800; }
+/* Emas: beberapa gramasi sekaligus */
+.keping-list { display: grid; gap: 8px; margin: 4px 0 8px; }
+.keping-row { display: grid; grid-template-columns: 1.05fr .6fr 1.5fr auto; gap: 8px; align-items: end; padding: 10px; border-radius: 14px; background: var(--surface-2, rgba(15,94,89,.05)); border: 1px solid var(--line-2); }
+.keping-row .field { margin: 0; min-width: 0; } .keping-row .field > span { font-size: 11.5px; }
+.keping-row select, .keping-row input { min-width: 0; }
+.keping-row input[data-k=gram] { margin-top: 6px; }
+.keping-row .keping-x { align-self: center; margin-top: 14px; }
+.keping-row .keping-x[hidden] { display: none; }
+.keping-total { margin: 4px 0 10px; } .keping-total .kv b { font-weight: 800; }
+.btn.sm { padding: 8px 12px; font-size: 13px; min-height: 0; }
+.rd-porto b .avatar.xs, .rd-upd-h b .avatar.xs { width: 18px; height: 18px; font-size: 9px; margin-right: 6px; vertical-align: -3px; display: inline-flex; }
+.seg.wrap { flex-wrap: wrap; flex-direction: column; } .seg.wrap label { width: 100%; } .seg.wrap span { justify-content: flex-start; gap: 8px; display: flex; align-items: center; }
+.seg.wrap span .ic { width: 16px; height: 16px; }
+/* ============ Jurnal saham ============ */
+.sh-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 5px; margin: 0 0 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-2); }
+.sh-tab { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; border-radius: 12px; color: var(--muted); font-size: 11.5px; font-weight: 700; text-decoration: none; }
+.sh-tab .ic { width: 18px; height: 18px; } .sh-tab.on { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(15,94,89,.25); }
+.sh-split { grid-template-columns: 1fr 1fr; row-gap: 12px; }
+.sh-kode { min-width: 52px; height: 34px; padding: 0 8px; border-radius: 10px; background: var(--primary-c); color: var(--primary); font-weight: 800; font-size: 12.5px; letter-spacing: .3px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+[data-theme=dark] .sh-kode { color: #9fdcd5; }
+.sh-kode.lg { min-width: 64px; height: 48px; font-size: 15px; border-radius: 14px; } .sh-kode.muted { background: var(--line-2); color: var(--muted); }
+.sh-pos .tx-txt b { font-size: 13.5px; } .sh-pos .tx-amt small { font-weight: 700; }
+.sh-ic { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.sh-ic .ic { width: 17px; height: 17px; }
+.sh-ic.buy { background: var(--primary-c); color: var(--primary); } .sh-ic.sell { background: rgba(194,85,61,.12); color: var(--bad); }
+.sh-ic.div { background: rgba(224,162,58,.16); color: #B37A12; } .sh-ic.fee { background: var(--line-2); color: var(--muted); }
+.sh-tr .tx-txt b small { font-weight: 600; }
+.seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px; }
+.seg2 button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+.seg2 button.on { background: var(--primary); border-color: var(--primary); color: #fff; } .seg2 .ic { width: 16px; height: 16px; }
+.sh-filter { display: grid; gap: 8px; margin-bottom: 10px; } .sh-filter .search { margin: 0; }
+.sh-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.sh-stat { padding: 12px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sh-stat > small:first-child { color: var(--muted); font-size: 11.5px; } .sh-stat b { font-size: 18px; font-weight: 800; } .sh-stat > small:last-child:not(:first-child) { color: var(--muted); font-size: 11px; }
+.sh-kalk .mini-h { margin-top: 12px; }
+.sh-kalk-out { margin: 6px 0 4px; }
+.sh-big { text-align: center; padding: 14px; border-radius: 16px; background: var(--primary-c); margin-bottom: 8px; display: flex; flex-direction: column; gap: 2px; }
+.sh-big b { font-size: 26px; font-weight: 800; color: var(--primary); } [data-theme=dark] .sh-big b { color: #9fdcd5; } .sh-big small { font-size: 12px; }
+.sh-kalk-need { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; } .sh-kalk-need b { font-size: 18px; font-weight: 800; }
+@media (min-width: 700px) { .sh-stats { grid-template-columns: repeat(4, 1fr); } .sh-split { grid-template-columns: repeat(4, 1fr); } }
+.inv-strip { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 12px; padding: 2px 16px 4px; scrollbar-width: none; }
+.inv-strip::-webkit-scrollbar { display: none; }
+.inv-pill { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 8px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); font-size: 12.5px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.inv-pill .ic { width: 15px; height: 15px; color: var(--primary); } .inv-pill.on { background: var(--primary); border-color: var(--primary); color: #fff; } .inv-pill.on .ic { color: #F2B33D; }
+input.up:not(:placeholder-shown) { text-transform: uppercase; }

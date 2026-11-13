@@ -120,10 +120,16 @@
     kendaraan: { label: 'Kendaraan', ikon: 'car', unit: '', zakat: false, spt: '043' },
     lain: { label: 'Aset Lain', ikon: 'package', unit: '', zakat: false, spt: '059' }
   };
-  C.investasi = (kelas, all) => M('inv:' + (kelas || '') + ':' + !!all, () => Store.t.Investasi
+  /** Baris tabel Investasi saja (tanpa posisi dari Jurnal Saham). */
+  C.investasiManual = (kelas, all) => M('invm:' + (kelas || '') + ':' + !!all, () => Store.t.Investasi
     .filter(x => (!kelas || x.kelas === kelas) && (all || x.status !== 'terjual'))
     .map(x => { const nilai = x.status === 'terjual' ? (x.hargaJual || 0) : (x.nilai || x.modal || 0); return { x, nilai, modal: x.modal || 0, untung: nilai - (x.modal || 0), pct: x.modal ? (nilai - x.modal) / x.modal : 0, basi: x.tglNilai ? U.diffDays(x.tglNilai, U.today()) > 45 : true }; })
     .sort((a, b) => b.nilai - a.nilai));
+  /** Semua investasi; posisi Jurnal Saham ikut masuk sebagai kelas saham (untuk kekayaan bersih, zakat & alokasi). */
+  C.investasi = (kelas, all) => M('inv:' + (kelas || '') + ':' + !!all, () => {
+    const a = C.investasiManual(kelas, all);
+    return (!kelas || kelas === 'saham') && C.sahamItems ? a.concat(C.sahamItems()).sort((x, y) => y.nilai - x.nilai) : a;
+  });
   /** Nilai aset non-kas per kelas (untuk kekayaan bersih & alokasi). */
   C.asetKelas = () => M('asetKelas', () => {
     const o = { emas: C.emasSummary().nilai };
@@ -234,6 +240,7 @@
       const k = C.KELAS[x.kelas] || C.KELAS.lain;
       harta.push({ kode: x.kelas === 'kendaraan' && /motor/i.test(x.nama) ? '042' : k.spt, nama: x.nama + (x.kode ? ' (' + x.kode + ')' : ''), tahun: thn(x.tanggal), v: x.modal || 0, ket: k.label });
     });
+    if (C.saham) C.saham(end).posisi.forEach(p => harta.push({ kode: '032', nama: 'Saham ' + p.kode + ' (' + U.fmtNum(p.lembar) + ' lembar)', tahun: thn(p.mulai), v: Math.round(p.biaya), ket: 'Saham' }));
     C.loans().forEach(l => {
       if ((l.p.mulai || '') > end) return;
       const paid = U.sum(Store.t.Transaksi.filter(t => t.refId === l.p.id && t.tanggal <= end && t.jenis !== 'pinjam_terima' && t.jenis !== 'pinjam_beri'), t => t.jumlah);

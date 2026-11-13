@@ -16,6 +16,10 @@
   const lbl = x => { const t = x.tujuanId && Store.byId.Tujuan[x.tujuanId], n = porto(x) || (t ? t.nama : ''); return x.nama + (n ? ' · ' + n : ''); };
   const av = (x, cls) => `<span class="rd-av ${cls || ''}" style="background:${warna(x.nama)}">${U.esc(String(x.nama).slice(0, 1).toUpperCase())}</span>`;
   const tujuan = x => x.tujuanId && Store.byId.Tujuan[x.tujuanId];
+  /** Pemilik portofolio: email bila dimiliki 1 orang, '' bila bersama. */
+  const pemilik = x => { const kp = x.kepemilikan || {}, ks = Object.keys(kp).filter(k => Number(kp[k]) > 0); return ks.length === 1 ? ks[0] : ''; };
+  const milikSaya = x => { const p = pemilik(x); return !p || p === me(); };
+  const ownChip = x => { const p = pemilik(x); return p ? UI.avatar(p, true) : ''; };
   /** Kelompokkan per aplikasi: [{nama, items, nilai, modal}] urut nilai terbesar. */
   const grupApp = list => {
     const g = {}; list.forEach(i => { const k = String(i.x.nama).trim().toLowerCase(); (g[k] = g[k] || { nama: i.x.nama, x: i.x, items: [], nilai: 0, modal: 0 }).items.push(i); g[k].nilai += i.nilai; g[k].modal += i.modal; });
@@ -81,7 +85,9 @@
     if (!list.length) return `<div class="card rd-empty">${UI.empty('chart-pie', 'Catat reksa dana per aplikasi', 'Cukup satu angka per portofolio di tiap aplikasi (Bibit, Bareksa, Ajaib, …), masing-masing bisa ditautkan ke tujuan berbeda. Perbarui sebulan sekali — grafik pertumbuhan dibuat otomatis.', `<button class="btn" data-act="rd-add">${I('plus')} Tambah aplikasi</button>`)}</div>`;
     const nilai = U.sum(list, i => i.nilai), modal = U.sum(list, i => i.modal), hasil = nilai - modal, pct = modal ? hasil / modal : 0;
     const deret = deretTotal(list), bul = hasilBulanan(list, 12), ini = bul[bul.length - 1];
-    const terlama = list.reduce((a, i) => Math.max(a, i.x.tglNilai ? U.diffDays(i.x.tglNilai, U.today()) : 999), 0);
+    const umur = x => x.tglNilai ? U.diffDays(x.tglNilai, U.today()) : 999;
+    const terlama = list.filter(i => milikSaya(i.x)).reduce((a, i) => Math.max(a, umur(i.x)), 0);
+    const basiSaya = list.filter(i => milikSaya(i.x) && umur(i.x) > 30).length;
     const batas = { '3b': U.addMonths(U.today(), -3), '6b': U.addMonths(U.today(), -6), '1t': U.addMonths(U.today(), -12), 'all': '0000' }[PERIODE];
     let pts = deret.filter(p => p.d >= batas); const sebelum = deret.filter(p => p.d < batas).pop();
     if (sebelum && PERIODE !== 'all') pts.unshift(Object.assign({}, sebelum, { d: batas }));
@@ -96,7 +102,7 @@
         <div class="rd-split"><div><small>Total disetor</small><b>${UI.ms(modal)}</b></div><div><small>Hasil bulan ini</small><b class="${ini.hasil >= 0 ? 'naik' : 'turun'}">${ini.hasil >= 0 ? '+' : '−'}${UI.ms(Math.abs(ini.hasil))}</b></div></div>
         <button class="btn on-dark block" data-act="rd-update">${I('refresh-cw')} Perbarui nilai${terlama > 30 ? ' · terakhir ' + terlama + ' hari lalu' : ''}</button>
       </div>
-      ${terlama > 30 ? `<div class="alert warn" data-act="rd-update">${I('bell-ring')}<div><b>Waktunya update bulanan</b><small>Buka aplikasi investasi Anda, lalu salin total nilainya ke sini — 1 menit selesai.</small></div>${I('chevron-right')}</div>` : ''}
+      ${terlama > 30 ? `<div class="alert warn" data-act="rd-update">${I('bell-ring')}<div><b>Waktunya update bulanan</b><small>${basiSaya} portofolio milik Anda belum diperbarui. Buka aplikasinya, salin total nilainya ke sini — 1 menit selesai.</small></div>${I('chevron-right')}</div>` : ''}
       <div class="card rd-trend">
         <div class="row-sp"><b>Pertumbuhan nilai</b><span class="${ubah >= 0 ? 'ok' : 'bad'} small">${ubah >= 0 ? '+' : '−'}${UI.ms(Math.abs(ubah))} hasil</span></div>
         <div class="chips sm">${[['3b', '3 bln'], ['6b', '6 bln'], ['1t', '1 thn'], ['all', 'Semua']].map(p => `<button class="chip ${PERIODE === p[0] ? 'on' : ''}" data-act="rd-per" data-p="${p[0]}">${p[1]}</button>`).join('')}</div>
@@ -122,7 +128,7 @@
             <div class="rd-app-sum"><b>${UI.ms(g.nilai)}</b><small class="${u >= 0 ? 'ok' : 'bad'}">${u >= 0 ? '+' : '−'}${U.pct(Math.abs(pc), 1)}</small></div></div>
           <div class="bar"><i style="width:${(nilai ? g.nilai / nilai * 100 : 0).toFixed(1)}%;background:${col}"></i></div>
           <div class="rd-portos">${g.items.map(i => { const x = i.x, t = tujuan(x), umur = x.tglNilai ? U.diffDays(x.tglNilai, U.today()) : 999;
-            return `<div class="rd-porto" data-act="rd-open" data-id="${x.id}"><div class="grow"><b>${U.esc(porto(x) || (t ? t.nama : 'Portofolio utama'))}</b>
+            return `<div class="rd-porto" data-act="rd-open" data-id="${x.id}"><div class="grow"><b>${ownChip(x)}${U.esc(porto(x) || (t ? t.nama : 'Portofolio utama'))}</b>
               <small>${t ? `<span class="rd-tag">${I('target')} ${U.esc(t.nama)}</span>` : '<span class="muted">tanpa tujuan</span>'} <span class="${umur > 30 ? 'bad' : 'muted'}">· ${umur === 0 ? 'hari ini' : umur > 900 ? 'belum diperbarui' : umur + ' hr lalu'}</span></small></div>
               ${spark(titik(x), col)}<div class="rd-porto-v"><b>${UI.ms(i.nilai)}</b><small class="${i.untung >= 0 ? 'ok' : 'bad'}">${i.untung >= 0 ? '+' : '−'}${U.pct(Math.abs(i.pct), 1)}</small></div></div>`; }).join('')}</div>
           <button class="link small" data-act="rd-add" data-app="${U.esc(g.nama)}">${I('plus')} Portofolio ${U.esc(g.nama)}</button>
@@ -141,19 +147,31 @@
     return { id: x.id, nilai: Math.round(nilai), modal: Math.round(modal), tglNilai: tgl >= (x.tglNilai || '') ? tgl : x.tglNilai, riwayatNilai: rw.slice(-120) };
   };
 
+  /** Beli/setor ke portofolio (dipakai dari halaman Tujuan): saldo dompet turun, modal & nilai portofolio naik. */
+  UI.rdSetor = (id, jumlah, tgl, walletId, oleh, catatan) => {
+    const i = Calc.investasi('reksadana').find(z => z.x.id === id); if (!i || !jumlah) return;
+    const now = new Date().toISOString();
+    Store.commit([{ op: 'upsert', t: 'Investasi', row: rowBaru(i.x, i.nilai + jumlah, i.modal + jumlah, tgl) },
+      { op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: tgl, jenis: 'aset_beli', jumlah, kategoriId: '', walletId, walletTujuan: '', biaya: 0, catatan: catatan || 'Beli reksa dana ' + lbl(i.x), dibayarOleh: oleh || me(), tag: '', sumber: 'aset', refId: id, periodeRef: tgl.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } }]);
+  };
+
   // ---------- Perbarui semua (layar bulanan) ----------
-  UI.act('rd-update', () => {
-    const list = apps(); if (!list.length) return UI.rdForm();
+  UI.act('rd-update', (el) => {
+    const semua = apps(); if (!semua.length) return UI.rdForm();
+    const adaPasangan = semua.some(i => !milikSaya(i.x)), mode = el && el.dataset && el.dataset.semua ? 'semua' : (adaPasangan && semua.some(i => milikSaya(i.x)) ? 'saya' : 'semua');
+    const list = mode === 'saya' ? semua.filter(i => milikSaya(i.x)) : semua;
     const s = UI.sheet({ title: 'Perbarui reksa dana', body: `
-      <p class="muted small">Buka tiap aplikasi, salin <b>total nilai portofolio</b>. Bila ada setoran/autodebet sejak update terakhir, isi juga — agar setoran tidak terhitung sebagai keuntungan.</p>
+      ${adaPasangan ? `<div class="chips sm"><button type="button" class="chip ${mode === 'saya' ? 'on' : ''}" data-mode="saya">Milik saya & bersama</button><button type="button" class="chip ${mode === 'semua' ? 'on' : ''}" data-mode="semua">Semua (${semua.length})</button></div>` : ''}
+      <p class="muted small">Buka tiap aplikasi, salin <b>total nilai portofolio</b>. Bila ada setoran/autodebet sejak update terakhir, isi juga — agar setoran tidak terhitung sebagai keuntungan.${mode === 'saya' ? ' Portofolio milik pasangan diperbarui dari HP-nya sendiri.' : ''}</p>
       ${grupApp(list).map(g => `<div class="rd-upd-app">${av(g.x, 'sm')}<b>${U.esc(g.nama)}</b></div>` + g.items.map(i => `<div class="rd-upd" data-id="${i.x.id}">
-        <div class="rd-upd-h"><b>${U.esc(porto(i.x) || (tujuan(i.x) ? tujuan(i.x).nama : 'Portofolio utama'))}</b><small class="muted">lalu ${UI.ms(i.nilai)}${i.x.tglNilai ? ' · ' + U.tgl(i.x.tglNilai, 'dm') : ''}</small></div>
+        <div class="rd-upd-h"><b>${ownChip(i.x)}${U.esc(porto(i.x) || (tujuan(i.x) ? tujuan(i.x).nama : 'Portofolio utama'))}</b><small class="muted">lalu ${UI.ms(i.nilai)}${i.x.tglNilai ? ' · ' + U.tgl(i.x.tglNilai, 'dm') : ''}</small></div>
         <div class="grid2">${UI.field('Nilai sekarang', UI.rpInput('v_' + i.x.id, 0, U.fmtNum(Math.round(i.nilai))))}${UI.field('Setoran baru', UI.rpInput('s_' + i.x.id, 0))}</div>
         <small class="rd-upd-hint muted" data-hint="${i.x.id}"></small></div>`).join('')).join('')}
       <div class="grid2">${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}${UI.field('Setoran dibayar dari', `<select name="sumber">${UI.sumberDanaOpts(localStorage.getItem('sa:rdSumber') || '').replace('Sudah dimiliki sebelumnya (tidak memotong saldo)', 'Sudah tercatat / tidak memotong saldo')}</select>`)}</div>
       <small class="muted">Kotak nilai yang dikosongkan = tidak berubah.</small>`,
       foot: `<button class="btn" data-ok>Simpan semua</button>` });
     UI.bindRp(s.el);
+    s.el.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { s.close(); setTimeout(() => UI.acts['rd-update'](b.dataset.mode === 'semua' ? { dataset: { semua: 1 } } : null), 220); });
     const hint = () => { const f = UI.formData(s.el); list.forEach(i => {
       const v = Number(f['v_' + i.x.id]) || 0, st = Number(f['s_' + i.x.id]) || 0, el = s.el.querySelector(`[data-hint="${i.x.id}"]`);
       if (!v && !st) { el.innerHTML = ''; return; }

@@ -159,7 +159,7 @@
   });
 
   UI.page('impor', {
-    head: () => ({ title: 'Impor CSV', crumb: 'Lainnya', back: 'lainnya' }), nav: () => 'lainnya',
+    head: () => ({ title: 'Impor CSV', crumb: 'Mutasi', back: 'mutasi' }), nav: () => 'mutasi',
     render() {
       const input = `<input type="file" id="imp-input" accept=".csv,.txt,text/csv" hidden>`;
       if (!P.raw) return input + `<div class="card"><h3>${I('file-up')} Impor mutasi rekening</h3>

@@ -64,7 +64,7 @@
     } else {
       tb.innerHTML = `<div class="brand" data-act="go" data-to="beranda"><img src="img/icon-192.png" alt="" width="34" height="34"><div><b>SatuAtap</b><span class="fam"><i class="dot ${Store.mode === 'demo' ? 'demo' : (UI.netOk ? 'ok' : 'off')}"></i>${U.esc(fam)}</span></div></div>
         <div class="tb-actions">${authChip()}<button class="icon-btn" data-act="toggle-hide" aria-label="Sembunyikan nominal">${I(UI.hide() ? 'eye-off' : 'eye')}</button>
-        <button class="avatar sm" style="background:${(Store.me && Store.me.warna) || '#0F5E59'}" data-act="go" data-to="pengaturan" aria-label="Profil">${U.esc(U.initials(Store.me && Store.me.nama))}</button></div>`;
+        <button class="avatar sm${UI.foto(Store.me && Store.me.email) ? ' has-foto' : ''}" style="background:${(Store.me && Store.me.warna) || '#0F5E59'}${UI.foto(Store.me && Store.me.email) ? `;background-image:url('${UI.foto(Store.me.email)}')` : ''}" data-act="go" data-to="pengaturan" aria-label="Profil">${UI.foto(Store.me && Store.me.email) ? '' : U.esc(U.initials(Store.me && Store.me.nama))}</button></div>`;
     }
     $('#fab').hidden = !!def.noFab;
     $('#demo-banner').hidden = Store.mode !== 'demo';
@@ -79,8 +79,8 @@
   const NAV = [['beranda', 'house', 'Beranda'], ['mutasi', 'arrow-left-right', 'Mutasi'], ['kalender', 'calendar-days', 'Kalender'],
                ['aset', 'wallet', 'Aset'], ['rapor', 'chart-column', 'Rapor'], ['lainnya', 'menu', 'Lainnya']];
   const SIDE = [['beranda', 'house', 'Beranda'], ['mutasi', 'arrow-left-right', 'Mutasi'], ['kalender', 'calendar-days', 'Kalender'], ['aset', 'wallet', 'Aset'],
-    ['rapor', 'chart-column', 'Rapor'], null, ['anggaran', 'clipboard-list', 'Anggaran'], ['tujuan', 'target', 'Tujuan'], ['utang', 'scale', 'Utang & Piutang'],
-    ['emas', 'gem', 'Brankas Emas'], ['zakat', 'hand-heart', 'Zakat'], ['rapat', 'users', 'Rapat Keuangan'], ['ai', 'sparkles', 'Tanya AI'], null, ['pengaturan', 'settings', 'Pengaturan'], ['laporan', 'message-square-warning', 'Laporkan Masalah']];
+    ['rapor', 'chart-column', 'Rapor'], null, ['tujuan', 'target', 'Tujuan'], ['anggaran', 'clipboard-list', 'Anggaran'], ['zakat', 'hand-heart', 'Zakat & Sedekah'], ['rapat', 'users', 'Rapat Keuangan'], null,
+    ['ai', 'sparkles', 'Tanya AI'], ['simulasi', 'git-fork', 'Simulasi Keputusan'], null, ['pengaturan', 'settings', 'Pengaturan'], ['laporan', 'message-square-warning', 'Laporkan Masalah']];
   UI.shell = () => {
     document.body.innerHTML = `
       <div id="demo-banner" class="demo-banner" hidden>${I('flask-conical')} Mode demo — data contoh, perubahan tidak disimpan. <button class="link" data-act="exit-demo">Keluar demo</button></div>
@@ -204,7 +204,7 @@
     el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
   }
   UI.confirm = (title, text, okLabel, danger) => new Promise(res => {
-    const s = UI.sheet({ title, body: `<p class="muted">${U.esc(text)}</p>`, foot: `<button class="btn ghost" data-no>Batal</button><button class="btn ${danger ? 'danger' : ''}" data-yes>${U.esc(okLabel || 'Ya')}</button>`,
+    const s = UI.sheet({ title, body: `<p class="muted" style="white-space:pre-line">${U.esc(text)}</p>`, foot: `<button class="btn ghost" data-no>Batal</button><button class="btn ${danger ? 'danger' : ''}" data-yes>${U.esc(okLabel || 'Ya')}</button>`,
       onClose: () => res(false) });
     s.el.querySelector('[data-no]').onclick = () => { s.close(); };
     s.el.querySelector('[data-yes]').onclick = () => { res(true); s.close(); };
@@ -232,7 +232,11 @@
   UI.empty = (ic, title, text, btn) => `<div class="empty">${I(ic, 'big')}<h3>${U.esc(title)}</h3>${text ? `<p>${text}</p>` : ''}${btn || ''}</div>`;
   UI.pill = (text, kind) => `<span class="pill ${kind || ''}">${U.esc(text)}</span>`;
   UI.bar = (pct, status) => `<div class="bar ${status || ''}"><i style="width:${U.clamp(pct * 100, 0, 100).toFixed(1)}%"></i></div>`;
-  UI.avatar = (email, sm) => { const m = Store.member(email); const n = m ? m.nama : Store.memberName(email); return `<span class="avatar ${sm ? 'xs' : ''}" style="background:${m && m.warna || '#5b7a78'}">${U.esc(U.initials(n))}</span>`; };
+  /** Avatar: foto profil bila ada, selain itu inisial berwarna. */
+  UI.foto = email => { const m = email && Store.member && Store.member(email); return (m && m.foto) || ''; };
+  UI.avaHtml = (email, nama, warna, cls, extra) => { const f = UI.foto(email);
+    return `<span class="avatar ${cls || ''}${f ? ' has-foto' : ''}" style="background:${warna || '#5b7a78'}${f ? `;background-image:url('${f}')` : ''}" ${extra || ''}>${f ? '' : U.esc(U.initials(nama))}</span>`; };
+  UI.avatar = (email, sm) => { const m = Store.member(email); const n = m ? m.nama : Store.memberName(email); return UI.avaHtml(email, n, m && m.warna, sm ? 'xs' : ''); };
   UI.tiles = (items, active, cls) => `<div class="tiles ${cls || ''}">${items.map(t => `
     <button class="tile ${t.id === active ? 'on' : ''} ${t.gold ? 'gold' : ''} ${t.soon ? 'soon' : ''}" ${t.to ? `data-act="go" data-to="${t.to}"` : `data-act="${t.act || ''}" data-id="${t.id}"`}>
       <span class="tile-ic">${I(t.icon)}</span><span class="tile-lb">${U.esc(t.label)}</span>${t.sub ? `<span class="tile-sub">${U.esc(t.sub)}</span>` : ''}${t.soon ? '<span class="tile-badge">Segera</span>' : t.badge ? `<span class="tile-badge new">${U.esc(t.badge)}</span>` : ''}

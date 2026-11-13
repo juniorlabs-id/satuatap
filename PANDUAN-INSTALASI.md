@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.5 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.6 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -9,7 +9,7 @@
 | **Aplikasi** (GitHub Pages) | `index.html`, `css/`, `js/`, `img/` | JuniorLabs | Sekali, dipakai semua pembeli |
 | **Relay** (Apps Script JuniorLabs) | `Relay.gs` + `appsscript-relay.json` | JuniorLabs | Sekali |
 | **Data keluarga** | 1 file Google Sheets "SatuAtap – Data …" | Dibuat otomatis oleh aplikasi | Per keluarga, di Drive Admin keluarga |
-| **Fungsi Vercel** | `api/emas.js` (harga emas), `api/tg.js` (jembatan Telegram), `vercel.json` | JuniorLabs | Sekali (ikut repo) |
+| **Fungsi Vercel** | `api/emas.js` (harga emas), `api/saham.js` (harga saham IDX), `api/tg.js` (jembatan Telegram), `vercel.json` | JuniorLabs | Sekali (ikut repo) |
 | **Bot Telegram** @SatuAtapBot | Dibuat lewat @BotFather, token di Script Properties relay | JuniorLabs | Sekali (Bagian G) |
 | **Skrip Pendamping** (opsional) | `Pendamping.gs` — Google Calendar, pengingat Telegram/WA pukul 08.00, catat lewat WA | Admin keluarga yang menginginkannya | Opsional (Bagian C) |
 | **Kunci Gemini** (opsional) | Untuk Tanya AI, foto struk, insight mingguan | Tiap keluarga, disimpan hanya di HP | Opsional (Bagian H) |
@@ -221,6 +221,13 @@ Fonnte adalah layanan pihak ketiga yang mengirim WA dari nomor WhatsApp milik ke
 4. Buka aplikasi dengan akun superadmin › **Lainnya › JuniorLabs › Harga Emas** dan pastikan harga sudah tampil.
 
 **Yang baru di 1.3:** Brankas Emas (koleksi per keping & gramasi, multi-pemilik, tautan ke Tujuan, tren akumulasi, jual sebagian + PPh 22, gadai/tebus, peringatan harga, simulasi jual), Investasi & aset lain (saham, reksa dana, SBN, deposito, kripto, properti, kendaraan), Target Alokasi, Zakat & Sedekah (mal dengan nisab & haul, penghasilan, fitrah, qurban, sedekah/donasi), dan Ringkasan SPT per tahun (unduh CSV). Tombol Catat Cepat kini bulat, dan setiap panel yang muncul dari bawah bisa ditutup dengan menggesernya ke bawah.
+
+**Khusus pembaruan ke 1.6:**
+1. Unggah semua file aplikasi baru. Ada file baru: `js/pages/saham.js` dan `api/saham.js`, dan `vercel.json` ikut berubah. Jangan menimpa `js/config.js` milik Anda — cukup ubah `VERSION: '1.6.0'`.
+2. Relay tidak berubah. Lembar baru **Jurnal Saham** dibuat otomatis di file keluarga saat pertama dipakai.
+3. Harga saham otomatis diambil lewat `/api/saham` (data Yahoo Finance, gratis, tanpa kunci). Bila sumber itu sedang tidak bisa diakses, aplikasi meminta harga diisi manual.
+
+**Yang baru di 1.6:** jurnal saham (Overview, Aktivitas trade & arus kas, Analitik, Kalkulator harga rata-rata, bea meterai otomatis), reksa dana per aplikasi & portofolio dengan setoran dari Tujuan, emas beberapa gramasi sekali catat dengan harga per keping, urutan prioritas Tujuan dengan seret, foto profil, hapus dompet/tujuan salah input, serta menu Aset, Lainnya, Anggaran dan Mutasi yang disederhanakan.
 
 **Khusus pembaruan ke 1.5 (Fase 3):**
 1. Unggah semua file aplikasi baru. Ada file baru: `js/calc3.js`, `js/ai.js`, `js/i18n.js`, `js/i18n-en.js`, `js/pages/simulasi.js`, `kilas.js`, `rapat.js`, `impor.js`, `ai.js`, `notif.js`, serta `api/tg.js`. Jangan menimpa `js/config.js` milik Anda — cukup ubah `VERSION: '1.5.0'`.

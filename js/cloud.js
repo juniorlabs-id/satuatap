@@ -86,7 +86,7 @@
 
   // ---------- Salinan tabel yang mudah dibaca ----------
   const TITLE = { Anggota: 'Anggota', Pengaturan: 'Pengaturan', Wallet: 'Dompet', Kategori: 'Kategori', Transaksi: 'Transaksi', Template: 'Template', Rutin: 'Rutin',
-    Acara: 'Acara', GeserDana: 'Geser Dana', Tujuan: 'Tujuan', Pinjaman: 'Utang Piutang', Laporan: 'Laporan', Emas: 'Brankas Emas', Investasi: 'Investasi', Skenario: 'Skenario', Rapat: 'Rapat Keuangan', Tugas: 'Tugas' };
+    Acara: 'Acara', GeserDana: 'Geser Dana', Tujuan: 'Tujuan', Pinjaman: 'Utang Piutang', Laporan: 'Laporan', Emas: 'Brankas Emas', Investasi: 'Investasi', Skenario: 'Skenario', Rapat: 'Rapat Keuangan', Tugas: 'Tugas', Saham: 'Jurnal Saham' };
   /** Simpan foto struk ke folder "SatuAtap – Struk" di Drive pencatat (izin drive.file). Hasil: id file. */
   C.simpanStruk = async (blob, nama) => {
     const kf = 'sa:strukFolder:' + (Auth.email || '');

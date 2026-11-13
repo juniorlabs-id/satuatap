@@ -9,7 +9,7 @@
     render() {
       const adm = Store.isAdminLike();
       return `
-        <div class="me-card"><span class="avatar lg" style="background:${Store.me.warna || '#0F5E59'}">${U.esc(U.initials(Store.me.nama))}</span><div><b>${U.esc(Store.me.nama)}</b><small>${U.esc(Store.me.email)} · ${U.esc(PERAN[Store.me.peran] || Store.me.peran)}</small></div></div>
+        <div class="me-card"><button class="ava-edit" data-act="foto-ganti" aria-label="Ganti foto profil">${UI.avaHtml(Store.me.email, Store.me.nama, Store.me.warna || '#0F5E59', 'lg')}<i>${I('camera')}</i></button><div><b>${U.esc(Store.me.nama)}</b><small>${U.esc(Store.me.email)} · ${U.esc(PERAN[Store.me.peran] || Store.me.peran)}</small></div></div>
         ${UI.pasangKartu ? UI.pasangKartu('lainnya') : ''}
         ${App.isSuper ? `${UI.sec('JuniorLabs')}${UI.tiles([
           { id: 'konsol', icon: 'shield-check', label: 'Konsol Lisensi', to: 'konsol', gold: true },
@@ -18,20 +18,16 @@
           { id: 'kstat', icon: 'chart-column', label: 'Statistik', to: 'konsol/statistik', gold: true }
         ])}` : ''}
         ${UI.sec('Keuangan')}${UI.tiles([
-          { id: 'ang', icon: 'clipboard-list', label: 'Anggaran', to: 'anggaran' },
           { id: 'tuj', icon: 'target', label: 'Tujuan', to: 'tujuan' },
-          { id: 'utg', icon: 'scale', label: 'Utang & Piutang', to: 'utang' },
-          { id: 'tag', icon: 'receipt', label: 'Tagihan', to: 'kalender/tagihan' },
+          { id: 'ang', icon: 'clipboard-list', label: 'Anggaran', to: 'anggaran' },
           { id: 'zak', icon: 'hand-heart', label: 'Zakat & Sedekah', to: 'zakat', gold: true },
-          { id: 'emas', icon: 'gem', label: 'Brankas Emas', to: 'emas', gold: true },
-          { id: 'kpr', icon: 'house', label: 'Simulasi KPR', to: 'utang/kpr' },
-          { id: 'sim', icon: 'git-fork', label: 'Simulasi Keputusan', to: 'simulasi' }
+          { id: 'rapat', icon: 'users', label: 'Rapat Keuangan', to: 'rapat' }
         ])}
-        ${UI.sec('Keluarga & cerdas')}${UI.tiles([
-          { id: 'rapat', icon: 'users', label: 'Rapat Keuangan', to: 'rapat' },
+        ${UI.sec('AI dan Simulator')}${UI.tiles([
           { id: 'ai', icon: 'sparkles', label: 'Tanya AI', to: 'ai' },
-          { id: 'kilas', icon: 'history', label: 'Kilas Balik', to: 'kilas' },
-          { id: 'impor', icon: 'file-up', label: 'Impor CSV', to: 'impor' }
+          { id: 'kpr', icon: 'house', label: 'Simulasi KPR', to: 'utang/kpr' },
+          { id: 'cic', icon: 'calculator', label: 'Simulasi Cicilan', to: 'utang/simulasi' },
+          { id: 'sim', icon: 'git-fork', label: 'Simulasi Keputusan', to: 'simulasi' }
         ])}
         ${UI.sec('Pengaturan')}${UI.tiles([
           { id: 'kel', icon: 'heart-handshake', label: 'Keluarga', to: 'pengaturan/keluarga' },
@@ -65,7 +61,7 @@
     render(p) {
       const fn = { keluarga, anggota, kategori, template, tampilan, notif, keamanan, data, tentang }[p];
       if (fn) return fn();
-      return `<div class="me-card"><span class="avatar lg" style="background:${Store.me.warna || '#0F5E59'}">${U.esc(U.initials(Store.me.nama))}</span><div><b>${U.esc(Store.me.nama)}</b><small>${U.esc(Store.me.email)}</small></div></div>
+      return `<div class="me-card"><button class="ava-edit" data-act="foto-ganti" aria-label="Ganti foto profil">${UI.avaHtml(Store.me.email, Store.me.nama, Store.me.warna || '#0F5E59', 'lg')}<i>${I('camera')}</i></button><div><b>${U.esc(Store.me.nama)}</b><small>${U.esc(Store.me.email)}</small></div></div>
         <div class="card list">${Object.keys(SUB).map(k => `<a class="row" href="#/pengaturan/${k}"><div class="tx-txt"><b>${SUB[k]}</b></div>${I('chevron-right')}</a>`).join('')}</div>
         <button class="btn block ghost danger" data-act="logout">${I('log-out')} Keluar</button><div class="spacer"></div>`;
     }
@@ -91,7 +87,7 @@
     const ms = Store.t.Anggota.slice().sort((a, b) => (a.peran === 'admin' ? -1 : 0) - (b.peran === 'admin' ? -1 : 0));
     return `${needAdmin()}
       <div class="note">${I('info')} Maksimal 5 akun per keluarga. Anggota masuk memakai akun Google dengan email yang didaftarkan di sini.</div>
-      <div class="card list">${ms.map(m => `<div class="row" ${Store.me.peran === 'admin' ? `data-act="member-edit" data-id="${m.id}"` : ''}><span class="avatar xs" style="background:${m.warna || '#5b7a78'}">${U.esc(U.initials(m.nama))}</span>
+      <div class="card list">${ms.map(m => `<div class="row" ${Store.me.peran === 'admin' ? `data-act="member-edit" data-id="${m.id}"` : ''}>${UI.avaHtml(m.email, m.nama, m.warna, 'xs')}
         <div class="tx-txt"><b>${U.esc(m.nama)} ${m.aktif === false ? UI.pill('Nonaktif', '') : ''}</b><small>${U.esc(m.email)} · ${U.esc(PERAN[m.peran] || m.peran)}</small></div>${I('chevron-right')}</div>`).join('')}</div>
       ${Store.me.peran === 'admin' && Store.t.Anggota.filter(m => m.aktif !== false).length < 5 ? `<button class="btn block" data-act="member-add">${I('user-plus')} Undang anggota</button>` : ''}
       <div class="card"><b>Cara anggota bergabung</b><ol class="steps small"><li>Admin menambahkan email di sini — Google Drive otomatis membagikan file keluarga & mengirim email undangan.</li><li>Anggota membuka aplikasi, <b>Masuk dengan Google</b>, lalu pilih <b>Saya diundang</b> dan pilih file "SatuAtap – Data …".</li></ol>
@@ -279,6 +275,37 @@
       <p class="muted small">Aplikasi menyimpan salinan data di perangkat agar terbuka instan & tetap bisa dipakai saat sinyal lemah; perubahan dikirim otomatis saat online. Tab tabel di spreadsheet diperbarui otomatis sekali sehari dari perangkat Admin.</p>`;
   }
   UI.act('sync-now', async () => { await Store.flush(); const r = await Store.sync(); UI.toast(r && r.ok ? 'Sinkron selesai.' : (r && r.message) || 'Belum bisa sinkron.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
+  // ---------- Foto profil (diperkecil 160px, disimpan di baris Anggota → ikut tersinkron ke anggota lain) ----------
+  const kecilkanFoto = (file) => new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const S = 160, c = document.createElement('canvas'); c.width = c.height = S;
+      const k = Math.min(img.width, img.height), sx = (img.width - k) / 2, sy = (img.height - k) / 2;
+      c.getContext('2d').drawImage(img, sx, sy, k, k, 0, 0, S, S);
+      URL.revokeObjectURL(url);
+      let q = 0.8, out = c.toDataURL('image/jpeg', q);
+      while (out.length > 16000 && q > 0.4) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+      res(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Gambar tidak bisa dibaca.')); };
+    img.src = url;
+  });
+  UI.act('foto-ganti', () => {
+    const m = Store.member(Store.me.email); if (!m) return UI.toast('Profil belum siap.', 'warn');
+    const s = UI.sheet({ title: 'Foto profil', cls: 'small', body: `<div class="ava-preview">${UI.avaHtml(m.email, m.nama, m.warna, 'xl')}</div>
+      <input type="file" accept="image/*" hidden data-file>
+      <p class="muted small">Foto diperkecil otomatis dan terlihat oleh anggota keluarga lain.</p>`,
+      foot: `${m.foto ? `<button class="btn ghost danger" data-hapus>${I('trash-2')} Hapus foto</button>` : ''}<button class="btn" data-pilih>${I('camera')} Pilih foto</button>` });
+    const inp = s.el.querySelector('[data-file]');
+    s.el.querySelector('[data-pilih]').onclick = () => inp.click();
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      try { const foto = await kecilkanFoto(f); Store.upsert('Anggota', { id: m.id, foto }); s.close(); UI.toast('Foto profil diperbarui.'); UI.shell && UI.chrome && UI.render(); }
+      catch (e) { UI.toast(e.message, 'warn'); }
+    };
+    const h = s.el.querySelector('[data-hapus]');
+    if (h) h.onclick = () => { Store.upsert('Anggota', { id: m.id, foto: '' }); s.close(); UI.toast('Foto dihapus.'); };
+  });
   UI.act('lang-set', el => window.I18N && I18N.set(el.value));
   UI.act('sync-full', async () => { await Store.flush(); const r = await Store.sync(true); UI.toast(r && r.ok ? 'Data dimuat ulang dari Google Drive.' : (r && r.message) || 'Gagal.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
   UI.act('mirror-now', async el => { el.disabled = true; const r = await Cloud.mirror(Store.tablesWire()); el.disabled = false; UI.toast(r.ok ? 'Tab tabel di spreadsheet diperbarui.' : 'Gagal: ' + r.message, r.ok ? 'ok' : 'error'); if (r.ok) localStorage.setItem('sa:mir:' + Store.fileId, String(Date.now())); });
