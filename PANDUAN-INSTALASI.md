@@ -256,7 +256,7 @@ Fonnte adalah layanan pihak ketiga yang mengirim WA dari nomor WhatsApp milik ke
 | Harga emas tidak muncul / bertanda "perlu diperbarui" | Superadmin: buka Konsol › Harga Emas › Ambil sekarang, atau isi manual. Keluarga juga bisa memakai harga sendiri di **Brankas Emas › Harga & Alert › Isi manual**. |
 | Pemicu harga emas belum jalan | Jalankan `setupRelay` sekali lagi di editor relay (D, langkah 3). |
 | "Bot Telegram belum diaktifkan oleh JuniorLabs" | Jalankan `setupTelegram` di relay (G3) dan pastikan relay sudah dideploy sebagai New version. |
-| Bot tidak membalas /start | Cek Vercel › Environment Variables `RELAY_URL` sudah diisi lalu **Redeploy**. Jalankan `setupTelegram` lagi; log harus menampilkan "✅ Webhook". |
+| Bot tidak membalas /start | Di editor relay jalankan **`cekTelegram`** › baca log. Fungsi ini memeriksa token, webhook (termasuk galat terakhir dari Telegram), `api/tg.js` di Vercel, `RELAY_URL`, dan versi deployment relay, lalu menyebut langkah perbaikannya. Webhook yang belum/beda alamat didaftarkan ulang otomatis. |
 | Pengingat Telegram pagi tidak datang | Pastikan Pendamping terpasang dengan `RELAY_URL` terisi (C1) dan anggota sudah menghubungkan Telegram di **Lainnya › Notifikasi**. |
 | Catat lewat WA tidak masuk | Cek webhook Fonnte memakai URL web app Pendamping lengkap dengan `?k=…`, dan nomor pengirim ada di `WA_ANGGOTA` (format 62…). |
 | "Kunci Gemini ditolak" / AI tidak menjawab | Buat kunci baru di Google AI Studio (Bagian H) lalu tempel ulang di **Lainnya › Tanya AI**. |
@@ -287,7 +287,8 @@ Telegram mengirim pesan ke `https://satuatap.vercel.app/api/tg`, lalu fungsi Ver
 2. **Simpan token di relay.** Editor relay › ⚙️ **Setelan Proyek › Script Properties** › tambahkan `TELEGRAM_TOKEN` = token tadi. Jangan menulisnya di kode.
 3. **Daftarkan webhook.** Pilih fungsi **`setupTelegram`** › ▶ Jalankan. Fungsi ini membuat `TELEGRAM_SECRET` otomatis, menyimpan nama bot, dan mendaftarkan webhook. Log harus menampilkan "✅ Webhook https://satuatap.vercel.app/api/tg". Bila domain aplikasi berbeda, isi dulu Script Property `TELEGRAM_WEBHOOK` dengan alamat `…/api/tg` Anda.
 4. **Sambungkan Vercel ke relay.** Vercel › proyek satuatap › **Settings › Environment Variables** › tambahkan `RELAY_URL` = URL `/exec` relay. Lalu **Deployments › ⋯ › Redeploy** agar variabel terbaca.
-5. **Uji.** Di aplikasi: **Lainnya › Notifikasi › Hubungkan Telegram saya** › Buka Telegram › **Start**. Bot membalas "Terhubung". Lalu ketuk **Kirim pesan uji**. Kirim juga `makan siang 25rb gopay` ke bot; catatannya muncul di Beranda untuk dikonfirmasi.
+5. **Bila bot diam,** jalankan `cekTelegram` di editor relay dan ikuti petunjuk di log.
+6. **Uji.** Di aplikasi: **Lainnya › Notifikasi › Hubungkan Telegram saya** › Buka Telegram › **Start**. Bot membalas "Terhubung". Lalu ketuk **Kirim pesan uji**. Kirim juga `makan siang 25rb gopay` ke bot; catatannya muncul di Beranda untuk dikonfirmasi.
 
 Batas: maksimal 60 pesan per jam per keluarga. Kode penghubung berlaku 15 menit dan sekali pakai. Ketik `/putus` di bot untuk memutus.
 
