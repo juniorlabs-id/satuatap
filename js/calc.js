@@ -41,7 +41,10 @@
   });
   C.txIn = (p) => C.txByPeriod()[p.key] || [];
   C.isExpense = t => t.jenis === 'keluar';
-  C.expAmount = t => t.jenis === 'keluar' ? t.jumlah : (t.jenis === 'transfer' ? t.biaya : 0);
+  /** Pengeluaran sebuah transaksi: jumlah (bila keluar) + biaya admin/lain (semua jenis). */
+  C.expAmount = t => (t.jenis === 'keluar' ? t.jumlah : 0) + (Number(t.biaya) || 0);
+  /** Pecahan pengeluaran per kategori: [[kategoriId, nilai]] — biaya masuk ke kategori Biaya Admin. */
+  C.expSplit = t => { const o = []; if (t.jenis === 'keluar' && t.jumlah) o.push([t.kategoriId, t.jumlah]); if (Number(t.biaya)) o.push([C.adminKatId(), Number(t.biaya)]); return o; };
   C.adminKatId = () => M('adminKat', () => { const k = Store.t.Kategori.find(x => /biaya admin/i.test(x.nama)); return k ? k.id : ''; });
 
   C.periodTotals = (p) => M('pt:' + p.key, () => {
@@ -77,6 +80,7 @@
         case 'aset_beli': add(t.walletId, -j); break;
         case 'aset_jual': add(t.walletId, j); break;
       }
+      if (t.biaya && t.jenis !== 'transfer') add(t.walletId, -(Number(t.biaya) || 0));   // biaya lain selalu dipotong dari dompet sumber
     });
     return b;
   });
@@ -89,8 +93,8 @@
     p = p || C.period();
     const txs = C.txIn(p), prev = C.periodShift(p, -1), prevTx = C.txIn(prev);
     const used = {}, usedPrev = {}, adminId = C.adminKatId();
-    txs.forEach(t => { const v = C.expAmount(t); if (!v) return; const k = t.jenis === 'transfer' ? adminId : t.kategoriId; used[k] = (used[k] || 0) + v; });
-    prevTx.forEach(t => { const v = C.expAmount(t); if (!v) return; const k = t.jenis === 'transfer' ? adminId : t.kategoriId; usedPrev[k] = (usedPrev[k] || 0) + v; });
+    txs.forEach(t => C.expSplit(t).forEach(([k, v]) => { used[k] = (used[k] || 0) + v; }));
+    prevTx.forEach(t => C.expSplit(t).forEach(([k, v]) => { usedPrev[k] = (usedPrev[k] || 0) + v; }));
     const g = geser(p), gPrev = geser(prev);
     const flow = (list, id) => U.sum(list, x => (x.ke === id ? x.jumlah : 0) - (x.dari === id ? x.jumlah : 0));
     return Store.kategori('keluar').map(k => {
@@ -413,9 +417,9 @@
     const m = {};
     C.txIn(p).forEach(t => {
       const v = C.expAmount(t); if (!v) return;
+      if (by === 'kategori') { C.expSplit(t).forEach(([k, x]) => { m[k] = (m[k] || 0) + x; }); return; }
       let k;
-      if (by === 'kategori') k = t.jenis === 'transfer' ? C.adminKatId() : t.kategoriId;
-      else if (by === 'anggota') k = t.dibayarOleh || t.dicatatOleh;
+      if (by === 'anggota') k = t.dibayarOleh || t.dicatatOleh;
       else if (by === 'wallet') k = t.walletId;
       else k = t.tag || '(tanpa tag)';
       m[k] = (m[k] || 0) + v;

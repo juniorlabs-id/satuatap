@@ -30,7 +30,7 @@
   function totals() {
     if (dayKey === key) return dayTot;
     dayKey = key; dayTot = {};
-    filtered().forEach(t => { dayTot[t.tanggal] = (dayTot[t.tanggal] || 0) + (t.jenis === 'masuk' ? t.jumlah : -Calc.expAmount(t)); });
+    filtered().forEach(t => { dayTot[t.tanggal] = (dayTot[t.tanggal] || 0) + (t.jenis === 'masuk' ? t.jumlah : 0) - Calc.expAmount(t); });
     return dayTot;
   }
   /** Kelompokkan potongan [from, to) per tanggal → [{d, rows}] */

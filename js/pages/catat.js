@@ -127,7 +127,7 @@
       body: `<div class="detail-head"><span class="cat-ic lg ${t.jenis}">${I(UI.txIcon(t))}</span><div><h3>${U.esc(UI.txTitle(t))}</h3><div class="big-amt">${UI.amount(t.jumlah, t.jenis)}</div></div></div>
         <div class="kv-list">${row('Jenis', Calc.JENIS_LABEL[t.jenis])}${row('Tanggal', U.tgl(t.tanggal, 'long'))}${row('Kategori', k ? U.esc(k.nama) : '')}
         ${row('Dompet', W[t.walletId] ? U.esc(W[t.walletId].nama) : '')}${row('Ke dompet', W[t.walletTujuan] ? U.esc(W[t.walletTujuan].nama) : '')}
-        ${t.biaya ? row('Biaya admin', U.rp(t.biaya)) : ''}${priv ? row('Catatan', '<i class="muted">Detail uang pribadi disembunyikan</i>') : row('Catatan', U.esc(UI.note(t)))}
+        ${t.biaya ? row('Biaya admin / lain', U.rp(t.biaya)) : ''}${priv ? row('Catatan', '<i class="muted">Detail uang pribadi disembunyikan</i>') : row('Catatan', U.esc(UI.note(t)))}
         ${priv ? '' : row('Tag', U.esc(UI.note(t, 'tag')))}${row('Dibayar oleh', U.esc(Store.memberName(t.dibayarOleh || t.dicatatOleh)))}
         ${row('Dicatat', U.esc(Store.memberName(t.dicatatOleh)) + (t.dibuat ? ' · ' + U.timeAgo(t.dibuat) : '') + (t.sumber && t.sumber !== 'app' ? ' · via ' + U.esc(t.sumber) : ''))}</div>
         ${riw.length ? `<h4 class="mini-h">${I('history')} Riwayat perubahan</h4><ul class="hist">${riw.slice().reverse().map(r => `<li><b>${U.esc(Store.memberName(r.oleh))}</b> · ${U.timeAgo(r.at)}<br><small>${Object.keys(r.ubah || {}).map(f => U.esc(f) + ': ' + U.esc(fmtVal(f, r.ubah[f]))).join(', ')}</small></li>`).join('')}</ul>` : ''}`,
@@ -208,7 +208,8 @@
           ${isT ? UI.field('Ke', `<select name="walletTujuan"><option value="">— pilih —</option>${Store.wallets().filter(w => w.id !== st.walletId).map(w => `<option value="${w.id}" ${w.id === st.walletTujuan ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>`)
                 : UI.field('Tanggal', `<input type="date" name="tanggal" value="${st.tanggal}" max="${U.addDays(U.today(), 366)}">`)}
         </div>
-        ${isT ? `<div class="grid2">${UI.field('Biaya admin', UI.rpInput('biaya', st.biaya, '0'), 'Dihitung sebagai pengeluaran')}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${st.tanggal}">`)}</div>` : ''}
+        ${isT ? `<div class="grid2">${UI.field('Biaya admin / lain', UI.rpInput('biaya', st.biaya, '0'), 'Dihitung sebagai pengeluaran')}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${st.tanggal}">`)}</div>`
+          : !special || edit ? (st.biayaOn || st.biaya ? UI.field('Biaya admin / lain', UI.rpInput('biaya', st.biaya, '0'), st.jenis === 'masuk' ? 'Potongan saat uang masuk (mis. biaya transfer) — dicatat sebagai pengeluaran Biaya Admin.' : 'Mis. ongkir, biaya layanan, admin bank — dicatat ke kategori Biaya Admin.') : `<button type="button" class="link small" data-biaya>${I('plus')} Biaya admin / lain</button>`) : ''}
         <div class="chips">${[['Hari ini', U.today()], ['Kemarin', U.addDays(U.today(), -1)]].map(d => `<button class="chip ${st.tanggal === d[1] ? 'on' : ''}" data-date="${d[1]}">${d[0]}</button>`).join('')}</div>
         ${UI.field('Catatan', `<input name="catatan" maxlength="140" placeholder="mis. Makan siang soto" value="${U.esc(st.catatan)}">`)}
         ${(edit && edit.lampiran) || pre.lampiran ? `<a class="link" href="https://drive.google.com/file/d/${encodeURIComponent((edit && edit.lampiran) || pre.lampiran)}/view" target="_blank" rel="noopener">${I('paperclip')} Lihat foto struk</a>` : ''}
@@ -261,6 +262,7 @@
       readForm();
       if (b.dataset.kat) { st.kategoriId = st.kategoriId === b.dataset.kat ? '' : b.dataset.kat; }
       else if (b.dataset.more !== undefined) st.more = !st.more;
+      else if (b.dataset.biaya !== undefined) st.biayaOn = true;
       else if (b.dataset.date) st.tanggal = b.dataset.date;
       else if (b.dataset.tpl) { const x = Store.byId.Template[b.dataset.tpl]; if (x) { st.jenis = x.jenis; if (x.jumlah) st.expr = String(x.jumlah); if (x.kategoriId) st.kategoriId = x.kategoriId; if (x.walletId) st.walletId = x.walletId; st.catatan = x.catatan || x.nama; } }
       else if (b.dataset.x === 'split') st.split = st.split ? null : [{ kategoriId: Store.kategori('keluar')[0].id, jumlah: 0 }];
@@ -311,7 +313,8 @@
       const ops = [];
       if (edit) {
         const row = Object.assign({ id: edit.id, jumlah: j }, base);
-        if (!special) Object.assign(row, { kategoriId: st.jenis === 'transfer' ? '' : st.kategoriId, walletTujuan: st.jenis === 'transfer' ? st.walletTujuan : '', biaya: st.jenis === 'transfer' ? (st.biaya || 0) : 0 });
+        if (!special) Object.assign(row, { kategoriId: st.jenis === 'transfer' ? '' : st.kategoriId, walletTujuan: st.jenis === 'transfer' ? st.walletTujuan : '' });
+        row.biaya = st.biaya || 0;
         const ubah = {};
         Object.keys(row).forEach(f => { const o = f === 'catatan' || f === 'tag' ? UI.note(edit, f) : edit[f]; if (f !== 'id' && String(o == null ? '' : o) !== String(row[f] == null ? '' : row[f])) ubah[f] = edit[f]; });
         if (!Object.keys(ubah).length) { s.close(); return; }
@@ -340,7 +343,8 @@
           if (U.sum(parts, x => x.jumlah) > mine) return UI.toast('Total pecahan melebihi jumlah.', 'warn');
           parts.forEach(x => { ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jumlah: x.jumlah, kategoriId: x.kategoriId, sumber: 'struk' }) }); mine -= x.jumlah; });
         }
-        if (mine > 0) ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jumlah: mine, kategoriId: st.kategoriId }) });
+        if (mine > 0) ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jumlah: mine, kategoriId: st.kategoriId, biaya: st.biaya || 0 }) });
+        else if (st.biaya) ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jenis: 'keluar', jumlah: st.biaya, kategoriId: Calc.adminKatId(), catatan: 'Biaya · ' + (st.catatan || '') }) });
       }
       if (!(await UI.commitPriv(ops))) return;
       const ids = ops.map(o => [o.t, o.row.id]);
@@ -429,9 +433,9 @@
     if (o.kind === 'rapat') return UI.go('rapat');
     const me = Store.me.email, now = new Date().toISOString();
     const cicKat = (Store.t.Kategori.find(k => /cicilan/i.test(k.nama) && k.jenis === 'keluar') || {}).id || '';
-    const mkRow = (jumlah, walletId, tanggal) => {
+    const mkRow = (jumlah, walletId, tanggal, biayaLain) => {
       const jenis = o.kind === 'pinjaman' ? (o.arah === 'masuk' ? 'pinjam_kembali' : 'keluar') : (o.arah === 'masuk' ? 'masuk' : 'keluar');
-      return { id: U.uid('t'), tanggal, jenis, jumlah, kategoriId: o.kind === 'pinjaman' ? (jenis === 'keluar' ? cicKat : '') : (o.kategoriId || ''), walletId, walletTujuan: '', biaya: 0,
+      return { id: U.uid('t'), tanggal, jenis, jumlah, kategoriId: o.kind === 'pinjaman' ? (jenis === 'keluar' ? cicKat : '') : (o.kategoriId || ''), walletId, walletTujuan: '', biaya: biayaLain || 0,
         catatan: o.nama + (o.periodeRef ? ' · ' + (o.periodeRef.length === 4 ? o.periodeRef : U.tgl(o.periodeRef + '-01', 'my')) : ''), dibayarOleh: me, tag: '', sumber: 'rutin', refId: o.refId, periodeRef: o.periodeRef, dicatatOleh: me, dibuat: now, riwayat: [] };
     };
     const done = (row) => {
@@ -442,7 +446,7 @@
     const s = UI.sheet({ title: o.nama, cls: 'small', body: `
       <div class="kv-list"><div class="kv"><span>Jatuh tempo</span><b>${U.tgl(o.tanggal, 'long')}</b></div><div class="kv"><span>Tagihan</span><b>${U.rp(o.jumlah)}</b></div>${o.dibayar ? `<div class="kv"><span>Sudah dibayar</span><b>${U.rp(o.dibayar)}</b></div>` : ''}</div>
       ${UI.seg('aksi', [['lunas', o.arah === 'masuk' ? 'Sudah diterima' : 'Sudah dibayar'], ['sebagian', 'Sebagian'], ['tunda', 'Tunda']], 'lunas')}
-      <div data-p="lunas sebagian">${UI.field('Jumlah', UI.rpInput('jumlah', o.sisa))}<div class="grid2">${UI.field(o.arah === 'masuk' ? 'Masuk ke' : 'Dari dompet', `<select name="walletId">${UI.walletOpts(o.walletId)}</select>`)}${UI.field('Tanggal bayar', `<input type="date" name="tanggal" value="${U.today()}">`)}</div></div>
+      <div data-p="lunas sebagian">${UI.field('Jumlah', UI.rpInput('jumlah', o.sisa))}<div class="grid2">${UI.field(o.arah === 'masuk' ? 'Masuk ke' : 'Dari dompet', `<select name="walletId">${UI.walletOpts(o.walletId)}</select>`)}${UI.field('Tanggal bayar', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>${UI.biayaField(0, 'Opsional — denda, biaya admin, biaya transfer.')}</div>
       <div data-p="tunda" hidden>${UI.field('Ingatkan lagi pada', `<input type="date" name="tunda" value="${U.addDays(U.today(), 3)}">`, 'Pengingat untuk tagihan ini ditunda sampai tanggal tersebut.')}</div>`,
       foot: `<button class="btn" data-ok>${I('check')} Simpan</button>` });
     UI.bindRp(s.el);
@@ -452,7 +456,7 @@
       const f = UI.formData(s.el);
       if (f.aksi === 'tunda') { Store.setSetting('tunda_' + o.id, f.tunda); UI.toast('Ditunda sampai ' + U.tgl(f.tunda)); s.close(); return; }
       if (!f.jumlah) return UI.toast('Isi jumlah.', 'warn');
-      done(mkRow(f.jumlah, f.walletId, f.tanggal || U.today()));
+      done(mkRow(f.jumlah, f.walletId, f.tanggal || U.today(), f.biayaLain || 0));
       s.close();
     };
   };

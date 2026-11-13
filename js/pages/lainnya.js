@@ -292,15 +292,19 @@
   });
   UI.act('foto-ganti', () => {
     const m = Store.member(Store.me.email); if (!m) return UI.toast('Profil belum siap.', 'warn');
-    const s = UI.sheet({ title: 'Foto profil', cls: 'small', body: `<div class="ava-preview">${UI.avaHtml(m.email, m.nama, m.warna, 'xl')}</div>
+    const pilih = (m.foto || '').indexOf('ava:') === 0 ? m.foto.slice(4) : '';
+    const s = UI.sheet({ title: 'Foto profil', body: `<div class="ava-preview">${UI.avaHtml(m.email, m.nama, m.warna, 'xl')}</div>
+      <h4 class="mini-h">Pilih avatar</h4>
+      <div class="ava-grid">${UI.AVATAR.map((a, i) => `<button type="button" class="ava-opt ${pilih === String(i) ? 'on' : ''}" data-ava="${i}" aria-label="Avatar ${i + 1}"><img src="${UI.avatarSvg(i)}" alt="" loading="lazy"></button>`).join('')}</div>
       <input type="file" accept="image/*" hidden data-file>
-      <p class="muted small">Foto diperkecil otomatis dan terlihat oleh anggota keluarga lain.</p>`,
-      foot: `${m.foto ? `<button class="btn ghost danger" data-hapus>${I('trash-2')} Hapus foto</button>` : ''}<button class="btn" data-pilih>${I('camera')} Pilih foto</button>` });
+      <p class="muted small">Atau unggah foto sendiri — diperkecil otomatis dan terlihat oleh anggota keluarga lain.</p>`,
+      foot: `${m.foto ? `<button class="btn ghost danger" data-hapus>${I('trash-2')} Hapus</button>` : ''}<button class="btn ghost" data-pilih>${I('camera')} Unggah foto</button>` });
+    s.el.querySelectorAll('[data-ava]').forEach(b => b.onclick = () => { Store.upsert('Anggota', { id: m.id, foto: 'ava:' + b.dataset.ava }); s.close(); UI.toast('Avatar dipilih.'); });
     const inp = s.el.querySelector('[data-file]');
     s.el.querySelector('[data-pilih]').onclick = () => inp.click();
     inp.onchange = async () => {
       const f = inp.files && inp.files[0]; if (!f) return;
-      try { const foto = await kecilkanFoto(f); Store.upsert('Anggota', { id: m.id, foto }); s.close(); UI.toast('Foto profil diperbarui.'); UI.shell && UI.chrome && UI.render(); }
+      try { const foto = await kecilkanFoto(f); Store.upsert('Anggota', { id: m.id, foto }); s.close(); UI.toast('Foto profil diperbarui.'); }
       catch (e) { UI.toast(e.message, 'warn'); }
     };
     const h = s.el.querySelector('[data-hapus]');

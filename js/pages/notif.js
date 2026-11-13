@@ -130,6 +130,9 @@
   };
   /** Amplop melewati 80% / 100% setelah transaksi dicatat di perangkat ini. */
   const tingkat = {};
+  /** Dipakai modul lain (mis. alert SL/TP saham). */
+  App.tgSiap = () => adaTelegram();
+  App.tgKirim = (pesan) => kirim(pesan);
   App.notifAmplop = () => {
     if (!adaTelegram() || !notifSet().amplop) return;
     const p = Calc.period(), pesan = [];

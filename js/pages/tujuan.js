@@ -90,6 +90,7 @@
       <div class="chips">${ambil ? '' : [g.t.setoranBulanan, 100000, 500000, 1000000].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map(v => `<button class="chip" data-q="${v}">${U.rpShort(v)}</button>`).join('')}</div>
       ${UI.field(ambil ? 'Masukkan ke dompet' : 'Ambil dari dompet', `<select name="walletId">${wl.map(w => `<option value="${w.id}" ${w.id === def.id ? 'selected' : ''}>${U.esc(w.nama)} — ${U.rpShort(bal[w.id] || 0)}</option>`).join('')}</select>`,
         ambil ? (g.t.walletId ? 'Saldo ' + U.esc((Store.byId.Wallet[g.t.walletId] || {}).nama) + ' ikut berkurang.' : '') : 'Saldo dompet ini otomatis berkurang' + (g.t.walletId ? ' dan masuk ke ' + U.esc((Store.byId.Wallet[g.t.walletId] || {}).nama) : '') + '.')}
+      ${UI.biayaField(0, 'Opsional — mis. biaya transfer antarbank, biaya pembelian.')}
       <div class="warn-line"></div>
       <div class="grid2">${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}${Store.members().length > 1 ? UI.field(ambil ? 'Diambil oleh' : 'Disetor oleh', `<select name="dibayarOleh">${UI.memberOpts(Store.me.email)}</select>`) : ''}</div>
       ${UI.field('Catatan', `<input name="catatan" maxlength="80" placeholder="${ambil ? 'Alasan pengambilan' : 'mis. setoran Nov'}">`)}`,
@@ -106,14 +107,14 @@
       const before = g.pct, me = Store.me.email;
       localStorage.setItem('sa:lastWallet', f.walletId);
       if (f.ke && UI.rdSetor) {
-        UI.rdSetor(f.ke, f.jumlah, f.tanggal || U.today(), f.walletId, f.dibayarOleh || me, f.catatan);
+        UI.rdSetor(f.ke, f.jumlah, f.tanggal || U.today(), f.walletId, f.dibayarOleh || me, f.catatan, f.biayaLain || 0);
         s.close();
         const after = Calc.goal(id).pct, ms = [1, 0.75, 0.5, 0.25].find(m => before < m && after >= m);
         if (ms) UI.celebrate(ms, g.t.nama); else UI.toast('Beli reksa dana ' + U.rp(f.jumlah) + ' · ' + U.pct(Math.min(1, after)));
         return;
       }
       Store.upsert('Transaksi', { id: U.uid('t'), tanggal: f.tanggal || U.today(), jenis: ambil ? 'tujuan_ambil' : 'tujuan', jumlah: f.jumlah, kategoriId: '', walletId: f.walletId, walletTujuan: g.t.walletId || '',
-        biaya: 0, catatan: f.catatan || ((ambil ? 'Ambil dari ' : 'Setor ke ') + g.t.nama), dibayarOleh: f.dibayarOleh || me, tag: '', sumber: 'app', refId: g.t.id, periodeRef: (f.tanggal || U.today()).slice(0, 7), dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
+        biaya: f.biayaLain || 0, catatan: f.catatan || ((ambil ? 'Ambil dari ' : 'Setor ke ') + g.t.nama), dibayarOleh: f.dibayarOleh || me, tag: '', sumber: 'app', refId: g.t.id, periodeRef: (f.tanggal || U.today()).slice(0, 7), dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
       s.close();
       const after = Calc.goal(id).pct;
       const ms = [1, 0.75, 0.5, 0.25].find(m => before < m && after >= m);

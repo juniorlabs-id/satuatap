@@ -103,8 +103,7 @@
       const e = C.expAmount(t);
       if (e) {
         keluar += e;
-        const k = t.jenis === 'transfer' ? C.adminKatId() : t.kategoriId;
-        perKat[k] = (perKat[k] || 0) + e;
+        C.expSplit(t).forEach(([k, x]) => { perKat[k] = (perKat[k] || 0) + x; });
         const ym = t.tanggal.slice(0, 7); perBulan[ym] = (perBulan[ym] || 0) + e;
         perHari[U.parseDate(t.tanggal).getDay()] += e;
         if (t.jenis === 'keluar' && (!terbesar || t.jumlah > terbesar.jumlah)) terbesar = t;
@@ -117,7 +116,7 @@
       .sort((a, b) => b.v - a.v);
     // tahun sebelumnya untuk pembanding
     const prevKat = {};
-    Store.t.Transaksi.forEach(t => { if (t.tanggal && t.tanggal.slice(0, 4) === String(tahun - 1)) { const e = C.expAmount(t); if (e) { const k = t.jenis === 'transfer' ? C.adminKatId() : t.kategoriId; prevKat[k] = (prevKat[k] || 0) + e; } } });
+    Store.t.Transaksi.forEach(t => { if (t.tanggal && t.tanggal.slice(0, 4) === String(tahun - 1)) { C.expSplit(t).forEach(([k, x]) => { prevKat[k] = (prevKat[k] || 0) + x; }); } });
     const hemat = kat.filter(x => prevKat[x.k] && x.v < prevKat[x.k]).map(x => Object.assign({}, x, { prev: prevKat[x.k], turun: prevKat[x.k] - x.v }))
       .concat(Object.keys(prevKat).filter(k => !perKat[k]).map(k => ({ k, v: 0, prev: prevKat[k], turun: prevKat[k], nama: (Store.byId.Kategori[k] || {}).nama || 'Lainnya' })))
       .sort((a, b) => b.turun - a.turun).slice(0, 3);

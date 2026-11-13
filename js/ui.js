@@ -233,7 +233,46 @@
   UI.pill = (text, kind) => `<span class="pill ${kind || ''}">${U.esc(text)}</span>`;
   UI.bar = (pct, status) => `<div class="bar ${status || ''}"><i style="width:${U.clamp(pct * 100, 0, 100).toFixed(1)}%"></i></div>`;
   /** Avatar: foto profil bila ada, selain itu inisial berwarna. */
-  UI.foto = email => { const m = email && Store.member && Store.member(email); return (m && m.foto) || ''; };
+  UI.foto = email => { const m = email && Store.member && Store.member(email), f = (m && m.foto) || ''; return f.indexOf('ava:') === 0 ? UI.avatarSvg(f.slice(4)) : f; };
+  // ---------- Template avatar (ilustrasi SVG buatan sendiri, ringan & tanpa unggah foto) ----------
+  const KULIT = ['#F6D3B8', '#EBB894', '#D39A6C', '#A9714B', '#7E5236'];
+  const RAMBUT = ['#2B2420', '#4A3123', '#7A4B2A', '#C9A27A', '#9A9A9A'];
+  const LATAR = ['#CFEDE8', '#FCE7C2', '#DCE6FB', '#F6D8DE', '#E3DBF6', '#D9EFD3', '#F3E2D3', '#D6E9F2'];
+  const BAJU = ['#0F5E59', '#E0A23A', '#3D7FC2', '#C2553D', '#7A5CC0', '#2E8C84', '#5B7A78', '#B04A7A'];
+  // [gaya rambut, kulit, rambut, latar, baju, aksesori]
+  UI.AVATAR = [['pendek', 1, 0, 0, 0, ''], ['hijab', 0, 0, 1, 1, ''], ['panjang', 0, 1, 3, 4, ''], ['botak', 2, 0, 2, 2, 'janggut'], ['keriting', 3, 0, 4, 3, ''], ['hijab', 2, 0, 5, 5, 'kacamata'],
+    ['cepol', 1, 2, 6, 7, ''], ['pendek', 3, 0, 7, 6, 'kacamata'], ['peci', 2, 0, 0, 0, ''], ['panjang', 1, 3, 1, 3, ''], ['hijab', 4, 0, 2, 6, ''], ['pendek', 0, 4, 6, 2, 'kacamata'],
+    ['anak', 0, 1, 3, 1, ''], ['kuncir', 1, 0, 5, 4, ''], ['keriting', 1, 1, 0, 7, 'kacamata'], ['botak', 4, 4, 1, 5, 'kumis']];
+  const AVA_CACHE = {};
+  UI.avatarSvg = (i) => {
+    if (AVA_CACHE[i]) return AVA_CACHE[i];
+    const a = UI.AVATAR[Number(i)] || UI.AVATAR[0], g = a[0], k = KULIT[a[1]], r = RAMBUT[a[2]], bg = LATAR[a[3]], b = BAJU[a[4]], x = a[5];
+    const hijabWarna = ['#0F5E59', '#E0A23A', '#7A5CC0', '#C2553D', '#3D7FC2', '#2E8C84', '#B04A7A', '#5B7A78'][a[3]];
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${bg}"/>`;
+    const kecil = g === 'anak';
+    if (g === 'panjang' || g === 'kuncir') s += `<path d="M18 30c0-11 6-17 14-17s14 6 14 17v${g === 'panjang' ? 18 : 6}h-6V31H24v${g === 'panjang' ? 17 : 5}h-6z" fill="${r}"/>`;
+    if (g === 'kuncir') s += `<circle cx="47" cy="22" r="5" fill="${r}"/>`;
+    if (g === 'hijab') s += `<path d="M13 64V42c0-17 8-28 19-28s19 11 19 28v22z" fill="${hijabWarna}"/>`;
+    s += `<path d="M10 64c1-11 10-17 22-17s21 6 22 17z" fill="${g === 'hijab' ? hijabWarna : b}"/>`;
+    if (g !== 'hijab') s += `<rect x="27" y="38" width="10" height="10" rx="4" fill="${k}" opacity=".92"/>`;
+    s += `<ellipse cx="32" cy="${kecil ? 31 : 29}" rx="${kecil ? 11 : 12}" ry="${kecil ? 12 : 13.5}" fill="${k}"/>`;
+    if (g === 'hijab') s += `<path d="M18.5 30c0-10 6-16.5 13.5-16.5S45.5 20 45.5 30c-2-6-7-9.5-13.5-9.5S20.5 24 18.5 30z" fill="${hijabWarna}"/><path d="M19 33c1 8 6 13 13 13s12-5 13-13" fill="none" stroke="${hijabWarna}" stroke-width="2.5"/>`;
+    if (g === 'pendek' || g === 'anak') s += `<path d="M20 ${kecil ? 29 : 27}c0-9 5-14 12-14s12 5 12 14c-3-5-7-7-12-7-4 0-6 2-8 4-1-1-3 0-4 3z" fill="${r}"/>`;
+    if (g === 'panjang' || g === 'kuncir') s += `<path d="M20 28c0-9 5-14 12-14s12 5 12 14c-4-4-8-7-14-7-4 0-7 2-10 7z" fill="${r}"/>`;
+    if (g === 'keriting') s += [[22, 20], [27, 16], [33, 15], [39, 17], [43, 22], [20, 26], [44, 27]].map(c => `<circle cx="${c[0]}" cy="${c[1]}" r="5" fill="${r}"/>`).join('');
+    if (g === 'cepol') s += `<circle cx="32" cy="12" r="6" fill="${r}"/><path d="M20 28c0-9 5-13.5 12-13.5S44 19 44 28c-3-5-7-7-12-7s-9 2-12 7z" fill="${r}"/>`;
+    if (g === 'peci') s += `<path d="M20.5 22c0-5 5-8 11.5-8s11.5 3 11.5 8v3h-23z" fill="#22201E"/><rect x="20.5" y="23" width="23" height="2" fill="#3a3632"/>`;
+    if (g === 'botak') s += `<path d="M21 24c2-6 6-9 11-9s9 3 11 9c-3-2-6-3-11-3s-8 1-11 3z" fill="${r}" opacity=".35"/>`;
+    const ey = kecil ? 31 : 29;
+    s += `<circle cx="27.5" cy="${ey}" r="1.7" fill="#2b2420"/><circle cx="36.5" cy="${ey}" r="1.7" fill="#2b2420"/>`;
+    s += `<path d="M28.5 ${ey + 6}q3.5 3 7 0" fill="none" stroke="#7a3b2e" stroke-width="1.6" stroke-linecap="round"/>`;
+    s += `<circle cx="24.5" cy="${ey + 4}" r="2" fill="#E88B7A" opacity=".35"/><circle cx="39.5" cy="${ey + 4}" r="2" fill="#E88B7A" opacity=".35"/>`;
+    if (x === 'kacamata') s += `<g fill="none" stroke="#2b2420" stroke-width="1.3"><circle cx="27.5" cy="${ey}" r="4"/><circle cx="36.5" cy="${ey}" r="4"/><path d="M31.5 ${ey}h1"/></g>`;
+    if (x === 'janggut') s += `<path d="M21 33c1 9 5 14 11 14s10-5 11-14c-2 4-5 6-11 6s-9-2-11-6z" fill="${r}"/><path d="M28.5 ${ey + 6}q3.5 2.5 7 0" fill="none" stroke="#f3e3d6" stroke-width="1.4" stroke-linecap="round"/>`;
+    if (x === 'kumis') s += `<path d="M27 ${ey + 4.5}q5-2.5 10 0q-5 1.5-10 0z" fill="${r}"/>`;
+    s += '</svg>';
+    return (AVA_CACHE[i] = 'data:image/svg+xml;utf8,' + encodeURIComponent(s));
+  };
   UI.avaHtml = (email, nama, warna, cls, extra) => { const f = UI.foto(email);
     return `<span class="avatar ${cls || ''}${f ? ' has-foto' : ''}" style="background:${warna || '#5b7a78'}${f ? `;background-image:url('${f}')` : ''}" ${extra || ''}>${f ? '' : U.esc(U.initials(nama))}</span>`; };
   UI.avatar = (email, sm) => { const m = Store.member(email); const n = m ? m.nama : Store.memberName(email); return UI.avaHtml(email, n, m && m.warna, sm ? 'xs' : ''); };

@@ -31,11 +31,11 @@
     Skenario:  ['id', 'nama', 'jenis', 'data', 'catatan', 'dibuat', 'oleh'],
     Rapat:     ['id', 'tanggal', 'jenis', 'judul', 'catatan', 'keputusan', 'hadir', 'skor', 'dibuat', 'oleh'],
     Tugas:     ['id', 'judul', 'pj', 'tenggat', 'selesai', 'rapatId', 'sumber', 'catatan', 'dibuat', 'tglSelesai'],
-    Saham:     ['id', 'tanggal', 'kode', 'aksi', 'lot', 'harga', 'fee', 'nominal', 'walletId', 'catatan', 'dibuat', 'txId', 'oleh']
+    Saham:     ['id', 'tanggal', 'kode', 'aksi', 'lot', 'harga', 'fee', 'nominal', 'walletId', 'catatan', 'dibuat', 'txId', 'oleh', 'setup', 'entryLow', 'entryHigh', 'sl', 'tp1', 'tp2']
   };
   const NUM = { saldoAwal: 1, urutan: 1, batas: 1, jumlah: 1, biaya: 1, tanggal_r: 1, estimasi: 1, target: 1, prioritas: 1,
                 setoranBulanan: 1, pokok: 1, bunga: 1, tenor: 1, tanggalBayar: 1, cicilan: 1, rev: 1,
-                gramKeping: 1, kadar: 1, hargaBeli: 1, hargaJual: 1, unit: 1, modal: 1, nilai: 1, imbal: 1, lot: 1, harga: 1, fee: 1, nominal: 1 };
+                gramKeping: 1, kadar: 1, hargaBeli: 1, hargaJual: 1, unit: 1, modal: 1, nilai: 1, imbal: 1, lot: 1, harga: 1, fee: 1, nominal: 1, sl: 1, tp1: 1, tp2: 1, entryLow: 1, entryHigh: 1 };
   const BOOL = { likuid: 1, arsip: 1, bawaSisa: 1, tetap: 1, langganan: 1, aktif: 1, besar: 1, lunas: 1, zakat: 1, selesai: 1 };
   const JSONC = { izin: 1, riwayat: 1, kepemilikan: 1, riwayatNilai: 1, data: 1, keputusan: 1, hadir: 1 };
 

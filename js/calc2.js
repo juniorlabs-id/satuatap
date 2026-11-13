@@ -221,6 +221,7 @@
         case 'tujuan': add(t.walletId, -j); add(t.walletTujuan, j); break;
         case 'tujuan_ambil': add(t.walletId, j); add(t.walletTujuan, -j); break;
       }
+      if (t.biaya && t.jenis !== 'transfer') add(t.walletId, -(Number(t.biaya) || 0));
     });
     return b;
   };

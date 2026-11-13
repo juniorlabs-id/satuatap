@@ -1,399 +1,647 @@
 /* ============================================================
- * Jurnal Saham — Overview · Aktivitas (Trade & Arus Kas) · Analitik · Kalkulator.
- * Akun = dompet (RDN/rekening sekuritas). Beli → aset_beli dari akun, Jual → aset_jual ke akun,
- * Dividen → pemasukan ke akun, Bea meterai Rp10.000 per hari bila nilai transaksi > Rp10 jt.
- * Posisi dihitung dengan metode harga rata-rata (biaya beli termasuk fee).
- * Harga terakhir: otomatis lewat /api/saham (bila tersedia) atau diisi manual.
+ * Jurnal Saham IDX — diadaptasi dari Trading Journal (Overview · Activity · Analytics · Avg Calculator · Settings)
+ * untuk tampilan HP & data keluarga SatuAtap.
+ *  - Portofolio = akun RDN (dompet). Kas RDN = saldo dompet itu, modal bersih = saldo awal + top up − tarik.
+ *  - Trade: Beli/Jual dengan setup & rencana (entry zone, SL, TP1, TP2). Harga rata-rata (average cost, fee masuk modal).
+ *  - Cash flow: Top up / Tarik (transfer bank ↔ RDN), Dividen, Penyesuaian.
+ *  - Bea meterai otomatis sekali per hari per akun bila nilai transaksi > ambang (disinkronkan setiap ada perubahan).
+ *  - Grafik Portofolio vs IHSG & max drawdown dihitung dari riwayat harga penutupan (/api/saham?hist=1).
+ *  - Alert SL/TP: label di posisi + Telegram (bila terhubung) saat harga diperbarui.
  * ============================================================ */
 (function () {
   const I = UI.icon, me = () => Store.me.email;
-  const LEMBAR = 100, MATERAI = 10000, BATAS_MATERAI = 10000000;
-  const F = { akun: '', tab: 'trade', rentang: 'bulan', aksi: '', q: '', anaRentang: 'tahun' };
-  const json = (k) => { const v = Store.setting(k, ''); if (v && typeof v === 'object') return v; try { return v ? JSON.parse(v) : {}; } catch (e) { return {}; } };
+  const LB = 100;
+  const SETUP_AWAL = ['Pullback MA20', 'Swing Low Support', 'Breakout ATH', 'Momentum', 'Speculative Rebound'];
+  const F = { akun: localStorage.getItem('sa:shPf') || '', q: '', ty: '', su: '', a: '', b: '' }, AN = { a: '', b: '' };
+  const json = (k, d) => { const v = Store.setting(k, ''); if (v && typeof v === 'object') return v; try { return v ? JSON.parse(v) : d; } catch (e) { return d; } };
   const setJson = (k, o) => Store.upsert('Pengaturan', { id: k, nilai: JSON.stringify(o) });
-  const fee = () => Object.assign({ beli: 0.15, jual: 0.25, materai: true }, json('sahamFee'));
-  const hargaMap = () => json('hargaSaham');
-  const nm = v => U.fmtNum(Math.round(v));
-  const lotTxt = l => U.fmtNum(Math.round(l * 100) / 100) + ' lot';
-  const tanda = v => (v >= 0 ? '+' : '−');
-  const kelasPL = v => v > 0 ? 'ok' : v < 0 ? 'bad' : 'muted';
+  const nm = v => U.fmtNum(Math.round(v || 0));
+  const tanda = v => (v > 0 ? '+' : v < 0 ? '−' : '');
+  const cls = v => v > 0 ? 'ok' : v < 0 ? 'bad' : '';
+  const pc = v => `<span class="${cls(v)}">${tanda(v)}${(Math.abs(v || 0)).toFixed(2).replace('.', ',')}%</span>`;
+  const rpS = (v, sg) => `<span class="${sg ? cls(v) : ''}">${sg ? tanda(v) : v < 0 ? '−' : ''}${UI.m(Math.abs(v || 0))}</span>`;
+  const rpK = (v, sg) => `<span class="${sg ? cls(v) : ''}">${sg ? tanda(v) : v < 0 ? '−' : ''}${UI.ms(Math.abs(v || 0))}</span>`;
   const akunNama = id => (Store.byId.Wallet[id] || {}).nama || 'Akun dihapus';
 
-  // ---------- Hitung posisi ----------
-  const trades = () => (Store.t.Saham || []).slice().sort((a, b) => (a.tanggal + (a.dibuat || '')).localeCompare(b.tanggal + (b.dibuat || '')));
-  /** Posisi per (akun, kode) per tanggal `sampai` (opsional). Hasil: {posisi: [...], realisasi: [...], dividen, fee}. */
+  // ---------- Pengaturan ----------
+  const setAkun = () => json('sahamAkun', {});
+  const cfg = (akun) => Object.assign({ beli: 0.15, jual: 0.25, materai: 10000, ambang: 10000000 }, json('sahamFee', {}), (setAkun()[akun] || {}));
+  const setups = () => { const s = json('sahamSetup', null); return Array.isArray(s) ? s : SETUP_AWAL.slice(); };
+  const harga = () => json('hargaSaham', {});
+
+  // ---------- Data ----------
+  const trades = () => (Store.t.Saham || []).slice().sort((a, b) => a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : String(a.dibuat) < String(b.dibuat) ? -1 : 1);
+  /** Akun yang dipakai jurnal: dompet RDN + dompet yang pernah dipakai trade. */
+  const akunList = () => { const ids = new Set(trades().map(t => t.walletId)); Store.wallets().forEach(w => { if (w.jenis === 'rdn') ids.add(w.id); }); return Array.from(ids).filter(id => Store.byId.Wallet[id]).map(id => Store.byId.Wallet[id]); };
+  const akunAktif = () => { const ak = akunList(); return F.akun && ak.some(w => w.id === F.akun) ? [F.akun] : ak.map(w => w.id); };
+
+  /** Kalkulasi average cost (mengikuti Trading Journal): posisi, realisasi, dividen, fee. */
   Calc.saham = (sampai, akun) => {
-    const pos = {}, realisasi = [], divs = [];
-    let feeTot = 0, materai = 0;
+    const P = {}, R = [], D = [], ids = akun ? [].concat(akun) : null;
+    let fee = 0, materai = 0;
     trades().forEach(t => {
       if (sampai && t.tanggal > sampai) return;
-      if (akun && t.walletId !== akun) return;
-      const k = t.walletId + '|' + t.kode, lb = (Number(t.lot) || 0) * LEMBAR, h = Number(t.harga) || 0, f = Number(t.fee) || 0;
-      if (t.aksi === 'materai') { materai += Number(t.nominal) || MATERAI; return; }
-      if (t.aksi === 'dividen') { divs.push({ t, v: Number(t.nominal) || 0 }); return; }
-      const p = pos[k] = pos[k] || { kode: t.kode, walletId: t.walletId, lembar: 0, biaya: 0, mulai: t.tanggal, beli: 0 };
-      feeTot += f;
-      if (t.aksi === 'beli') { if (p.lembar <= 0) p.mulai = t.tanggal; p.lembar += lb; p.biaya += lb * h + f; p.beli++; }
-      else if (t.aksi === 'jual' && p.lembar > 0) {
-        const jual = Math.min(lb, p.lembar), avg = p.biaya / p.lembar, modal = avg * jual, hasil = jual * h - f;
-        realisasi.push({ t, kode: t.kode, walletId: t.walletId, modal, hasil, pl: hasil - modal, pct: modal ? (hasil - modal) / modal : 0, avg, umur: U.diffDays(p.mulai, t.tanggal) });
-        p.lembar -= jual; p.biaya -= modal; if (p.lembar <= 0) { p.lembar = 0; p.biaya = 0; }
+      if (ids && ids.indexOf(t.walletId) < 0) return;
+      if (t.aksi === 'materai') { materai += Number(t.nominal) || 0; return; }
+      if (t.aksi === 'dividen') { D.push({ t, v: Number(t.nominal) || 0 }); return; }
+      const k = t.walletId + '|' + t.kode, lots = Number(t.lot) || 0, gross = lots * LB * (Number(t.harga) || 0), f = Number(t.fee) || 0, ms = Date.parse(t.tanggal);
+      const p = P[k] = P[k] || { kode: t.kode, walletId: t.walletId, lots: 0, cost: 0, dw: 0, plan: {}, mulai: t.tanggal };
+      fee += f;
+      if (t.aksi === 'beli') { if (p.lots <= 0) p.mulai = t.tanggal; p.cost += gross + f; p.lots += lots; p.dw += lots * ms; if (t.sl || t.tp1 || t.tp2) p.plan = t; }
+      else if (t.aksi === 'jual' && p.lots > 0) {
+        const fr = Math.min(1, lots / p.lots), c = p.cost * fr, net = gross - f, hold = (ms - p.dw / p.lots) / 864e5;
+        R.push({ t, kode: t.kode, walletId: t.walletId, tanggal: t.tanggal, setup: t.setup || '', lots, cost: c, hasil: net, pl: net - c, pct: c ? (net - c) / c * 100 : 0, hold, avg: c / (lots * LB), px: Number(t.harga), fee: f });
+        p.cost -= c; p.dw -= p.dw * fr; p.lots -= lots; if (p.lots <= 0) { p.lots = p.cost = p.dw = 0; p.plan = {}; }
       }
     });
-    const hm = hargaMap();
-    const posisi = Object.values(pos).filter(p => p.lembar > 0).map(p => {
-      const hh = hm[p.kode], last = hh && Number(hh[0]) || 0, avg = p.biaya / p.lembar, nilai = last ? last * p.lembar : p.biaya;
-      return Object.assign(p, { avg, last, nilai, pl: nilai - p.biaya, pct: p.biaya ? (nilai - p.biaya) / p.biaya : 0, prev: hh && Number(hh[3]) || 0, tglHarga: hh && hh[1] || '', sumber: hh && hh[2] || '' });
-    }).sort((a, b) => b.nilai - a.nilai);
-    return { posisi, realisasi, dividen: divs, fee: feeTot, materai };
+    const hm = harga();
+    const H = Object.values(P).filter(p => p.lots > 0).map(p => {
+      const h = hm[p.kode] || [], l = Number(h[0]) || 0, avg = p.cost / (p.lots * LB), mv = (l || avg) * p.lots * LB, pl = p.plan;
+      const st = !pl.sl && !pl.tp1 ? '' : l && pl.sl && l <= Number(pl.sl) ? 'sl' : l && pl.tp2 && l >= Number(pl.tp2) ? 'tp2' : l && pl.tp1 && l >= Number(pl.tp1) ? 'tp' : 'ok';
+      return Object.assign(p, { avg, l, prev: Number(h[3]) || 0, tglHarga: h[1] || '', sumber: h[2] || '', mv, nilai: mv, biaya: p.cost, lembar: p.lots * LB, unr: l ? mv - p.cost : 0, pl: l ? mv - p.cost : 0, pct: l ? (mv / p.cost - 1) * 100 : 0, st });
+    }).sort((a, b) => b.mv - a.mv);
+    return { posisi: H, H, realisasi: R, R, dividen: D, fee, materai };
   };
-  /** Posisi saham → item virtual untuk kekayaan bersih, zakat & alokasi (lewat Calc.investasi). */
-  Calc.sahamItems = () => Calc.saham().posisi.map(p => {
+  /** Posisi → item virtual untuk kekayaan bersih, zakat & alokasi (lewat Calc.investasi). */
+  Calc.sahamItems = () => Calc.saham().H.map(p => {
     const w = Store.byId.Wallet[p.walletId] || {}, pemilik = w.pemilik && w.pemilik !== 'bersama' ? w.pemilik : '';
-    return { x: { id: 'sh:' + p.walletId + ':' + p.kode, kelas: 'saham', nama: p.kode, kode: p.kode, unit: p.lembar, modal: Math.round(p.biaya), nilai: Math.round(p.nilai), tglNilai: p.tglHarga, tanggal: p.mulai, walletId: p.walletId, tujuanId: '', kepemilikan: pemilik ? { [pemilik]: 100 } : {}, zakat: true, status: 'aktif', virtual: true }, nilai: p.nilai, modal: p.biaya, untung: p.pl, pct: p.pct, basi: !p.tglHarga || U.diffDays(p.tglHarga, U.today()) > 45 };
+    return { x: { id: 'sh:' + p.walletId + ':' + p.kode, kelas: 'saham', nama: p.kode, kode: p.kode, unit: p.lembar, modal: Math.round(p.cost), nilai: Math.round(p.mv), tglNilai: p.tglHarga, tanggal: p.mulai, walletId: p.walletId, tujuanId: '', kepemilikan: pemilik ? { [pemilik]: 100 } : {}, zakat: true, status: 'aktif', virtual: true }, nilai: p.mv, modal: p.cost, untung: p.mv - p.cost, pct: p.cost ? (p.mv - p.cost) / p.cost : 0, basi: !p.tglHarga || U.diffDays(p.tglHarga, U.today()) > 45 };
   });
-  const akunList = () => { const ids = Array.from(new Set(trades().map(t => t.walletId))); return ids.filter(id => Store.byId.Wallet[id]).map(id => Store.byId.Wallet[id]); };
 
-  // ---------- Harga ----------
-  const simpanHarga = (obj) => setJson('hargaSaham', Object.assign({}, hargaMap(), obj));
-  const ambilHarga = async (diam) => {
-    const kode = Array.from(new Set(Calc.saham().posisi.map(p => p.kode)));
-    if (!kode.length) return false;
-    if (Store.mode === 'demo') {
-      const o = {}; kode.forEach(k => { const h = hargaMap()[k]; const base = h ? Number(h[0]) : 1000; const nb = Math.round(base * (1 + (Math.random() - 0.48) * 0.02) / 5) * 5; o[k] = [nb, U.today(), 'Contoh', base]; });
-      simpanHarga(o); if (!diam) UI.toast('Harga contoh diperbarui.'); return true;
+  // ---------- Kas & modal per akun (dari transaksi SatuAtap) ----------
+  const efek = (t, id) => {   // pengaruh transaksi ke saldo dompet id
+    const j = Number(t.jumlah) || 0, b = Number(t.biaya) || 0; let v = 0;
+    if (t.walletId === id) {
+      if (['keluar', 'pinjam_beri', 'aset_beli', 'tujuan'].indexOf(t.jenis) > -1) v -= j;
+      else if (['masuk', 'pinjam_kembali', 'pinjam_terima', 'penyesuaian', 'aset_jual', 'tujuan_ambil'].indexOf(t.jenis) > -1) v += j;
+      else if (t.jenis === 'transfer') v -= j;
+      v -= b;
     }
-    try {
-      const r = await fetch('/api/saham?k=' + encodeURIComponent(kode.join(',')), { cache: 'no-store' });
-      const j = await r.json();
-      if (!j || !j.ok || !j.data) throw new Error((j && j.message) || 'Harga tidak tersedia');
-      const o = {}; let n = 0;
-      Object.keys(j.data).forEach(k => { const d = j.data[k]; if (d && d.harga) { o[k] = [d.harga, d.tanggal || U.today(), 'Yahoo Finance', d.prev || 0]; n++; } });
-      if (!n) throw new Error('Harga tidak ditemukan');
-      simpanHarga(o); if (!diam) UI.toast(n + ' harga saham diperbarui.'); return true;
-    } catch (e) { if (!diam) UI.toast('Harga otomatis belum tersedia — isi manual.', 'warn'); return false; }
+    if (t.walletTujuan === id) { if (t.jenis === 'transfer' || t.jenis === 'tujuan') v += j; else if (t.jenis === 'tujuan_ambil') v -= j; }
+    return v;
   };
-  UI.act('sh-harga', async () => { if (!(await ambilHarga())) hargaManual(); });
-  UI.act('sh-harga-manual', () => hargaManual());
-  function hargaManual() {
-    const ps = Calc.saham().posisi, kode = Array.from(new Set(ps.map(p => p.kode)));
-    if (!kode.length) return UI.toast('Belum ada saham yang dipegang.', 'warn');
-    const hm = hargaMap();
-    const s = UI.sheet({ title: 'Harga terakhir', cls: 'small', body: `<p class="muted small">Isi harga penutupan terakhir per lembar (lihat di aplikasi sekuritas).</p>
-      ${kode.map(k => UI.field(k + (hm[k] ? ` <small class="muted">· ${U.rp(hm[k][0])} (${U.tgl(hm[k][1], 'dm')})</small>` : ''), UI.rpInput('h_' + k, 0, hm[k] ? U.fmtNum(hm[k][0]) : 'harga per lembar'))).join('')}`,
-      foot: `<button class="btn" data-ok>Simpan</button>` });
-    UI.bindRp(s.el);
-    s.el.querySelector('[data-ok]').onclick = () => {
-      const f = UI.formData(s.el), o = {}; kode.forEach(k => { if (f['h_' + k]) o[k] = [f['h_' + k], U.today(), 'Manual', hm[k] ? hm[k][0] : 0]; });
-      if (!Object.keys(o).length) return UI.toast('Belum ada harga yang diisi.', 'warn');
-      simpanHarga(o); s.close(); UI.toast('Harga disimpan.');
-    };
-  }
+  /** Arus modal (top up − tarik) satu transaksi ke akun id. */
+  const modalTx = (t, id) => t.jenis === 'transfer' ? (t.walletTujuan === id ? Number(t.jumlah) : t.walletId === id ? -Number(t.jumlah) : 0) : 0;
+  const ringkasAkun = (ids) => {
+    const b = Calc.balances(); let cash = 0, nc = 0;
+    ids.forEach(id => { cash += b[id] || 0; nc += Number((Store.byId.Wallet[id] || {}).saldoAwal) || 0; });
+    Store.t.Transaksi.forEach(t => ids.forEach(id => { nc += modalTx(t, id); }));
+    return { cash, nc };
+  };
 
-  // ---------- Form transaksi ----------
-  const katCari = (jenis, re) => (Store.t.Kategori || []).find(k => k.jenis === jenis && !k.arsip && re.test(k.nama));
-  UI.sahamForm = (t, pre) => {
-    const isNew = !t; pre = pre || {};
-    const ws = Store.wallets().slice().sort((a, b) => (b.jenis === 'rdn') - (a.jenis === 'rdn'));
-    if (!ws.length) return UI.toast('Tambahkan dompet/RDN dulu di Kas & Bank.', 'warn');
-    const lastAkun = localStorage.getItem('sa:shAkun');
-    t = t || { id: U.uid('sh'), tanggal: U.today(), kode: pre.kode || '', aksi: pre.aksi || 'beli', lot: 0, harga: 0, fee: 0, nominal: 0, walletId: pre.walletId || (ws.find(w => w.id === lastAkun) || ws[0]).id, catatan: '', dibuat: new Date().toISOString(), txId: '', oleh: me() };
-    const kodeAda = Array.from(new Set(trades().map(x => x.kode))).sort();
-    const s = UI.sheet({ title: isNew ? 'Catat transaksi saham' : 'Ubah transaksi saham', body: `
-      ${UI.seg('aksi', [['beli', 'Beli'], ['jual', 'Jual'], ['dividen', 'Dividen']], t.aksi)}
-      <div class="grid2">${UI.field('Kode saham', `<input name="kode" maxlength="6" value="${U.esc(t.kode)}" placeholder="BBCA" list="sh-kode" autocapitalize="characters" class="up"><datalist id="sh-kode">${kodeAda.map(k => `<option value="${k}">`).join('')}</datalist>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${t.tanggal}">`)}</div>
-      ${UI.field('Akun / RDN', `<select name="walletId">${ws.map(w => `<option value="${w.id}" ${w.id === t.walletId ? 'selected' : ''}>${U.esc(w.nama)}${w.jenis === 'rdn' ? ' · RDN' : ''}</option>`).join('')}</select>`, 'Uang beli diambil dari akun ini; hasil jual & dividen masuk ke sini.')}
-      <div data-trade><div class="grid2">${UI.field('Jumlah lot', `<input type="number" name="lot" min="1" step="1" inputmode="numeric" value="${t.lot || ''}" placeholder="1 lot = 100 lembar">`)}${UI.field('Harga per lembar', UI.rpInput('harga', t.harga))}</div>
-        ${UI.field('Fee broker', UI.rpInput('fee', t.fee), '')}<div class="sh-hint"></div></div>
-      <div data-div>${UI.field('Dividen diterima (bersih)', UI.rpInput('nominal', t.nominal), 'Setelah pajak dividen.')}</div>
-      ${UI.field('Catatan', `<input name="catatan" maxlength="120" value="${U.esc(t.catatan)}" placeholder="alasan beli/jual, rencana TP/SL">`)}`,
-      foot: `${isNew ? '' : `<button class="btn ghost danger" data-del>${I('trash-2')}</button>`}<button class="btn" data-ok>${I('check')} Simpan</button>` });
-    UI.bindRp(s.el);
-    let feeManual = !isNew;
-    const hint = s.el.querySelector('.sh-hint'), feeIn = s.el.querySelector('[name=fee]');
-    feeIn.addEventListener('input', () => { feeManual = true; });
-    const sync = (ev) => {
-      const v = UI.formData(s.el); v.kode = String(v.kode || '').toUpperCase().trim();
-      s.el.querySelector('[data-trade]').hidden = v.aksi === 'dividen'; s.el.querySelector('[data-div]').hidden = v.aksi !== 'dividen';
-      const lb = (Number(v.lot) || 0) * LEMBAR, nilai = lb * (v.harga || 0), fp = fee();
-      if (!feeManual || (ev && ev.target && ev.target.name === 'aksi')) { feeManual = false; feeIn.value = nilai ? U.fmtNum(Math.round(nilai * (v.aksi === 'jual' ? fp.jual : fp.beli) / 100)) : ''; }
-      const fe = U.parseRp(feeIn.value);
-      const pos = Calc.saham(v.tanggal, v.walletId).posisi.find(p => p.kode === v.kode && (isNew || true));
-      let h = '';
-      if (nilai) h += `<div class="kv"><span>${v.aksi === 'jual' ? 'Uang diterima' : 'Total bayar'}</span><b>${U.rp(v.aksi === 'jual' ? nilai - fe : nilai + fe)}</b></div>`;
-      if (v.aksi === 'beli' && pos && lb) { const avgB = (pos.biaya + nilai + fe) / (pos.lembar + lb); h += `<div class="kv muted"><span>Harga rata-rata baru</span><b>${U.rp(Math.round(pos.avg))} → ${U.rp(Math.round(avgB))}</b></div>`; }
-      if (v.aksi === 'jual') {
-        if (!pos) h += v.kode ? `<div class="kv bad"><span>Tidak ada ${U.esc(v.kode)} di akun ini</span></div>` : '';
-        else { const pl = lb ? (nilai - fe) - pos.avg * Math.min(lb, pos.lembar) : 0;
-          h += `<div class="kv muted"><span>Dipegang</span><b>${lotTxt(pos.lembar / LEMBAR)} · rata-rata ${U.rp(Math.round(pos.avg))}</b></div>` + (lb ? `<div class="kv"><span>Untung/rugi</span><b class="${kelasPL(pl)}">${tanda(pl)}${U.rp(Math.abs(Math.round(pl)))} (${U.pct(Math.abs(pl) / (pos.avg * Math.min(lb, pos.lembar) || 1), 1)})</b></div>` : '') +
-            (lb > pos.lembar ? `<div class="kv bad"><span>Melebihi jumlah yang dipegang</span></div>` : ''); }
+  // ---------- Bea meterai: sinkron otomatis (sekali per hari per akun bila gross > ambang) ----------
+  function sinkronMaterai() {
+    const perlu = {}, ada = {};
+    trades().forEach(t => {
+      if (t.aksi === 'materai') { (ada[t.walletId + '|' + t.tanggal] = ada[t.walletId + '|' + t.tanggal] || []).push(t); return; }
+      if (t.aksi !== 'beli' && t.aksi !== 'jual') return;
+      const k = t.walletId + '|' + t.tanggal; perlu[k] = (perlu[k] || 0) + (Number(t.lot) || 0) * LB * (Number(t.harga) || 0);
+    });
+    const ops = [], now = new Date().toISOString(), kat = (Store.t.Kategori.find(k => k.jenis === 'keluar' && !k.arsip && /admin|biaya/i.test(k.nama)) || {}).id || '';
+    Object.keys(perlu).forEach(k => {
+      const [akun, tgl] = k.split('|'), c = cfg(akun), harus = c.materai > 0 && perlu[k] > c.ambang, rows = ada[k] || [];
+      if (harus && !rows.length) {
+        const id = U.uid('sh'), txId = U.uid('t');
+        ops.push({ op: 'upsert', t: 'Saham', row: { id, tanggal: tgl, kode: '-', aksi: 'materai', lot: 0, harga: 0, fee: 0, nominal: c.materai, walletId: akun, catatan: 'Bea meterai harian', dibuat: now, txId, oleh: me() } });
+        ops.push({ op: 'upsert', t: 'Transaksi', row: { id: txId, tanggal: tgl, jenis: 'keluar', jumlah: c.materai, kategoriId: kat, walletId: akun, walletTujuan: '', biaya: 0, catatan: 'Bea meterai saham', dibayarOleh: me(), tag: 'saham', sumber: 'saham', refId: id, periodeRef: tgl.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } });
       }
-      hint.innerHTML = h;
-    };
-    s.el.addEventListener('input', sync); s.el.addEventListener('change', sync); sync();
-    s.el.querySelector('[data-ok]').onclick = () => {
-      const v = UI.formData(s.el); v.kode = String(v.kode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (!/^[A-Z]{4}[A-Z0-9]?$/.test(v.kode)) return UI.toast('Kode saham 4 huruf, mis. BBCA.', 'warn');
-      const row = Object.assign({}, t, { tanggal: v.tanggal || U.today(), kode: v.kode, aksi: v.aksi, walletId: v.walletId, catatan: v.catatan || '' });
-      if (v.aksi === 'dividen') { if (!v.nominal) return UI.toast('Isi nominal dividen.', 'warn'); Object.assign(row, { lot: 0, harga: 0, fee: 0, nominal: v.nominal }); }
-      else {
-        const lot = Math.round(Number(v.lot) || 0); if (lot < 1 || !v.harga) return UI.toast('Isi jumlah lot dan harga.', 'warn');
-        Object.assign(row, { lot, harga: v.harga, fee: U.parseRp(feeIn.value), nominal: 0 });
-        if (v.aksi === 'jual') { const pos = Calc.saham(row.tanggal, row.walletId).posisi.find(p => p.kode === row.kode); const punya = (pos ? pos.lembar : 0) + (!isNew && t.aksi === 'jual' && t.kode === row.kode && t.walletId === row.walletId ? (Number(t.lot) || 0) * LEMBAR : 0); if (lot * LEMBAR > punya) return UI.toast('Jumlah jual melebihi yang dipegang (' + lotTxt(punya / LEMBAR) + ').', 'warn'); }
-      }
-      localStorage.setItem('sa:shAkun', row.walletId);
-      const ops = opsTrade(row, isNew ? null : t);
-      Store.commit(ops.concat(cekMaterai(row, isNew)));
-      s.close(); UI.toast(v.aksi === 'dividen' ? 'Dividen ' + row.kode + ' dicatat.' : (v.aksi === 'beli' ? 'Beli ' : 'Jual ') + row.kode + ' ' + lotTxt(row.lot) + ' dicatat.');
-    };
-    const d = s.el.querySelector('[data-del]');
-    if (d) d.onclick = async () => { if (await UI.confirm('Hapus transaksi ' + t.kode + '?', 'Transaksi uang yang terkait ikut dihapus, saldo akun kembali seperti semula.', 'Hapus', true)) { Store.commit(hapusOps(t)); s.close(); } };
-  };
-  /** Baris Saham + baris Transaksi (uang) yang selalu berpasangan lewat txId. */
-  function opsTrade(row, lama) {
-    const now = new Date().toISOString(), txId = (lama && lama.txId) || U.uid('t');
-    row.txId = txId;
-    const base = { id: txId, tanggal: row.tanggal, walletId: row.walletId, walletTujuan: '', biaya: 0, dibayarOleh: row.oleh || me(), tag: 'saham', sumber: 'saham', refId: row.id, periodeRef: row.tanggal.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] };
-    let tx;
-    if (row.aksi === 'beli') tx = Object.assign(base, { jenis: 'aset_beli', jumlah: Math.round(row.lot * LEMBAR * row.harga + row.fee), kategoriId: '', catatan: `Beli ${row.kode} ${row.lot} lot @ ${nm(row.harga)}` });
-    else if (row.aksi === 'jual') tx = Object.assign(base, { jenis: 'aset_jual', jumlah: Math.round(row.lot * LEMBAR * row.harga - row.fee), kategoriId: '', catatan: `Jual ${row.kode} ${row.lot} lot @ ${nm(row.harga)}` });
-    else { const k = katCari('masuk', /divid|investasi|pasif|pemasukan lain/i); tx = Object.assign(base, { jenis: 'masuk', jumlah: Math.round(row.nominal), kategoriId: k ? k.id : '', catatan: `Dividen ${row.kode}` }); }
-    return [{ op: 'upsert', t: 'Saham', row }, { op: 'upsert', t: 'Transaksi', row: tx }];
+      (harus ? rows.slice(1) : rows).forEach(r => ops.push(...hapusOps(r)));
+      delete ada[k];
+    });
+    Object.values(ada).forEach(rows => rows.forEach(r => ops.push(...hapusOps(r))));   // hari tanpa transaksi lagi
+    if (ops.length) Store.commit(ops);
   }
   const hapusOps = t => [{ op: 'delete', t: 'Saham', id: t.id }].concat(t.txId && Store.byId.Transaksi[t.txId] ? [{ op: 'delete', t: 'Transaksi', id: t.txId }] : []);
-  /** Bea meterai Rp10.000 sekali per hari per akun bila total nilai transaksi hari itu > Rp10 juta. */
-  function cekMaterai(row, isNew) {
-    if (!fee().materai || row.aksi === 'dividen') return [];
-    const hari = trades().filter(x => x.tanggal === row.tanggal && x.walletId === row.walletId && x.id !== row.id && (x.aksi === 'beli' || x.aksi === 'jual')).concat([row]);
-    if (trades().some(x => x.aksi === 'materai' && x.tanggal === row.tanggal && x.walletId === row.walletId)) return [];
-    const tot = U.sum(hari, x => (Number(x.lot) || 0) * LEMBAR * (Number(x.harga) || 0));
-    if (tot <= BATAS_MATERAI) return [];
-    const id = U.uid('sh'), txId = U.uid('t'), k = katCari('keluar', /admin|biaya|investasi/i), now = new Date().toISOString();
-    return [{ op: 'upsert', t: 'Saham', row: { id, tanggal: row.tanggal, kode: '-', aksi: 'materai', lot: 0, harga: 0, fee: 0, nominal: MATERAI, walletId: row.walletId, catatan: 'Bea meterai (transaksi harian > Rp10 jt)', dibuat: now, txId, oleh: me() } },
-      { op: 'upsert', t: 'Transaksi', row: { id: txId, tanggal: row.tanggal, jenis: 'keluar', jumlah: MATERAI, kategoriId: k ? k.id : '', walletId: row.walletId, walletTujuan: '', biaya: 0, catatan: 'Bea meterai saham', dibayarOleh: me(), tag: 'saham', sumber: 'saham', refId: id, periodeRef: row.tanggal.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } }];
+
+  // ---------- Harga terakhir ----------
+  const simpanHarga = o => setJson('hargaSaham', Object.assign({}, harga(), o));
+  const kodeDipegang = () => Array.from(new Set(Calc.saham().H.map(p => p.kode)));
+  async function ambilHarga(diam) {
+    const kode = kodeDipegang(); if (!kode.length) return false;
+    if (Store.mode === 'demo') {
+      const o = {}; kode.forEach(k => { const h = harga()[k], base = h ? Number(h[0]) : 1000; o[k] = [Math.max(50, Math.round(base * (1 + (Math.random() - 0.48) * 0.02) / 5) * 5), U.today(), 'Contoh', base]; });
+      simpanHarga(o); if (!diam) UI.toast('Harga contoh diperbarui.'); alertSlTp(); return true;
+    }
+    try {
+      const r = await fetch('/api/saham?k=' + encodeURIComponent(kode.join(',')), { cache: 'no-store' }), j = await r.json();
+      const o = {}; Object.keys((j && j.data) || {}).forEach(k => { const d = j.data[k]; if (d && d.harga) o[k] = [d.harga, d.tanggal || U.today(), 'Yahoo Finance', d.prev || 0]; });
+      if (!Object.keys(o).length) throw new Error('kosong');
+      simpanHarga(o); if (!diam) UI.toast(Object.keys(o).length + ' harga diperbarui.'); alertSlTp(); return true;
+    } catch (e) { if (!diam) UI.toast('Harga otomatis belum tersedia — isi manual.', 'warn'); return false; }
   }
-  UI.act('sh-catat', el => UI.sahamForm(null, el && el.dataset ? { kode: el.dataset.kode, aksi: el.dataset.aksi, walletId: el.dataset.akun } : {}));
-  UI.act('sh-edit', el => { const t = (Store.t.Saham || []).find(x => x.id === el.dataset.id); if (!t) return; if (t.aksi === 'materai') { UI.confirm('Hapus bea meterai?', U.tgl(t.tanggal) + ' · ' + akunNama(t.walletId), 'Hapus', true).then(ok => ok && Store.commit(hapusOps(t))); return; } UI.sahamForm(t); });
+  UI.sahamAutoHarga = () => { try { const t = Number(localStorage.getItem('sa:shHargaT') || 0); if (Date.now() - t < 30 * 60000 || Store.mode === 'demo' || !kodeDipegang().length) return; localStorage.setItem('sa:shHargaT', String(Date.now())); ambilHarga(true); } catch (e) {} };
+  UI.act('sh-harga', async () => { if (!(await ambilHarga())) hargaManual(); });
+  function hargaManual() {
+    const kode = kodeDipegang(); if (!kode.length) return UI.toast('Belum ada posisi terbuka.', 'warn');
+    const hm = harga();
+    const s = UI.sheet({ title: 'Harga terakhir', cls: 'small', body: `<p class="muted small">Isi harga penutupan per lembar dari aplikasi sekuritas.</p>
+      ${kode.map(k => UI.field(k + (hm[k] ? ` <small class="muted">· ${nm(hm[k][0])} (${U.tgl(hm[k][1], 'dm')})</small>` : ''), UI.rpInput('h_' + k, 0, hm[k] ? nm(hm[k][0]) : 'per lembar'))).join('')}`, foot: `<button class="btn" data-ok>Simpan</button>` });
+    UI.bindRp(s.el);
+    s.el.querySelector('[data-ok]').onclick = () => { const f = UI.formData(s.el), o = {}; kode.forEach(k => { if (f['h_' + k]) o[k] = [f['h_' + k], U.today(), 'Manual', hm[k] ? hm[k][0] : 0]; }); if (!Object.keys(o).length) return UI.toast('Belum ada harga diisi.', 'warn'); simpanHarga(o); s.close(); alertSlTp(); UI.toast('Harga disimpan.'); };
+  }
+  UI.act('sh-harga-manual', hargaManual);
+  /** Kirim alert Telegram bila posisi menyentuh SL / TP (sekali per level per posisi). */
+  function alertSlTp() {
+    if (!App.tgSiap || !App.tgSiap()) return;
+    const pesan = [];
+    Calc.saham().H.forEach(p => {
+      if (!p.st || p.st === 'ok') return;
+      const lv = { sl: ['SL', p.plan.sl, '🔻'], tp: ['TP1', p.plan.tp1, '🎯'], tp2: ['TP2', p.plan.tp2, '🎯'] }[p.st];
+      const w = Store.byId.Wallet[p.walletId] || {}, ke = w.pemilik && w.pemilik !== 'bersama' ? w.pemilik : Store.me.email;
+      pesan.push({ ke, kunci: 'sh|' + p.walletId + '|' + p.kode + '|' + lv[0] + '|' + (p.plan.id || ''), teks: `${lv[2]} <b>${lv[0]} ${p.kode}</b> [${U.esc(w.nama || '')}]\nHarga ${U.rp(p.l)} (level ${U.rp(lv[1])}) · avg ${U.rp(Math.round(p.avg))}` });
+    });
+    if (pesan.length) App.tgKirim(pesan);
+  }
 
-  // ---------- Pengaturan fee ----------
-  UI.act('sh-set', () => {
-    const f = fee();
-    const s = UI.sheet({ title: 'Pengaturan saham', cls: 'small', body: `
-      <div class="grid2">${UI.field('Fee beli (%)', `<input type="number" step="0.01" min="0" name="beli" value="${f.beli}">`)}${UI.field('Fee jual (%)', `<input type="number" step="0.01" min="0" name="jual" value="${f.jual}">`)}</div>
-      <p class="muted small">Umumnya 0,15% beli & 0,25% jual (termasuk PPh final 0,1%). Cek di aplikasi sekuritas Anda.</p>
-      <label class="check"><input type="checkbox" name="materai" ${f.materai ? 'checked' : ''}><span>Catat bea meterai Rp10.000 otomatis bila transaksi sehari &gt; Rp10 juta</span></label>
-      <a class="link" data-act="sh-harga-manual">${I('pencil')} Isi harga terakhir secara manual</a>`, foot: `<button class="btn" data-ok>Simpan</button>` });
-    s.el.querySelector('[data-ok]').onclick = () => { const v = UI.formData(s.el); setJson('sahamFee', { beli: Number(v.beli) || 0, jual: Number(v.jual) || 0, materai: !!v.materai }); s.close(); UI.toast('Tersimpan.'); };
-  });
+  // ---------- Riwayat harga & snapshot harian (Portofolio vs IHSG) ----------
+  let HIST = null, SERI = { key: '', v: null };
+  try { HIST = JSON.parse(localStorage.getItem('sa:shHist') || 'null'); } catch (e) {}
+  const awalData = () => { const ids = akunAktif(); const d = trades().filter(t => ids.indexOf(t.walletId) > -1).map(t => t.tanggal).concat(Store.t.Transaksi.filter(t => t.jenis === 'transfer' && (ids.indexOf(t.walletTujuan) > -1)).map(t => t.tanggal)).sort(); return d[0] || ''; };
+  async function muatHist() {
+    const kode = Array.from(new Set(trades().filter(t => t.kode && t.kode !== '-').map(t => t.kode))), dari = awalData();
+    if (!kode.length || !dari) return;
+    const kunci = kode.slice().sort().join(',') + '|' + dari;
+    if (HIST && HIST.kunci === kunci && HIST.tgl === U.today()) return;
+    if (Store.mode === 'demo') { HIST = histContoh(kode, dari); HIST.kunci = kunci; SERI.key = ''; return; }
+    try {
+      const r = await fetch('/api/saham?hist=1&k=' + encodeURIComponent(kode.join(',')) + '&dari=' + dari, { cache: 'no-store' }), j = await r.json();
+      if (!j || !j.ok) return;
+      HIST = { kunci, tgl: U.today(), data: j.data || {}, ihsg: j.ihsg || {} }; SERI.key = '';
+      try { localStorage.setItem('sa:shHist', JSON.stringify(HIST)); } catch (e) {}
+    } catch (e) {}
+  }
+  function histContoh(kode, dari) {
+    const ih = {}, data = {}, hm = harga(); let d = dari, x = 7050;
+    const hari = []; while (d <= U.today()) { const w = U.parseDate(d).getDay(); if (w > 0 && w < 6) hari.push(d); d = U.addDays(d, 1); }
+    let seed = 7; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    hari.forEach(h => { x *= 1 + (rnd() - 0.48) * 0.012; ih[h] = Math.round(x); });
+    kode.forEach(k => {   // contoh: harga melewati harga transaksi asli lalu menuju harga terakhir (+ derau kecil)
+      const knot = trades().filter(t => t.kode === k && Number(t.harga)).map(t => [t.tanggal, Number(t.harga)]).concat(hm[k] ? [[U.today(), Number(hm[k][0])]] : []).sort((a, b) => a[0] < b[0] ? -1 : 1);
+      const m = {}; hari.forEach(h => {
+        let i = knot.findIndex(z => z[0] >= h), v;
+        if (i < 0) v = knot[knot.length - 1][1]; else if (i === 0) v = knot[0][1];
+        else { const a = knot[i - 1], b = knot[i], f = U.diffDays(a[0], h) / Math.max(1, U.diffDays(a[0], b[0])); v = a[1] + (b[1] - a[1]) * f; }
+        m[h] = Math.round(v * (1 + (rnd() - 0.5) * 0.025) / 5) * 5;
+      }); data[k] = m; });
+    return { tgl: U.today(), data, ihsg: ih };
+  }
+  /** Deret harian: {d, aum, nc, cash, inv, ret (%), ihsg (%)} untuk akun aktif. */
+  function seri() {
+    const ids = akunAktif(), key = Store.ver + '|' + ids.join(',') + '|' + (HIST ? HIST.kunci + HIST.tgl : '');
+    if (SERI.key === key) return SERI.v;
+    SERI.key = key; SERI.v = null;
+    if (!HIST || !HIST.ihsg) return null;
+    const start = awalData(); if (!start) return null;
+    const tgl = Object.keys(HIST.ihsg).filter(d => d >= start).sort(); if (tgl.length < 2) return null;
+    const tx = Store.t.Transaksi.filter(t => ids.indexOf(t.walletId) > -1 || ids.indexOf(t.walletTujuan) > -1).sort((a, b) => a.tanggal < b.tanggal ? -1 : 1);
+    const tr = trades().filter(t => ids.indexOf(t.walletId) > -1 && (t.aksi === 'beli' || t.aksi === 'jual'));
+    let cash = 0, nc = 0, ti = 0, ri = 0; ids.forEach(id => { const s0 = Number((Store.byId.Wallet[id] || {}).saldoAwal) || 0; cash += s0; nc += s0; });
+    const P = {}, last = {}, i0 = HIST.ihsg[tgl[0]], out = [];
+    tgl.forEach(d => {
+      while (ti < tx.length && tx[ti].tanggal <= d) { const t = tx[ti++]; ids.forEach(id => { cash += efek(t, id); nc += modalTx(t, id); }); }
+      while (ri < tr.length && tr[ri].tanggal <= d) { const t = tr[ri++], q = P[t.kode] = P[t.kode] || { l: 0, c: 0 }, lb = (Number(t.lot) || 0) * LB;
+        if (t.aksi === 'beli') { q.c += lb * Number(t.harga) + (Number(t.fee) || 0); q.l += lb; } else if (q.l > 0) { q.c -= q.c * Math.min(1, lb / q.l); q.l -= lb; if (q.l <= 0) q.l = q.c = 0; } }
+      let mv = 0, inv = 0;
+      Object.keys(P).forEach(k => { const h = (HIST.data[k] || {})[d]; if (h) last[k] = h; const q = P[k]; if (q.l > 0) { inv += q.c; mv += last[k] ? q.l * last[k] : q.c; } });
+      const aum = cash + mv;
+      out.push({ d, aum, nc, cash, inv, ret: nc ? (aum / nc - 1) * 100 : 0, ihsg: i0 ? (HIST.ihsg[d] / i0 - 1) * 100 : 0, ih: HIST.ihsg[d] });
+    });
+    let pk = 0, mdd = 0; out.forEach(s => { const r = s.nc ? s.aum / s.nc : 1; pk = Math.max(pk, r); if (pk) mdd = Math.min(mdd, (r / pk - 1) * 100); });
+    SERI.v = { s: out, mdd };
+    return SERI.v;
+  }
 
-  // ---------- Grafik kecil ----------
-  const barPN = (rows) => {
-    const W = 340, H = 140, pad = { l: 6, r: 6, t: 14, b: 22 }, max = Math.max(1, ...rows.map(r => Math.abs(r.v)));
-    const gw = (W - pad.l - pad.r) / rows.length, bw = Math.min(18, gw * 0.56), mid = pad.t + (H - pad.t - pad.b) / 2, sc = (H - pad.t - pad.b) / 2 / max;
-    let s = `<svg viewBox="0 0 ${W} ${H}" class="chart rd-bars" role="img" aria-label="Untung rugi per bulan"><line x1="${pad.l}" x2="${W - pad.r}" y1="${mid}" y2="${mid}" class="grid"/>`;
-    rows.forEach((r, i) => { const cx = pad.l + gw * i + gw / 2, h = Math.max(r.v ? 2 : 0, Math.abs(r.v) * sc);
-      s += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${(r.v >= 0 ? mid - h : mid).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" class="${r.v >= 0 ? 'naik' : 'turun'}"/>`;
-      if (rows.length <= 6 || i % 2 === (rows.length - 1) % 2) s += `<text x="${cx}" y="${H - 6}" text-anchor="middle" class="axis${i === rows.length - 1 ? ' strong' : ''}">${U.esc(r.label)}</text>`; });
-    return s + '</svg>';
-  };
-  const WARNA = ['#0F5E59', '#E0A23A', '#2E8C84', '#7A5CC0', '#C2553D', '#3D7FC2', '#5B7A78', '#9C6B1E', '#4E9F6E', '#B04A7A'];
+  // ---------- Log aktivitas gabungan (trade, kas, dividen, meterai) ----------
+  const TIPE = { BELI: 'buy', JUAL: 'sell', DIVIDEN: 'div', 'TOP UP': 'dep', TARIK: 'wd', MATERAI: 'mat', PENYESUAIAN: 'adj' };
+  function LOG() {
+    const ids = akunAktif(), out = [];
+    trades().filter(t => ids.indexOf(t.walletId) > -1).forEach(t => {
+      const g = (Number(t.lot) || 0) * LB * (Number(t.harga) || 0), f = Number(t.fee) || 0;
+      if (t.aksi === 'beli') out.push({ k: 'trade', id: t.id, d: t.tanggal, ty: 'BELI', kode: t.kode, setup: t.setup || '', amt: -(g + f), g, f, t });
+      else if (t.aksi === 'jual') out.push({ k: 'trade', id: t.id, d: t.tanggal, ty: 'JUAL', kode: t.kode, setup: t.setup || '', amt: g - f, g, f, t });
+      else if (t.aksi === 'dividen') out.push({ k: 'trade', id: t.id, d: t.tanggal, ty: 'DIVIDEN', kode: t.kode, setup: '', amt: Number(t.nominal) || 0, g: 0, f: 0, t });
+      else if (t.aksi === 'materai') out.push({ k: 'mat', id: t.id, d: t.tanggal, ty: 'MATERAI', kode: '', setup: '', amt: -(Number(t.nominal) || 0), g: 0, f: Number(t.nominal) || 0, t });
+    });
+    Store.t.Transaksi.forEach(t => ids.forEach(id => {
+      if (t.jenis === 'transfer' && (t.walletTujuan === id || t.walletId === id)) out.push({ k: 'cash', id: t.id, d: t.tanggal, ty: t.walletTujuan === id ? 'TOP UP' : 'TARIK', kode: '', setup: '', amt: efek(t, id), g: 0, f: 0, tx: t });
+      else if (t.jenis === 'penyesuaian' && t.walletId === id) out.push({ k: 'cash', id: t.id, d: t.tanggal, ty: 'PENYESUAIAN', kode: '', setup: '', amt: Number(t.jumlah) || 0, g: 0, f: 0, tx: t });
+    }));
+    return out.sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : 0);
+  }
+  const bdg = ty => `<span class="tjb ${TIPE[ty] || ''}">${ty}</span>`;
 
   // ---------- Halaman ----------
-  const TABS = () => `<div class="sh-tabs">${[['', 'layout-grid', 'Overview'], ['aktivitas', 'list', 'Aktivitas'], ['analitik', 'chart-column', 'Analitik'], ['kalkulator', 'calculator', 'Kalkulator']].map(t => `<a class="sh-tab ${(UI.param || '') === t[0] ? 'on' : ''}" href="#/saham${t[0] ? '/' + t[0] : ''}">${I(t[1])}<span>${t[2]}</span></a>`).join('')}</div>`;
-  const akunChips = () => { const ak = akunList(); return ak.length > 1 ? `<div class="chips sm scroll">${[['', 'Semua akun']].concat(ak.map(w => [w.id, w.nama])).map(a => `<button class="chip ${F.akun === a[0] ? 'on' : ''}" data-act="sh-akun" data-v="${a[0]}">${U.esc(a[1])}</button>`).join('')}</div>` : ''; };
-  UI.act('sh-akun', el => { F.akun = el.dataset.v; UI.render(); });
+  const TABS = [['', 'layout-grid', 'Overview'], ['aktivitas', 'arrow-left-right', 'Activity'], ['analitik', 'chart-column', 'Analytics'], ['kalkulator', 'calculator', 'Avg Calc']];
+  const tabs = p => `<nav class="tj-tabs">${TABS.map(t => `<a class="${(p || '') === t[0] ? 'on' : ''}" href="#/saham${t[0] ? '/' + t[0] : ''}">${I(t[1])}<span>${t[2]}</span></a>`).join('')}</nav>`;
+  const pfBar = () => { const ak = akunList(); if (!ak.length) return ''; return `<div class="tj-pf">${I('briefcase')}<select data-change="sh-pf" aria-label="Pilih portofolio">${ak.length > 1 ? `<option value="">Semua portofolio (${ak.length})</option>` : ''}${ak.map(w => `<option value="${w.id}" ${F.akun === w.id ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>
+    <button class="btn xs ghost" data-act="sh-cash">${I('plus')} Kas</button><button class="btn xs" data-act="sh-catat">${I('plus')} Trade</button></div>`; };
+  UI.act('sh-pf', el => { F.akun = el.value; try { localStorage.setItem('sa:shPf', F.akun); } catch (e) {} SERI.key = ''; UI.render(); });
 
   UI.page('saham', {
-    head: p => ({ title: { aktivitas: 'Aktivitas Saham', analitik: 'Analitik Saham', kalkulator: 'Kalkulator Rata-rata' }[p] || 'Saham', crumb: 'Aset', back: p ? 'saham' : 'aset',
-      right: `<button class="icon-btn" data-act="sh-set" aria-label="Pengaturan saham">${I('sliders-horizontal')}</button><button class="icon-btn" data-act="sh-catat" aria-label="Catat transaksi">${I('plus')}</button>` }),
+    head: p => ({ title: { aktivitas: 'Activity', analitik: 'Analytics', kalkulator: 'Avg Calculator' }[p] || 'Saham', crumb: 'Aset · Saham', back: 'aset',
+      right: `<button class="icon-btn" data-act="sh-set" aria-label="Pengaturan saham">${I('settings')}</button>` }),
     nav: () => 'aset',
     render(p) {
       if (!Store.can('aset', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Aset.');
+      if (!akunList().length && !(Store.t.Saham || []).length) return tabs(p) + mulai();
       const body = p === 'aktivitas' ? aktivitas() : p === 'analitik' ? analitik() : p === 'kalkulator' ? kalkulator() : overview();
-      return (UI.invTiles ? UI.invTiles('saham') : '') + TABS() + body + '<div class="spacer"></div>';
+      return tabs(p) + pfBar() + body + '<div class="spacer"></div>';
     },
-    after(v, p) { if (p === 'kalkulator') kalkHitung(); if (!p) UI.sahamAutoHarga(); }
+    after(v, p) {
+      if (p === 'kalkulator') kalkHitung();
+      if (!p) { UI.sahamAutoHarga(); pasangGrafik(); if (!HIST || HIST.tgl !== U.today()) muatHist().then(() => { if (UI.cur === 'saham' && !UI.param) UI.render(); }); }
+    }
   });
-
-  function overview() {
-    const r = Calc.saham(null, F.akun || null), ps = r.posisi;
-    const lama = Calc.investasiManual ? Calc.investasiManual('saham') : [];
-    if (!ps.length && !(Store.t.Saham || []).length) return `<div class="card">${UI.empty('chart-candlestick', 'Mulai jurnal saham', 'Catat setiap beli, jual & dividen. Harga rata-rata, untung/rugi, win rate dan bea meterai dihitung otomatis.', `<button class="btn" data-act="sh-catat">${I('plus')} Catat transaksi pertama</button>`)}</div>${legacy(lama)}`;
-    const nilai = U.sum(ps, x => x.nilai), modal = U.sum(ps, x => x.biaya), pl = nilai - modal, th = U.today().slice(0, 4);
-    const realTh = U.sum(r.realisasi.filter(x => x.t.tanggal.slice(0, 4) === th), x => x.pl), divTh = U.sum(r.dividen.filter(x => x.t.tanggal.slice(0, 4) === th), x => x.v);
-    const harian = U.sum(ps.filter(x => x.prev && x.last), x => (x.last - x.prev) * x.lembar);
-    const tgl = ps.map(x => x.tglHarga).filter(Boolean).sort()[0], b = Calc.balances(), kas = U.sum(akunList().filter(w => !F.akun || w.id === F.akun), w => b[w.id] || 0);
-    const parts = ps.slice(0, 8).map((x, i) => ({ v: x.nilai, color: WARNA[i % WARNA.length], label: x.kode })).concat(ps.length > 8 ? [{ v: U.sum(ps.slice(8), x => x.nilai), color: 'var(--muted)', label: 'Lainnya' }] : []);
-    return `${akunChips()}
-      <div class="hero rd-hero sh-hero">
-        <div class="hero-top"><small>${I('chart-candlestick')} Nilai portofolio saham</small><button class="icon-btn sm on-dark" data-act="toggle-hide" aria-label="Sembunyikan angka">${I(UI.hide() ? 'eye-off' : 'eye')}</button></div>
-        <div class="rd-big">${UI.m(nilai)}</div>
-        <div class="rd-pill ${pl >= 0 ? 'naik' : 'turun'}">${I(pl >= 0 ? 'arrow-up-right' : 'arrow-down-left')} ${tanda(pl)}${UI.ms(Math.abs(pl))} (${tanda(pl)}${U.pct(Math.abs(modal ? pl / modal : 0), 2)}) <span>belum terealisasi</span></div>
-        <div class="rd-split sh-split"><div><small>Hari ini</small><b class="${harian >= 0 ? 'naik' : 'turun'}">${harian ? tanda(harian) + UI.ms(Math.abs(harian)) : '—'}</b></div><div><small>Realisasi ${th}</small><b class="${realTh >= 0 ? 'naik' : 'turun'}">${tanda(realTh)}${UI.ms(Math.abs(realTh))}</b></div><div><small>Dividen ${th}</small><b class="naik">${UI.ms(divTh)}</b></div><div><small>Kas di akun</small><b>${UI.ms(kas)}</b></div></div>
-        <button class="btn on-dark block" data-act="sh-harga">${I('refresh-cw')} Perbarui harga${tgl ? ' · ' + U.relDay(tgl).toLowerCase() : ''}</button>
-      </div>
-      ${ps.length ? `<div class="card donut-card">${Charts.donut(parts, ['Saham', ps.length + ' emiten'])}<ul class="legend">${parts.map(x => `<li><i style="background:${x.color}"></i>${U.esc(x.label)}<b>${U.pct(nilai ? x.v / nilai : 0)}</b></li>`).join('')}</ul></div>` : ''}
-      ${UI.sec('Posisi', `<small class="muted">${ps.length} emiten</small>`)}
-      <div class="card list sh-pos">${ps.map(x => `<div class="row" data-act="sh-open" data-kode="${x.kode}" data-akun="${x.walletId}">
-          <span class="sh-kode">${U.esc(x.kode)}</span>
-          <div class="tx-txt"><b>${lotTxt(x.lembar / LEMBAR)} · avg ${nm(x.avg)}</b><small>${x.last ? 'harga ' + nm(x.last) + (x.prev ? ` <span class="${kelasPL(x.last - x.prev)}">${tanda(x.last - x.prev)}${U.pct(Math.abs((x.last - x.prev) / x.prev), 1)}</span>` : '') : '<span class="bad">harga belum diisi</span>'}${akunList().length > 1 && !F.akun ? ' · ' + U.esc(akunNama(x.walletId)) : ''}</small></div>
-          <div class="tx-amt"><b>${UI.ms(x.nilai)}</b><small class="${kelasPL(x.pl)}">${tanda(x.pl)}${UI.ms(Math.abs(x.pl))} · ${U.pct(Math.abs(x.pct), 1)}</small></div></div>`).join('') || '<div class="row muted">Tidak ada posisi terbuka.</div>'}</div>
-      <div class="row-btns"><button class="btn ghost" data-act="sh-catat" data-aksi="beli">${I('plus')} Beli</button><button class="btn ghost" data-act="sh-catat" data-aksi="jual">${I('minus')} Jual</button><button class="btn ghost" data-act="sh-catat" data-aksi="dividen">${I('coins')} Dividen</button></div>
-      ${legacy(lama)}
-      <p class="muted small">Harga ${ps.some(x => x.sumber === 'Manual') ? 'diisi manual' : 'otomatis'} · nilai & untung/rugi hanya catatan, bukan rekomendasi investasi.</p>`;
+  function mulai() {
+    const ada = Store.wallets().filter(w => w.jenis === 'rdn');
+    return `<div class="card tj-mulai">${UI.empty('chart-candlestick', 'Mulai jurnal saham', 'Satu portofolio = satu akun RDN. Catat top up, beli, jual & dividen — harga rata-rata, P&L, win rate, meterai dan grafik vs IHSG dihitung otomatis.',
+      `<button class="btn" data-act="sh-pf-baru">${I('plus')} Buat portofolio</button>${ada.length ? '' : ''}`)}</div>${legacy()}`;
   }
-  function legacy(lama) {
-    if (!lama.length) return '';
-    return UI.sec('Dicatat manual (versi lama)') + `<div class="card list">${lama.map(i => `<div class="row" data-act="inv-open" data-id="${i.x.id}"><span class="sh-kode muted">${U.esc(i.x.kode || '—')}</span><div class="tx-txt"><b>${U.esc(i.x.nama)}</b><small>${U.fmtNum(i.x.unit || 0)} lembar · modal ${UI.ms(i.modal)}</small></div><button class="btn xs ghost" data-act="sh-pindah" data-id="${i.x.id}">Pindah ke jurnal</button></div>`).join('')}</div>`;
-  }
-  UI.act('sh-pindah', async el => {
-    const x = Store.byId.Investasi[el.dataset.id]; if (!x) return;
-    const ws = Store.wallets().slice().sort((a, b) => (b.jenis === 'rdn') - (a.jenis === 'rdn'));
-    const lem = Number(x.unit) || 0, lot = Math.round(lem / LEMBAR);
-    if (!lot || !/^[A-Z]{4}/.test(String(x.kode || '').toUpperCase())) return UI.toast('Isi kode saham (mis. BBCA) dan jumlah lembar dulu di catatan lama.', 'warn', { ms: 5000 });
-    const s = UI.sheet({ title: 'Pindahkan ' + x.kode + ' ke jurnal', cls: 'small', body: `<p class="muted">${lotTxt(lot)} dengan harga rata-rata ${U.rp(Math.round((x.modal || 0) / lem))} dicatat sebagai pembelian awal tanggal ${U.tgl(x.tanggal)}. Saldo dompet tidak berubah.</p>
-      ${UI.field('Akun / RDN', `<select name="walletId">${ws.map(w => `<option value="${w.id}">${U.esc(w.nama)}</option>`).join('')}</select>`)}`, foot: `<button class="btn" data-ok>Pindahkan</button>` });
+  UI.act('sh-pf-baru', () => portofolioBaru());
+  function portofolioBaru() {
+    const s = UI.sheet({ title: 'Portofolio baru', cls: 'small', body: `<p class="muted small">Dibuat sebagai dompet "RDN" di Kas & Bank. Modal awal dicatat sebagai top up dari rekening yang dipilih.</p>
+      ${UI.field('Nama portofolio / akun', `<input name="nama" maxlength="40" placeholder="mis. RDN Ajaib Dimas">`)}
+      <div class="grid2">${UI.field('Modal awal', UI.rpInput('modal', 0))}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>
+      ${UI.field('Modal diambil dari', `<select name="dari"><option value="">Sudah ada di RDN (tidak memotong rekening lain)</option>${UI.walletOpts()}</select>`)}
+      <div class="grid2">${UI.field('Pemilik', `<select name="pemilik"><option value="bersama">Bersama</option>${Store.members().map(m => `<option value="${m.email}" ${m.email === me() ? 'selected' : ''}>${U.esc(m.nama)}</option>`).join('')}</select>`)}${UI.field('Fee beli / jual (%)', `<div class="grid2 tight"><input type="number" step="0.001" name="beli" value="0.15"><input type="number" step="0.001" name="jual" value="0.25"></div>`)}</div>`,
+      foot: `<button class="btn" data-ok>Buat portofolio</button>` });
+    UI.bindRp(s.el);
     s.el.querySelector('[data-ok]').onclick = () => {
-      const v = UI.formData(s.el), now = new Date().toISOString();
-      const row = { id: U.uid('sh'), tanggal: x.tanggal || U.today(), kode: String(x.kode).toUpperCase().slice(0, 5), aksi: 'beli', lot, harga: Math.round((x.modal || 0) / (lot * LEMBAR)), fee: 0, nominal: 0, walletId: v.walletId, catatan: 'Saldo awal dari catatan lama', dibuat: now, txId: '', oleh: me() };
-      Store.commit([{ op: 'upsert', t: 'Saham', row }, { op: 'delete', t: 'Investasi', id: x.id }]);
-      if (x.nilai && lem && !hargaMap()[row.kode]) simpanHarga({ [row.kode]: [Math.round(x.nilai / lem), x.tglNilai || U.today(), 'Manual', 0] });
-      s.close(); UI.toast(row.kode + ' dipindah ke jurnal.');
+      const v = UI.formData(s.el); if (!v.nama) return UI.toast('Nama wajib diisi.', 'warn');
+      const id = U.uid('w'), now = new Date().toISOString(), ops = [{ op: 'upsert', t: 'Wallet', row: { id, nama: v.nama, jenis: 'rdn', pemilik: v.pemilik, saldoAwal: v.dari ? 0 : (v.modal || 0), ikon: '', likuid: false, urutan: Store.t.Wallet.length, arsip: false, catatan: 'Portofolio saham' } }];
+      if (v.dari && v.modal) ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal || U.today(), jenis: 'transfer', jumlah: v.modal, kategoriId: '', walletId: v.dari, walletTujuan: id, biaya: 0, catatan: 'Modal awal ' + v.nama, dibayarOleh: me(), tag: 'saham', sumber: 'saham', refId: '', periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
+      const sa = setAkun(); sa[id] = { beli: Number(v.beli) || 0.15, jual: Number(v.jual) || 0.25 };
+      Store.commit(ops); setJson('sahamAkun', sa);
+      F.akun = id; try { localStorage.setItem('sa:shPf', id); } catch (e) {}
+      s.close(); UI.toast('Portofolio ' + v.nama + ' dibuat.'); UI.go('saham');
+    };
+  }
+
+  // ===== Overview =====
+  function overview() {
+    const ids = akunAktif(), r = Calc.saham(null, ids), H = r.H, ak = ringkasAkun(ids), sr = seri();
+    const mvT = U.sum(H, h => h.mv), aum = ak.cash + mvT, real = U.sum(r.R, x => x.pl), unr = U.sum(H, h => h.unr), tr = ak.nc ? (aum / ak.nc - 1) * 100 : 0;
+    const harian = U.sum(H.filter(h => h.prev && h.l), h => (h.l - h.prev) * h.lembar), tgl = H.map(h => h.tglHarga).filter(Boolean).sort()[0];
+    const k = (l, t, v, s, c) => `<div class="tj-k ${c || ''}"><div class="lb">${l}<em>${t}</em></div><div class="tjv">${v}</div><div class="sub">${s}</div></div>`;
+    return `
+      <section class="hero rd-hero tj-hero">
+        <div class="hero-top"><small>Total AUM · ekuitas + kas</small><button class="icon-btn sm on-dark" data-act="toggle-hide" aria-label="Sembunyikan angka">${I(UI.hide() ? 'eye-off' : 'eye')}</button></div>
+        <div class="rd-big">${UI.m(aum)}</div>
+        <div class="rd-pill ${tr >= 0 ? 'naik' : 'turun'}">${I(tr >= 0 ? 'arrow-up-right' : 'arrow-down-left')} ${tanda(tr)}${Math.abs(tr).toFixed(2).replace('.', ',')}% <span>total return · ${tanda(aum - ak.nc)}${UI.ms(Math.abs(aum - ak.nc))} vs modal</span></div>
+        <button class="btn on-dark block" data-act="sh-harga">${I('refresh-cw')} Perbarui harga${tgl ? ' · ' + U.relDay(tgl).toLowerCase() : ''}${harian ? ' · hari ini ' + tanda(harian) + UI.ms(Math.abs(harian)) : ''}</button>
+      </section>
+      <div class="tj-kpi">
+        ${k('Realized P&L', 'net fee', rpK(real, 1), r.R.length + ' penjualan', cls(real))}
+        ${k('Floating P&L', 'unrealized', rpK(unr, 1), H.length + ' posisi aktif', cls(unr))}
+        ${k('Cash (RDN)', '', rpK(ak.cash), aum ? (ak.cash / aum * 100).toFixed(1).replace('.', ',') + '% dari AUM' : '')}
+        ${k('Max Drawdown', 'risk', sr ? pc(sr.mdd) : '—', sr ? 'dari snapshot harian' : 'menunggu data harga')}
+      </div>
+      <div class="card tj-card"><div class="row-sp"><h3>Portofolio vs IHSG</h3>${sr ? `<small>${pc(sr.s[sr.s.length - 1].ret)} · IHSG ${pc(sr.s[sr.s.length - 1].ihsg)}</small>` : ''}</div>${grafik(sr)}</div>
+      ${UI.sec('Open positions', `<small class="muted">${H.length} emiten</small>`)}
+      <div class="tj-pos">${H.map(h => `<div class="card tj-p" data-act="sh-open" data-kode="${h.kode}" data-akun="${h.walletId}">
+          <div class="tj-p-top"><span class="sh-kode">${h.kode}</span><div class="grow"><b>${h.lots} lot</b><small>avg ${nm(h.avg)} · last ${h.l ? nm(h.l) : '<span class="bad">n/a</span>'}${h.l && h.prev ? ' ' + pc((h.l / h.prev - 1) * 100) : ''}</small></div>
+            ${h.st ? `<span class="tjs ${h.st}">${{ sl: 'Near SL', tp: 'TP1 reached', tp2: 'TP2 reached', ok: 'In plan' }[h.st]}</span>` : ''}</div>
+          <div class="tj-p-mid"><div><small>Invested</small><b>${UI.ms(h.cost)}</b></div><div><small>Market value</small><b>${UI.ms(h.mv)}</b></div><div class="r"><small>Floating</small><b>${rpK(h.unr, 1)}</b><small>${pc(h.pct)}</small></div></div>
+          ${h.plan.sl || h.plan.tp1 ? `<div class="tj-plan">${planBar(h)}</div>` : ''}
+          ${ids.length > 1 ? `<small class="muted">${U.esc(akunNama(h.walletId))}</small>` : ''}</div>`).join('') || `<div class="card muted center">Tidak ada posisi terbuka.</div>`}</div>
+      ${UI.sec('Recent activity', '<a class="link" href="#/saham/aktivitas">Semua</a>')}
+      <div class="card list">${LOG().slice(0, 8).map(rowLog).join('') || '<div class="row muted">Belum ada aktivitas.</div>'}</div>
+      ${legacy()}`;
+  }
+  /** Bar posisi harga terhadap SL — entry — TP1 — TP2. */
+  function planBar(h) {
+    const p = h.plan, sl = Number(p.sl) || 0, t1 = Number(p.tp1) || 0, t2 = Number(p.tp2) || 0, lo = sl || h.avg * 0.9, hi = t2 || t1 || h.avg * 1.1;
+    const pos = v => Math.max(0, Math.min(100, (v - lo) / ((hi - lo) || 1) * 100));
+    return `<div class="tj-bar"><i class="avg" style="left:${pos(h.avg)}%"></i>${h.l ? `<i class="now ${h.l >= h.avg ? 'up' : 'dn'}" style="left:${pos(h.l)}%"></i>` : ''}</div>
+      <div class="tj-lv"><span class="bad">SL ${sl ? nm(sl) : '—'}</span><span>avg ${nm(h.avg)}</span><span class="ok">TP1 ${t1 ? nm(t1) : '—'}${t2 ? ' · TP2 ' + nm(t2) : ''}</span></div>`;
+  }
+  function grafik(sr) {
+    if (!sr) return `<div class="tj-empty">${I('chart-column')} Grafik muncul setelah riwayat harga tersedia (otomatis dari data penutupan harian).</div>`;
+    const s = sr.s, p = s.map(x => x.ret), h = s.map(x => x.ihsg), al = p.concat(h), mn = Math.min(0, ...al), mx = Math.max(1, ...al), W = 340, Hh = 160;
+    const X = i => i / (s.length - 1) * W, Y = v => Hh - 8 - (v - mn) / ((mx - mn) || 1) * (Hh - 16), pl = a => a.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ');
+    return `<div class="tj-cw" data-n="${s.length}"><svg viewBox="0 0 ${W} ${Hh}" class="tj-ch" preserveAspectRatio="none"><line class="l0" x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}"/><polygon class="ar" points="0,${Hh - 8} ${pl(p)} ${W},${Hh - 8}"/><polyline class="l2" points="${pl(h)}"/><polyline class="l1" points="${pl(p)}"/></svg>
+      <i class="xl" hidden></i><i class="dt a" hidden></i><i class="dt b" hidden></i><div class="tt" hidden></div></div>
+      <div class="tj-leg"><span><i class="a"></i>Portofolio</span><span><i class="b"></i>IHSG</span><span class="sp"></span><small>${U.tgl(s[0].d, 'mys')} – ${U.tgl(s[s.length - 1].d, 'mys')}</small></div>
+      <small class="muted">Sentuh grafik untuk melihat detail harian.</small>`;
+  }
+  function pasangGrafik() {
+    const w = document.querySelector('#view .tj-cw'), sr = SERI.v; if (!w || !sr) return;
+    const s = sr.s, p = s.map(x => x.ret), h = s.map(x => x.ihsg), al = p.concat(h), mn = Math.min(0, ...al), mx = Math.max(1, ...al), Y = v => (160 - 8 - (v - mn) / ((mx - mn) || 1) * 144) / 160 * 100;
+    const q = c => w.querySelector(c), tt = q('.tt');
+    const show = e => {
+      const r = w.getBoundingClientRect(), n = s.length, i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left) / r.width * (n - 1)))), x = i / (n - 1) * 100, pv = i ? s[i - 1] : null, d = s[i];
+      q('.xl').hidden = false; q('.xl').style.left = x + '%';
+      [['.a', d.ret], ['.b', d.ihsg]].forEach(a => { const el = q(a[0]); el.hidden = false; el.style.left = x + '%'; el.style.top = Y(a[1]) + '%'; });
+      tt.hidden = false; tt.innerHTML = `<b>${U.tgl(d.d)}</b><div>Portofolio ${pc(d.ret)}</div><div>IHSG ${pc(d.ihsg)}</div><div>Selisih ${pc(d.ret - d.ihsg)}</div><div>AUM ${UI.ms(d.aum)}</div><div>Δ harian ${pv ? rpK(d.aum - pv.aum, 1) : '-'}</div>`;
+      tt.style.left = x > 55 ? 'auto' : x + '%'; tt.style.right = x > 55 ? (100 - x) + '%' : 'auto';
+    };
+    const hide = () => w.querySelectorAll('.tt,.xl,.dt').forEach(x => x.hidden = true);
+    w.addEventListener('pointermove', show); w.addEventListener('pointerdown', show); w.addEventListener('pointerleave', hide);
+  }
+  function rowLog(r) {
+    const t = r.t, d = t && (t.aksi === 'beli' || t.aksi === 'jual') ? `${t.lot} lot @ ${nm(t.harga)}${r.f ? ' · fee ' + nm(r.f) : ''}` : r.k === 'cash' ? U.esc(UI.note(r.tx) || '') : t && t.aksi === 'dividen' ? 'Dividen tunai' : 'Bea meterai harian';
+    return `<div class="row tj-row" ${r.k === 'cash' ? `data-act="tx-open" data-id="${r.id}"` : `data-act="sh-edit" data-id="${r.id}"`}>${bdg(r.ty)}
+      <div class="tx-txt"><b>${r.kode ? r.kode : ''}${r.setup ? ` <small class="muted">· ${U.esc(r.setup)}</small>` : ''}</b><small>${U.tgl(r.d, 'dm')} · ${d}</small></div><b class="tx-amt">${rpK(r.amt, 1)}</b></div>`;
+  }
+  function legacy() {
+    const lama = Calc.investasiManual ? Calc.investasiManual('saham') : [];
+    if (!lama.length) return '';
+    return UI.sec('Dicatat manual (versi lama)') + `<div class="card list">${lama.map(i => `<div class="row"><span class="sh-kode muted">${U.esc(i.x.kode || '—')}</span><div class="tx-txt"><b>${U.esc(i.x.nama)}</b><small>${U.fmtNum(i.x.unit || 0)} lembar · modal ${UI.ms(i.modal)}</small></div><button class="btn xs ghost" data-act="sh-pindah" data-id="${i.x.id}">Pindah ke jurnal</button></div>`).join('')}</div>`;
+  }
+  UI.act('sh-pindah', el => {
+    const x = Store.byId.Investasi[el.dataset.id]; if (!x) return;
+    const ak = akunList(); if (!ak.length) return portofolioBaru();
+    const lem = Number(x.unit) || 0, lot = Math.round(lem / LB);
+    if (!lot || !/^[A-Z]{4}/.test(String(x.kode || '').toUpperCase())) return UI.toast('Isi kode saham & jumlah lembar dulu di catatan lama.', 'warn');
+    const s = UI.sheet({ title: 'Pindahkan ' + x.kode, cls: 'small', body: `<p class="muted">${lot} lot @ ${U.rp(Math.round((x.modal || 0) / lem))} dicatat sebagai pembelian awal ${U.tgl(x.tanggal)}. Saldo tidak berubah.</p>
+      ${UI.field('Portofolio', `<select name="w">${ak.map(w => `<option value="${w.id}">${U.esc(w.nama)}</option>`).join('')}</select>`)}`, foot: `<button class="btn" data-ok>Pindahkan</button>` });
+    s.el.querySelector('[data-ok]').onclick = () => {
+      const v = UI.formData(s.el), now = new Date().toISOString(), kode = String(x.kode).toUpperCase().slice(0, 4);
+      Store.commit([{ op: 'upsert', t: 'Saham', row: { id: U.uid('sh'), tanggal: x.tanggal || U.today(), kode, aksi: 'beli', lot, harga: Math.round((x.modal || 0) / (lot * LB)), fee: 0, nominal: 0, walletId: v.w, catatan: 'Saldo awal dari catatan lama', dibuat: now, txId: '', oleh: me(), setup: '' } }, { op: 'delete', t: 'Investasi', id: x.id }]);
+      if (x.nilai && lem && !harga()[kode]) simpanHarga({ [kode]: [Math.round(x.nilai / lem), x.tglNilai || U.today(), 'Manual', 0] });
+      s.close(); UI.toast(kode + ' dipindah ke jurnal.');
     };
   });
 
   UI.act('sh-open', el => {
-    const kode = el.dataset.kode, akun = el.dataset.akun, p = Calc.saham(null, akun).posisi.find(x => x.kode === kode);
+    const kode = el.dataset.kode, akun = el.dataset.akun, r = Calc.saham(null, [akun]), h = r.H.find(x => x.kode === kode);
+    const real = U.sum(r.R.filter(x => x.kode === kode), x => x.pl), div = U.sum(r.dividen.filter(x => x.t.kode === kode), x => x.v);
     const tr = trades().filter(t => t.kode === kode && t.walletId === akun).reverse();
-    const r = Calc.saham(null, akun), real = U.sum(r.realisasi.filter(x => x.kode === kode), x => x.pl), div = U.sum(r.dividen.filter(x => x.t.kode === kode), x => x.v);
-    const s = UI.sheet({ title: kode + ' · ' + akunNama(akun), body: (p ? `
-      <div class="detail-head"><span class="sh-kode lg">${U.esc(kode)}</span><div><small class="muted">${lotTxt(p.lembar / LEMBAR)} (${U.fmtNum(p.lembar)} lembar)</small><div class="big-amt">${UI.m(p.nilai)}</div>
-        <small class="${kelasPL(p.pl)}">${tanda(p.pl)}${UI.m(Math.abs(p.pl))} (${U.pct(Math.abs(p.pct), 2)})</small></div></div>
-      <div class="kv-list"><div class="kv"><span>Harga rata-rata</span><b>${U.rp(Math.round(p.avg))}</b></div><div class="kv"><span>Harga terakhir</span><b>${p.last ? U.rp(p.last) + ' · ' + U.tgl(p.tglHarga, 'dm') : '—'}</b></div>
-        <div class="kv"><span>Modal</span><b>${U.rp(Math.round(p.biaya))}</b></div>${real ? `<div class="kv"><span>Untung/rugi terealisasi</span><b class="${kelasPL(real)}">${tanda(real)}${U.rp(Math.abs(Math.round(real)))}</b></div>` : ''}${div ? `<div class="kv"><span>Dividen diterima</span><b class="ok">${U.rp(div)}</b></div>` : ''}
-        <div class="kv"><span>Dipegang sejak</span><b>${U.tgl(p.mulai)} · ${U.diffDays(p.mulai, U.today())} hari</b></div></div>` : `<p class="muted">Posisi ${kode} sudah ditutup.</p>`) + `
-      <h4 class="mini-h">Riwayat ${kode}</h4><div class="list">${tr.map(rowTrade).join('')}</div>`,
-      foot: `<button class="btn ghost" data-a="kalk">${I('calculator')}</button><button class="btn ghost" data-a="jual">${I('minus')} Jual</button><button class="btn" data-a="beli">${I('plus')} Beli</button>` });
-    s.el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { s.close(); if (b.dataset.a === 'kalk') { K.kode = kode; K.akun = akun; UI.go('saham/kalkulator'); } else UI.sahamForm(null, { kode, aksi: b.dataset.a, walletId: akun }); });
+    const s = UI.sheet({ title: kode + ' · ' + akunNama(akun), body: (h ? `
+      <div class="detail-head"><span class="sh-kode lg">${kode}</span><div><small class="muted">${h.lots} lot (${U.fmtNum(h.lembar)} lembar)</small><div class="big-amt">${UI.m(h.mv)}</div><small>${rpS(h.unr, 1)} ${pc(h.pct)}</small></div></div>
+      ${h.plan.sl || h.plan.tp1 ? `<div class="tj-plan card">${planBar(h)}</div>` : ''}
+      <div class="kv-list"><div class="kv"><span>Average</span><b>${U.rp(Math.round(h.avg))}</b></div><div class="kv"><span>Last</span><b>${h.l ? U.rp(h.l) + ' · ' + U.tgl(h.tglHarga, 'dm') : 'n/a'}</b></div>
+        <div class="kv"><span>Invested</span><b>${U.rp(Math.round(h.cost))}</b></div>${real ? `<div class="kv"><span>Realized</span><b class="${cls(real)}">${tanda(real)}${UI.m(Math.abs(real))}</b></div>` : ''}${div ? `<div class="kv"><span>Dividen</span><b class="ok">${U.rp(div)}</b></div>` : ''}
+        <div class="kv"><span>Dipegang sejak</span><b>${U.tgl(h.mulai)}</b></div>${h.plan.setup ? `<div class="kv"><span>Setup</span><b>${U.esc(h.plan.setup)}</b></div>` : ''}</div>` : `<p class="muted">Posisi ${kode} sudah ditutup.</p>`) +
+      `<h4 class="mini-h">Riwayat ${kode}</h4><div class="list">${tr.map(t => rowLog(LOG().find(x => x.id === t.id) || { k: 'trade', id: t.id, d: t.tanggal, ty: 'BELI', kode, amt: 0, t })).join('')}</div>`,
+      foot: `${h ? `<button class="btn ghost" data-a="plan" aria-label="Ubah rencana">${I('target')}</button><button class="btn ghost" data-a="kalk" aria-label="Kalkulator">${I('calculator')}</button>` : ''}<button class="btn ghost" data-a="jual">Jual</button><button class="btn" data-a="beli">Beli</button>` });
+    s.el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { s.close(); const a = b.dataset.a;
+      if (a === 'kalk') { K.kode = kode; K.akun = akun; UI.go('saham/kalkulator'); }
+      else if (a === 'plan') { const t = h.plan.id ? h.plan : trades().filter(x => x.kode === kode && x.walletId === akun && x.aksi === 'beli').pop(); if (t) UI.tradeForm(t, { fokusPlan: true }); }
+      else UI.tradeForm(null, { kode, side: a, akun }); });
   });
 
-  // ---------- Aktivitas ----------
-  const realMap = () => { const m = {}; Calc.saham().realisasi.forEach(x => m[x.t.id] = x); return m; };
-  function rowTrade(t) {
-    const rm = rowTrade.rm || realMap(), x = rm[t.id];
-    const ic = { beli: ['arrow-down-left', 'buy'], jual: ['arrow-up-right', 'sell'], dividen: ['coins', 'div'], materai: ['stamp', 'fee'] }[t.aksi] || ['circle', ''];
-    const nilai = t.aksi === 'dividen' || t.aksi === 'materai' ? Number(t.nominal) : t.lot * LEMBAR * t.harga;
-    return `<div class="row sh-tr" data-act="sh-edit" data-id="${t.id}"><span class="sh-ic ${ic[1]}">${I(ic[0])}</span>
-      <div class="tx-txt"><b>${t.aksi === 'materai' ? 'Bea meterai' : `${t.aksi === 'beli' ? 'Beli' : t.aksi === 'jual' ? 'Jual' : 'Dividen'} ${U.esc(t.kode)}`}${t.lot ? ` <small class="muted">${lotTxt(t.lot)} @ ${nm(t.harga)}</small>` : ''}</b>
-        <small>${U.tgl(t.tanggal, 'dm')} · ${U.esc(akunNama(t.walletId))}${t.fee ? ' · fee ' + nm(t.fee) : ''}${t.catatan && t.aksi !== 'materai' ? ' · ' + U.esc(t.catatan) : ''}</small></div>
-      <div class="tx-amt"><b class="${t.aksi === 'beli' || t.aksi === 'materai' ? '' : 'ok'}">${t.aksi === 'beli' || t.aksi === 'materai' ? '−' : '+'}${UI.ms(nilai + (t.aksi === 'beli' ? Number(t.fee) || 0 : t.aksi === 'jual' ? -(Number(t.fee) || 0) : 0))}</b>${x ? `<small class="${kelasPL(x.pl)}">${tanda(x.pl)}${UI.ms(Math.abs(x.pl))} · ${U.pct(Math.abs(x.pct), 1)}</small>` : ''}</div></div>`;
-  }
-  const RENTANG = [['bulan', 'Bulan ini'], ['3b', '3 bulan'], ['tahun', 'Tahun ini'], ['semua', 'Semua']];
-  const dariRentang = r => r === 'bulan' ? U.today().slice(0, 7) + '-01' : r === '3b' ? U.addMonths(U.today(), -3) : r === 'tahun' ? U.today().slice(0, 4) + '-01-01' : '0000';
-  ['sh-tab2', 'sh-rentang', 'sh-aksi', 'sh-ana'].forEach(a => UI.act(a, el => { const k = { 'sh-tab2': 'tab', 'sh-rentang': 'rentang', 'sh-aksi': 'aksi', 'sh-ana': 'anaRentang' }[a]; F[k] = F[k] === el.dataset.v && a === 'sh-aksi' ? '' : el.dataset.v; UI.render(); }));
-  UI.act('sh-q', U.debounce(el => { F.q = el.value.toUpperCase(); const l = document.getElementById('sh-act'); if (l) l.innerHTML = daftarAktivitas(); }, 200));
-  function daftarAktivitas() {
-    const dari = dariRentang(F.rentang);
-    if (F.tab === 'kas') {
-      const ak = akunList().map(w => w.id).filter(id => !F.akun || id === F.akun);
-      const tx = Calc.txSorted().filter(t => t.tanggal >= dari && (t.jenis === 'transfer' && (ak.indexOf(t.walletId) > -1 || ak.indexOf(t.walletTujuan) > -1)));
-      const masuk = U.sum(tx.filter(t => ak.indexOf(t.walletTujuan) > -1), t => t.jumlah), keluar = U.sum(tx.filter(t => ak.indexOf(t.walletId) > -1), t => t.jumlah);
-      return `<div class="stat3"><div class="stat in"><small>Top up</small><b>${UI.ms(masuk)}</b></div><div class="stat out"><small>Tarik dana</small><b>${UI.ms(keluar)}</b></div><div class="stat"><small>Bersih</small><b>${UI.ms(masuk - keluar)}</b></div></div>
-        <div class="card list">${tx.map(t => UI.txRow(t, { date: true })).join('') || `<div class="row muted">Belum ada top up / tarik dana. Catat sebagai Transfer dari rekening bank ke akun RDN.</div>`}</div>
-        <button class="btn block ghost" data-act="sh-topup">${I('arrow-left-right')} Top up / tarik dana</button>`;
-    }
-    rowTrade.rm = realMap();
-    const tr = trades().filter(t => t.tanggal >= dari && (!F.akun || t.walletId === F.akun) && (!F.aksi || t.aksi === F.aksi) && (!F.q || t.kode.indexOf(F.q) > -1)).reverse();
-    const beli = U.sum(tr.filter(t => t.aksi === 'beli'), t => t.lot * LEMBAR * t.harga), jual = U.sum(tr.filter(t => t.aksi === 'jual'), t => t.lot * LEMBAR * t.harga);
-    const g = U.groupBy(tr, t => t.tanggal.slice(0, 7));
-    const out = `<div class="stat3"><div class="stat"><small>Beli</small><b>${UI.ms(beli)}</b></div><div class="stat"><small>Jual</small><b>${UI.ms(jual)}</b></div><div class="stat"><small>Fee + meterai</small><b>${UI.ms(U.sum(tr, t => (Number(t.fee) || 0) + (t.aksi === 'materai' ? Number(t.nominal) || 0 : 0)))}</b></div></div>` +
-      (Object.keys(g).map(m => `<div class="day-h"><b>${U.tgl(m + '-01', 'my')}</b><span>${g[m].length} transaksi</span></div><div class="card list">${g[m].map(rowTrade).join('')}</div>`).join('') || `<div class="card">${UI.empty('list', 'Belum ada transaksi', 'Tidak ada transaksi pada rentang ini.', `<button class="btn" data-act="sh-catat">${I('plus')} Catat</button>`)}</div>`);
-    rowTrade.rm = null;
-    return out;
-  }
-  UI.act('sh-topup', () => { const ak = akunList(); UI.catat({ preset: { jenis: 'transfer', walletTujuan: (ak[0] || {}).id } }); });
+  // ===== Activity =====
   function aktivitas() {
-    return `${akunChips()}
-      <div class="seg2"><button class="${F.tab === 'trade' ? 'on' : ''}" data-act="sh-tab2" data-v="trade">${I('chart-candlestick')} Trade</button><button class="${F.tab === 'kas' ? 'on' : ''}" data-act="sh-tab2" data-v="kas">${I('arrow-left-right')} Arus kas</button></div>
-      <div class="chips sm scroll">${RENTANG.map(r => `<button class="chip ${F.rentang === r[0] ? 'on' : ''}" data-act="sh-rentang" data-v="${r[0]}">${r[1]}</button>`).join('')}</div>
-      ${F.tab === 'trade' ? `<div class="sh-filter"><div class="search">${I('search')}<input type="search" placeholder="Cari kode, mis. BBCA" value="${U.esc(F.q)}" data-input="sh-q" class="up"></div>
-        <div class="chips sm">${[['beli', 'Beli'], ['jual', 'Jual'], ['dividen', 'Dividen'], ['materai', 'Meterai']].map(a => `<button class="chip ${F.aksi === a[0] ? 'on' : ''}" data-act="sh-aksi" data-v="${a[0]}">${a[1]}</button>`).join('')}</div></div>` : ''}
-      <div id="sh-act">${daftarAktivitas()}</div>`;
+    const q = F.q.toLowerCase(), L = LOG().filter(r => (!F.ty || r.ty === F.ty) && (!F.su || r.setup === F.su) && (!F.a || r.d >= F.a) && (!F.b || r.d <= F.b) && (!q || [r.kode, r.setup, r.t ? r.t.catatan : r.tx ? UI.note(r.tx) : ''].join(' ').toLowerCase().indexOf(q) > -1));
+    const tr = L.filter(r => r.k === 'trade' && r.g), nf = (F.ty ? 1 : 0) + (F.su ? 1 : 0) + (F.a || F.b ? 1 : 0);
+    const g = U.groupBy(L, r => r.d.slice(0, 7));
+    return `<div class="tj-flt"><div class="search">${I('search')}<input type="search" placeholder="Cari kode, setup, catatan…" value="${U.esc(F.q)}" data-input="sh-q"></div>
+        <button class="chip ${nf ? 'on' : ''}" data-act="sh-filter">${I('sliders-horizontal')} Filter${nf ? ' · ' + nf : ''}</button></div>
+      <div class="chips sm scroll">${Object.keys(TIPE).map(t => `<button class="chip ${F.ty === t ? 'on' : ''}" data-act="sh-ty" data-v="${t}">${t[0] + t.slice(1).toLowerCase()}</button>`).join('')}</div>
+      <div class="tj-kpi">${[['Records', L.length + ' event'], ['Gross turnover', UI.ms(U.sum(tr, r => r.g))], ['Fee & materai', UI.ms(U.sum(L, r => r.f))], ['Net cash delta', rpK(U.sum(L, r => r.amt), 1)]].map(x => `<div class="tj-k"><div class="lb">${x[0]}</div><div class="tjv sm">${x[1]}</div></div>`).join('')}</div>
+      ${Object.keys(g).map(m => `<div class="day-h"><b>${U.tgl(m + '-01', 'my')}</b><span>${g[m].length} event · ${rpK(U.sum(g[m], r => r.amt), 1)}</span></div><div class="card list">${g[m].map(rowLog).join('')}</div>`).join('') || `<div class="card">${UI.empty('list', 'Belum ada data', 'Tidak ada aktivitas yang cocok dengan filter.', nf || F.q ? `<button class="btn ghost" data-act="sh-reset">Reset filter</button>` : '')}</div>`}`;
   }
+  UI.act('sh-q', U.debounce(el => { F.q = el.value; const pos = el.selectionStart; UI.render(); const n = document.querySelector('[data-input=sh-q]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } }, 250));
+  UI.act('sh-ty', el => { F.ty = F.ty === el.dataset.v ? '' : el.dataset.v; UI.render(); });
+  UI.act('sh-reset', () => { Object.assign(F, { q: '', ty: '', su: '', a: '', b: '' }); UI.render(); });
+  UI.act('sh-filter', () => {
+    const s = UI.sheet({ title: 'Filter aktivitas', cls: 'small', body: `
+      ${UI.field('Tipe', `<select name="ty"><option value="">Semua tipe</option>${Object.keys(TIPE).map(t => `<option ${F.ty === t ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+      ${UI.field('Setup', `<select name="su"><option value="">Semua setup</option>${setups().map(x => `<option ${F.su === x ? 'selected' : ''}>${U.esc(x)}</option>`).join('')}</select>`)}
+      <div class="grid2">${UI.field('Dari', `<input type="date" name="a" value="${F.a}">`)}${UI.field('Sampai', `<input type="date" name="b" value="${F.b}">`)}</div>`,
+      foot: `<button class="btn ghost" data-r>Reset</button><button class="btn" data-ok>Terapkan</button>` });
+    s.el.querySelector('[data-ok]').onclick = () => { const v = UI.formData(s.el); Object.assign(F, { ty: v.ty, su: v.su, a: v.a, b: v.b }); s.close(); UI.render(); };
+    s.el.querySelector('[data-r]').onclick = () => { Object.assign(F, { ty: '', su: '', a: '', b: '' }); s.close(); UI.render(); };
+  });
 
-  // ---------- Analitik ----------
+  // ===== Analytics =====
   function analitik() {
-    const r = Calc.saham(null, F.akun || null), dari = dariRentang(F.anaRentang);
-    const re = r.realisasi.filter(x => x.t.tanggal >= dari), menang = re.filter(x => x.pl > 0), kalah = re.filter(x => x.pl < 0);
-    const totPL = U.sum(re, x => x.pl), gross = U.sum(menang, x => x.pl), loss = -U.sum(kalah, x => x.pl);
-    const div = U.sum(r.dividen.filter(x => x.t.tanggal >= dari), x => x.v);
-    const fe = U.sum(trades().filter(t => t.tanggal >= dari && (!F.akun || t.walletId === F.akun)), t => (Number(t.fee) || 0) + (t.aksi === 'materai' ? Number(t.nominal) || 0 : 0));
-    const bln = []; for (let k = 11; k >= 0; k--) { const ym = U.ym(U.addMonths(U.today(), -k)); bln.push({ label: U.tgl(ym + '-01', 'mys').split(' ')[0], v: U.sum(r.realisasi.filter(x => x.t.tanggal.slice(0, 7) === ym), x => x.pl) + U.sum(r.dividen.filter(x => x.t.tanggal.slice(0, 7) === ym), x => x.v) }); }
-    let cum = 0; const kurva = r.realisasi.concat(r.dividen.map(d => ({ t: d.t, pl: d.v }))).sort((a, b) => a.t.tanggal.localeCompare(b.t.tanggal)).map(x => ({ d: x.t.tanggal, bal: (cum += x.pl) }));
-    const perKode = {}; re.forEach(x => { perKode[x.kode] = perKode[x.kode] || { kode: x.kode, pl: 0, n: 0, w: 0 }; perKode[x.kode].pl += x.pl; perKode[x.kode].n++; if (x.pl > 0) perKode[x.kode].w++; });
-    const top = Object.values(perKode).sort((a, b) => b.pl - a.pl), best = re.slice().sort((a, b) => b.pct - a.pct)[0], worst = re.slice().sort((a, b) => a.pct - b.pct)[0];
-    const avgHold = re.length ? Math.round(U.sum(re, x => x.umur) / re.length) : 0;
-    const st = (lb, v, cls, sub) => `<div class="sh-stat"><small>${lb}</small><b class="${cls || ''}">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
-    return `${akunChips()}
-      <div class="chips sm scroll">${RENTANG.map(x => `<button class="chip ${F.anaRentang === x[0] ? 'on' : ''}" data-act="sh-ana" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>
-      <div class="sh-stats">
-        ${st('Untung/rugi terealisasi', tanda(totPL) + UI.ms(Math.abs(totPL)), kelasPL(totPL), re.length + ' penjualan')}
-        ${st('Win rate', re.length ? U.pct(menang.length / re.length) : '—', re.length && menang.length / re.length >= 0.5 ? 'ok' : '', menang.length + ' untung · ' + kalah.length + ' rugi')}
-        ${st('Rata-rata untung', menang.length ? '+' + U.pct(U.sum(menang, x => x.pct) / menang.length, 1) : '—', 'ok', menang.length ? '+' + UI.ms(gross / menang.length) + '/trade' : '')}
-        ${st('Rata-rata rugi', kalah.length ? '−' + U.pct(Math.abs(U.sum(kalah, x => x.pct) / kalah.length), 1) : '—', 'bad', kalah.length ? '−' + UI.ms(loss / kalah.length) + '/trade' : '')}
-        ${st('Profit factor', loss ? (gross / loss).toFixed(2) : gross ? '∞' : '—', loss && gross / loss >= 1 ? 'ok' : loss ? 'bad' : '', 'total untung dibagi total rugi')}
-        ${st('Dividen', UI.ms(div), 'ok', '')}
-        ${st('Fee & meterai', UI.ms(fe), '', '')}
-        ${st('Lama pegang', avgHold ? avgHold + ' hari' : '—', '', 'rata-rata sampai jual')}
+    const ids = akunAktif(), R = Calc.saham(null, ids).R.filter(r => (!AN.a || r.tanggal >= AN.a) && (!AN.b || r.tanggal <= AN.b));
+    const w = R.filter(r => r.pl > 0), ls = R.filter(r => r.pl < 0), L = U.sum(R, r => r.lots) || 1, hold = U.sum(R, r => r.hold * r.lots) / L;
+    const gross = U.sum(w, r => r.pl), loss = -U.sum(ls, r => r.pl), real = U.sum(R, r => r.pl);
+    const row = r => `<div class="row" data-act="sh-edit" data-id="${r.t.id}"><span class="sh-kode">${r.kode}</span><div class="tx-txt"><b>${U.esc(r.setup || '—')}</b><small>${U.tgl(r.tanggal, 'dm')} · ${r.lots} lot · avg ${nm(r.avg)} → ${nm(r.px)} · ${Math.round(r.hold)} hr</small></div><div class="tx-amt"><b>${rpK(r.pl, 1)}</b><small>${pc(r.pct)}</small></div></div>`;
+    const grp = k => { const m = {}; R.forEach(r => { const g = m[r[k] || '—'] = m[r[k] || '—'] || { n: 0, w: 0, pl: 0 }; g.n++; g.w += r.pl > 0 ? 1 : 0; g.pl += r.pl; });
+      return Object.entries(m).sort((a, b) => b[1].pl - a[1].pl).map(e => `<div class="row"><span class="${k === 'kode' ? 'sh-kode' : 'tj-setup'}">${U.esc(e[0])}</span><div class="tx-txt"><b>${e[1].n} trade</b><small>win ${Math.round(e[1].w / e[1].n * 100)}%</small></div><b class="tx-amt">${rpK(e[1].pl, 1)}</b></div>`).join(''); };
+    const bln = []; for (let k = 11; k >= 0; k--) { const ym = U.ym(U.addMonths(U.today(), -k)); bln.push({ label: U.tgl(ym + '-01', 'mys').split(' ')[0], v: U.sum(R.filter(x => x.tanggal.slice(0, 7) === ym), x => x.pl) }); }
+    const kk = (l, v, s, c) => `<div class="tj-k ${c || ''}"><div class="lb">${l}</div><div class="tjv">${v}</div>${s ? `<div class="sub">${s}</div>` : ''}</div>`;
+    return `<div class="grid2 tj-range">${UI.field('Dari', `<input type="date" value="${AN.a}" data-change="sh-an" data-k="a">`)}${UI.field('Sampai', `<input type="date" value="${AN.b}" data-change="sh-an" data-k="b">`)}</div>
+      <div class="tj-kpi">
+        ${kk('Win rate', `<span class="${R.length && w.length / R.length >= 0.5 ? 'ok' : ''}">${R.length ? (w.length / R.length * 100).toFixed(1).replace('.', ',') : 0}%</span>`, w.length + ' win · ' + ls.length + ' loss')}
+        ${kk('Total trade', R.length, 'penjualan tertutup')}
+        ${kk('Avg holding', hold.toFixed(1).replace('.', ',') + ' hari', 'tertimbang lot')}
+        ${kk('Realized', rpK(real, 1), 'net fee', cls(real))}
+        ${kk('Profit factor', loss ? (gross / loss).toFixed(2).replace('.', ',') : gross ? '∞' : '—', 'total win ÷ total loss')}
+        ${kk('Avg win / loss', `<span class="ok">${w.length ? '+' + (U.sum(w, r => r.pct) / w.length).toFixed(1).replace('.', ',') + '%' : '—'}</span> <span class="bad">${ls.length ? (U.sum(ls, r => r.pct) / ls.length).toFixed(1).replace('.', ',') + '%' : ''}</span>`, '')}
       </div>
-      <div class="card rd-trend"><div class="row-sp"><b>Hasil per bulan</b><small class="muted">realisasi + dividen</small></div>${barPN(bln)}</div>
-      ${kurva.length > 1 ? `<div class="card rd-trend"><div class="row-sp"><b>Kumulatif hasil</b><span class="${kelasPL(cum)} small">${tanda(cum)}${UI.ms(Math.abs(cum))}</span></div>${Charts.line(kurva, { fit: true, fmt: 'mys', aria: 'Kumulatif untung rugi terealisasi' })}</div>` : ''}
-      ${top.length ? UI.sec('Per emiten') + `<div class="card list">${top.map(x => `<div class="row"><span class="sh-kode">${U.esc(x.kode)}</span><div class="tx-txt"><b>${x.n} penjualan</b><small>win rate ${U.pct(x.w / x.n)}</small></div><b class="${kelasPL(x.pl)}">${tanda(x.pl)}${UI.ms(Math.abs(x.pl))}</b></div>`).join('')}</div>` : ''}
-      ${best ? UI.sec('Trade terbaik & terburuk') + `<div class="card list">${[best, worst].filter((x, i, a) => x && a.indexOf(x) === i).map(x => `<div class="row" data-act="sh-edit" data-id="${x.t.id}"><span class="sh-ic ${x.pl >= 0 ? 'div' : 'sell'}">${I(x.pl >= 0 ? 'trophy' : 'trending-down')}</span><div class="tx-txt"><b>${U.esc(x.kode)} · ${U.tgl(x.t.tanggal, 'dm')}</b><small>beli avg ${nm(x.avg)} → jual ${nm(x.t.harga)} · ${x.umur} hari</small></div><b class="${kelasPL(x.pl)}">${tanda(x.pl)}${U.pct(Math.abs(x.pct), 1)}</b></div>`).join('')}</div>` : ''}
-      ${!re.length ? `<p class="muted small">Analitik terisi setelah ada transaksi jual. Untung/rugi dihitung dari harga rata-rata termasuk fee.</p>` : ''}`;
+      <div class="card rd-trend"><div class="row-sp"><b>Realized per bulan</b><small class="muted">12 bulan</small></div>${barPN(bln)}</div>
+      ${UI.sec('Best sale — top 10')}<div class="card list">${R.filter(r => r.pl > 0).sort((a, b) => b.pl - a.pl).slice(0, 10).map(row).join('') || '<div class="row muted">Belum ada data.</div>'}</div>
+      ${UI.sec('Worst sale — top 10')}<div class="card list">${R.filter(r => r.pl < 0).sort((a, b) => a.pl - b.pl).slice(0, 10).map(row).join('') || '<div class="row muted">Belum ada data.</div>'}</div>
+      ${UI.sec('Realized — 10 terakhir')}<div class="card list">${R.slice().sort((a, b) => a.tanggal < b.tanggal ? 1 : -1).slice(0, 10).map(row).join('') || '<div class="row muted">Belum ada data.</div>'}</div>
+      ${UI.sec('Per kode saham')}<div class="card list">${grp('kode') || '<div class="row muted">Belum ada data.</div>'}</div>
+      ${UI.sec('Per setup')}<div class="card list">${grp('setup') || '<div class="row muted">Belum ada data.</div>'}</div>`;
   }
+  UI.act('sh-an', el => { AN[el.dataset.k] = el.value; UI.render(); });
+  const barPN = rows => {
+    const W = 340, H = 140, pd = 14, max = Math.max(1, ...rows.map(r => Math.abs(r.v))), gw = (W - 12) / rows.length, bw = Math.min(18, gw * 0.56), mid = pd + (H - pd - 22) / 2, sc = (H - pd - 22) / 2 / max;
+    let s = `<svg viewBox="0 0 ${W} ${H}" class="chart rd-bars" role="img" aria-label="Realized per bulan"><line x1="6" x2="${W - 6}" y1="${mid}" y2="${mid}" class="grid"/>`;
+    rows.forEach((r, i) => { const cx = 6 + gw * i + gw / 2, h = Math.max(r.v ? 2 : 0, Math.abs(r.v) * sc); s += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${(r.v >= 0 ? mid - h : mid).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" class="${r.v >= 0 ? 'naik' : 'turun'}"/>`;
+      if (i % 2 === (rows.length - 1) % 2) s += `<text x="${cx}" y="${H - 6}" text-anchor="middle" class="axis${i === rows.length - 1 ? ' strong' : ''}">${U.esc(r.label)}</text>`; });
+    return s + '</svg>';
+  };
 
-  // ---------- Kalkulator harga rata-rata ----------
+  // ===== Avg Calculator (2 skenario, termasuk fee & materai) =====
   const K = { kode: '', akun: '' };
   function kalkulator() {
-    const ps = Calc.saham().posisi, p = ps.find(x => x.kode === K.kode && (!K.akun || x.walletId === K.akun));
-    return `<div class="card sh-kalk">
-      ${ps.length ? UI.field('Ambil dari posisi', `<select data-kk="pos"><option value="">— isi manual —</option>${ps.map(x => `<option value="${x.walletId}|${x.kode}" ${p === x ? 'selected' : ''}>${x.kode} · ${lotTxt(x.lembar / LEMBAR)} @ ${nm(x.avg)}${akunList().length > 1 ? ' · ' + U.esc(akunNama(x.walletId)) : ''}</option>`).join('')}</select>`) : ''}
-      <h4 class="mini-h">Posisi sekarang</h4>
-      <div class="grid2">${UI.field('Lot dimiliki', `<input type="number" min="0" data-kk="lot0" value="${p ? p.lembar / LEMBAR : ''}" inputmode="numeric">`)}${UI.field('Harga rata-rata', `<input inputmode="numeric" data-kk="avg0" data-rpk value="${p ? nm(p.avg) : ''}">`)}</div>
-      <h4 class="mini-h">Rencana beli</h4>
-      <div class="grid2">${UI.field('Lot dibeli', `<input type="number" min="0" data-kk="lot1" inputmode="numeric" placeholder="0">`)}${UI.field('Harga beli', `<input inputmode="numeric" data-kk="h1" data-rpk value="${p && p.last ? nm(p.last) : ''}">`)}</div>
-      <div class="sh-kalk-out" id="kk-out"></div>
-      <h4 class="mini-h">Ingin rata-rata berapa?</h4>
-      <div class="grid2">${UI.field('Target rata-rata', `<input inputmode="numeric" data-kk="tgt" data-rpk placeholder="mis. 9.000">`)}<div class="sh-kalk-need" id="kk-need"></div></div>
-      <label class="check"><input type="checkbox" data-kk="fee" checked><span>Hitung fee beli ${fee().beli}%</span></label></div>
-      <p class="muted small">Kalkulator hanya berhitung — tidak mencatat transaksi.</p>`;
+    const ids = akunAktif(), H = Calc.saham(null, ids).H;
+    const i = (k, l, v) => UI.field(l, `<input type="number" step="any" inputmode="decimal" data-kk="${k}" value="${v || ''}">`);
+    const h = H.find(x => x.kode === K.kode && (!K.akun || x.walletId === K.akun));
+    return `<div class="card"><div class="chips scroll">${H.map(x => `<button class="chip ${h === x ? 'on' : ''}" data-act="sh-kchip" data-kode="${x.kode}" data-akun="${x.walletId}">${x.kode} ${x.lots} lot · ${nm(x.avg)}</button>`).join('') || '<small class="muted">Belum ada posisi — isi manual.</small>'}</div>
+        <div class="grid2">${i('L', 'Lot dimiliki', h && h.lots)}${i('A', 'Average saat ini', h && Math.round(h.avg))}</div></div>
+      <div class="card"><h3 class="tj-h">Skenario 1 — Target average</h3><div class="grid2">${i('T', 'Target average')}${i('P1', 'Harga beli tambahan', h && h.l)}</div><div id="o1"></div></div>
+      <div class="card"><h3 class="tj-h">Skenario 2 — Simulasi beli</h3><div class="grid2">${i('N', 'Lot tambahan')}${i('P2', 'Harga beli', h && h.l)}</div><div id="o2"></div></div>
+      <button class="btn ghost" data-act="sh-kreset">${I('rotate-ccw')} Reset</button>
+      <p class="muted small">Termasuk fee beli & bea meterai bila nilai beli > ambang. Hanya berhitung — tidak mencatat transaksi.</p>`;
   }
+  UI.act('sh-kchip', el => { K.kode = el.dataset.kode; K.akun = el.dataset.akun; UI.render(); });
+  UI.act('sh-kreset', () => { K.kode = K.akun = ''; UI.render(); document.querySelectorAll('[data-kk]').forEach(x => x.value = ''); kalkHitung(); });
   function kalkHitung() {
-    const root = document.querySelector('#view .sh-kalk'); if (!root) return;
-    const q = k => root.querySelector(`[data-kk=${k}]`), num = el => el ? Number(String(el.value).replace(/\D/g, '')) || 0 : 0;
-    const calc = () => {
-      root.querySelectorAll('[data-rpk]').forEach(el => { const n = num(el); if (document.activeElement !== el) el.value = n ? U.fmtNum(n) : ''; });
-      const fp = q('fee').checked ? fee().beli / 100 : 0;
-      const l0 = Number(q('lot0').value) || 0, a0 = num(q('avg0')), l1 = Number(q('lot1').value) || 0, h1 = num(q('h1')), tg = num(q('tgt'));
-      const c0 = l0 * LEMBAR * a0, c1 = l1 * LEMBAR * h1 * (1 + fp), lt = l0 + l1, avg = lt ? (c0 + c1) / (lt * LEMBAR) : 0;
-      document.getElementById('kk-out').innerHTML = l1 && h1 ? `<div class="sh-big"><small>Rata-rata baru</small><b>${U.rp(Math.round(avg))}</b><small class="${avg < a0 ? 'ok' : 'bad'}">${a0 ? (avg < a0 ? 'turun ' : 'naik ') + U.pct(Math.abs(avg - a0) / a0, 2) : ''}</small></div>
-        <div class="kv-list"><div class="kv"><span>Total lot</span><b>${lotTxt(lt)}</b></div><div class="kv"><span>Dana dibutuhkan</span><b>${U.rp(Math.round(c1))}</b></div><div class="kv"><span>Total modal</span><b>${U.rp(Math.round(c0 + c1))}</b></div>
-        ${a0 && h1 ? `<div class="kv"><span>Impas (BEP) setelah fee jual</span><b>${U.rp(Math.ceil(avg / (1 - fee().jual / 100)))}</b></div>` : ''}</div>` : '<p class="muted small">Isi lot & harga beli untuk melihat rata-rata baru.</p>';
-      let need = '';
-      if (tg && h1 && l0 && a0) {
-        const hEff = h1 * (1 + fp);
-        if (!(hEff < tg && tg < a0) && !(hEff > tg && tg > a0)) need = `<small class="bad">Target harus di antara harga beli (${nm(hEff)}) dan rata-rata sekarang (${nm(a0)}).</small>`;
-        else { const lots = Math.ceil(l0 * (a0 - tg) / (tg - hEff)); need = `<small class="muted">Perlu beli</small><b>${lotTxt(lots)}</b><small>≈ ${U.rp(Math.round(lots * LEMBAR * hEff))}</small>`; }
-      }
-      document.getElementById('kk-need').innerHTML = need;
+    const root = document.getElementById('view'); if (!root || !root.querySelector('[data-kk]')) return;
+    const v = k => Number((root.querySelector(`[data-kk=${k}]`) || {}).value) || 0;
+    const run = () => {
+      const c = cfg(K.akun || akunAktif()[0]), f = c.beli / 100, L = v('L'), A0 = v('A'), Tg = v('T'), P1 = v('P1'), N = v('N'), P2 = v('P2'), cash = ringkasAkun(K.akun ? [K.akun] : akunAktif()).cash;
+      const ev = (n, p) => { const g = n * LB * p, m = g > c.ambang ? c.materai : 0, fe = Math.round(g * f); return { avg: (L * LB * A0 + g + fe + m) / ((L + n) * LB), g, fe, m, tot: g + fe + m }; };
+      const box = (e, n) => `<div class="tj-box"><div class="lb">Lot dibeli</div><div class="kv">${n} <small>(${U.fmtNum(n * LB)} lbr)</small></div>
+        <div class="sub">Dana ${U.rp(e.tot)} = gross ${U.rp(e.g)} + fee ${U.rp(e.fe)} + materai ${U.rp(e.m)}</div>
+        <div class="sub">Avg baru <b>${U.rp(Math.round(e.avg))}</b> · posisi ${L + n} lot · ${e.tot <= cash ? '<span class="ok">cash cukup</span>' : '<span class="bad">kurang ' + U.rp(e.tot - cash) + '</span>'}</div>
+        ${A0 ? `<div class="sub">BEP setelah fee jual ≈ <b>${U.rp(Math.ceil(e.avg / (1 - c.jual / 100)))}</b></div>` : ''}</div>`;
+      let o = '<div class="tj-empty">Isi lot, average, target, dan harga beli.</div>';
+      if (L && A0 && Tg && P1) { const dn = Tg < A0;
+        if (Tg === A0) o = '<div class="sub">Target sama dengan average saat ini.</div>';
+        else if (dn ? P1 * (1 + f) >= Tg : P1 * (1 + f) <= Tg) o = `<div class="warn-line bad">Target tidak mungkin: harga beli (+fee) harus ${dn ? 'di bawah' : 'di atas'} target.</div>`;
+        else { const ok = n => dn ? ev(n, P1).avg <= Tg : ev(n, P1).avg >= Tg; let n = Math.max(1, Math.ceil(L * (A0 - Tg) / (Tg - P1))); while (!ok(n) && n < 1e5) n++; while (n > 1 && ok(n - 1)) n--; o = box(ev(n, P1), n); } }
+      document.getElementById('o1').innerHTML = o;
+      document.getElementById('o2').innerHTML = L && A0 && N && P2 ? box(ev(N, P2), N) : '<div class="tj-empty">Isi lot tambahan dan harga beli.</div>';
     };
-    root.addEventListener('input', calc);
-    const sel = q('pos');
-    if (sel) sel.addEventListener('change', () => { const [ak, kd] = sel.value.split('|'); K.akun = ak || ''; K.kode = kd || ''; const p = Calc.saham().posisi.find(x => x.kode === kd && x.walletId === ak); q('lot0').value = p ? p.lembar / LEMBAR : ''; q('avg0').value = p ? nm(p.avg) : ''; q('h1').value = p && p.last ? nm(p.last) : ''; calc(); });
-    calc();
+    root.querySelectorAll('[data-kk]').forEach(x => x.addEventListener('input', run)); run();
   }
 
-  // harga diperbarui diam-diam saat halaman saham dibuka (maks. sekali per 30 menit)
-  UI.sahamAutoHarga = () => { try { const k = 'sa:shHargaT', t = Number(localStorage.getItem(k) || 0); if (Date.now() - t < 30 * 60000 || Store.mode === 'demo') return; localStorage.setItem(k, String(Date.now())); ambilHarga(true); } catch (e) {} };
+  // ===== Modal: Trade (Beli/Jual + setup & rencana) =====
+  const heldAt = (kode, akun, tgl, kecuali) => trades().filter(x => x.kode === kode && x.walletId === akun && x.tanggal <= tgl && x.id !== kecuali && (x.aksi === 'beli' || x.aksi === 'jual')).reduce((a, x) => a + (x.aksi === 'beli' ? 1 : -1) * (Number(x.lot) || 0), 0);
+  UI.tradeForm = (t, o) => {
+    o = o || {};
+    const ak = akunList(); if (!ak.length) return portofolioBaru();
+    const isNew = !t, akun0 = (t && t.walletId) || o.akun || F.akun || ak[0].id;
+    let side = t ? (t.aksi === 'jual' ? 'jual' : 'beli') : (o.side === 'jual' ? 'jual' : 'beli'), warned = false;
+    const n = (k, l, v) => UI.field(l, `<input type="number" step="any" inputmode="decimal" name="${k}" value="${v || ''}">`);
+    const kodeAda = Array.from(new Set(trades().map(x => x.kode).filter(k => k && k !== '-'))).sort();
+    const s = UI.sheet({ title: (t ? 'Ubah' : 'Catat') + ' transaksi saham', body: `
+      <div class="seg tj-side"><button type="button" data-sd="beli">BELI</button><button type="button" data-sd="jual">JUAL</button></div>
+      <div class="grid2">${UI.field('Kode saham', `<input name="kode" maxlength="4" value="${t ? t.kode : o.kode || ''}" list="tj-kode" autocomplete="off" autocapitalize="characters" class="up" placeholder="BBCA"><datalist id="tj-kode">${kodeAda.map(k => `<option>${k}</option>`).join('')}</datalist>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${t ? t.tanggal : U.today()}">`)}</div>
+      ${UI.field('Portofolio', `<select name="walletId">${ak.map(w => `<option value="${w.id}" ${w.id === akun0 ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>`)}
+      <div class="grid2">${n('lot', 'Volume (lot)', t && t.lot)}${n('harga', 'Harga / lembar', t && t.harga)}</div>
+      ${UI.field('Setup', `<select name="setup"><option value="">—</option>${setups().map(x => `<option ${t && t.setup === x ? 'selected' : ''}>${U.esc(x)}</option>`).join('')}</select>`)}
+      <div data-plan><h4 class="mini-h">Rencana trade</h4><div class="grid2">${n('entryLow', 'Entry low', t && t.entryLow)}${n('entryHigh', 'Entry high', t && t.entryHigh)}</div>
+        <div class="grid3">${n('sl', 'Stop loss', t && t.sl)}${n('tp1', 'Take profit 1', t && t.tp1)}${n('tp2', 'Take profit 2', t && t.tp2)}</div></div>
+      ${UI.field('Catatan', `<input name="catatan" maxlength="140" value="${U.esc(t ? t.catatan : '')}" placeholder="alasan entry / exit">`)}
+      <div class="tj-sum"></div><div class="warn-line bad" data-w></div>`,
+      foot: `${t ? `<button class="btn ghost danger" data-del aria-label="Hapus">${I('trash-2')}</button>` : `<button class="btn ghost" data-lagi>Simpan & tambah</button>`}<button class="btn" data-ok>${I('check')} Simpan</button>` });
+    const q = k => s.el.querySelector(`[name=${k}]`), W = m => { s.el.querySelector('[data-w]').textContent = m; return true; };
+    const prev = () => {
+      const kode = String(q('kode').value).toUpperCase(), L = Number(q('lot').value) || 0, p = Number(q('harga').value) || 0, akun = q('walletId').value, c = cfg(akun), gr = L * LB * p, f = Math.round(gr * (side === 'beli' ? c.beli : c.jual) / 100), d = q('tanggal').value;
+      s.el.querySelectorAll('[data-sd]').forEach(b => { b.classList.toggle('on', b.dataset.sd === side); b.classList.toggle('buy', b.dataset.sd === side && side === 'beli'); });
+      const held = kode.length === 4 ? heldAt(kode, akun, d, t && t.id) : 0;
+      s.el.querySelector('[data-plan]').hidden = !(side === 'beli' && (held === 0 || o.fokusPlan || (t && (t.sl || t.tp1))));
+      const net = side === 'beli' ? -(gr + f) : gr - f, pos = Calc.saham(d, [akun]).H.find(x => x.kode === kode);
+      s.el.querySelector('.tj-sum').innerHTML = `<div class="kv"><span>Gross</span><b>${U.rp(gr)}</b></div><div class="kv"><span>Fee ${side === 'beli' ? c.beli : c.jual}%</span><b>${U.rp(f)}</b></div>
+        <div class="kv tot"><span>${side === 'beli' ? 'Total cash out' : 'Total cash in'}</span><b>${U.rp(Math.abs(net))}</b></div>
+        ${held ? `<div class="kv muted"><span>Dipegang</span><b>${held} lot${pos ? ' · avg ' + nm(pos.avg) : ''}</b></div>` : ''}
+        ${side === 'jual' && pos && L ? (() => { const pl = (gr - f) - pos.cost * Math.min(1, L / pos.lots); return `<div class="kv"><span>Estimasi P&L</span><b class="${cls(pl)}">${tanda(pl)}${U.rp(Math.abs(Math.round(pl)))}</b></div>`; })() : ''}
+        ${side === 'beli' && gr > c.ambang ? `<div class="kv muted"><span>+ Bea meterai hari ini</span><b>${U.rp(c.materai)}</b></div>` : ''}`;
+      return { kode, L, p, akun, f, d, net, held };
+    };
+    s.el.addEventListener('input', () => { W(''); prev(); }); s.el.addEventListener('change', prev);
+    s.el.querySelectorAll('[data-sd]').forEach(b => b.onclick = () => { side = b.dataset.sd; warned = false; prev(); });
+    prev();
+    const simpan = (lagi) => {
+      const x = prev(), v = UI.formData(s.el);
+      if (!/^[A-Z]{4}$/.test(x.kode)) return W('Kode saham harus 4 huruf.');
+      if (!(x.L > 0 && x.L % 1 === 0)) return W('Lot harus bilangan bulat > 0.');
+      if (!(x.p > 0)) return W('Harga harus > 0.');
+      if (!x.d) return W('Tanggal wajib diisi.');
+      if (side === 'jual' && x.L > x.held) return W('Jual melebihi kepemilikan (' + x.held + ' lot pada tanggal tsb).');
+      const old = t && t.txId && Store.byId.Transaksi[t.txId] ? -efek(Store.byId.Transaksi[t.txId], x.akun) : 0, cash = ringkasAkun([x.akun]).cash;
+      if (side === 'beli' && cash + old + x.net < 0 && !warned) { warned = true; return W('Peringatan: kas ' + akunNama(x.akun) + ' akan negatif. Tekan simpan lagi untuk melanjutkan (atau catat top up dulu).'); }
+      const plan = !s.el.querySelector('[data-plan]').hidden, num = k => Number(v[k]) || '';
+      const row = Object.assign({}, t || { id: U.uid('sh'), dibuat: new Date().toISOString(), txId: '', oleh: me(), nominal: 0 }, {
+        tanggal: x.d, kode: x.kode, aksi: side, lot: x.L, harga: x.p, fee: x.f, walletId: x.akun, setup: v.setup || '', catatan: v.catatan || '',
+        entryLow: plan ? num('entryLow') : (t ? t.entryLow : ''), entryHigh: plan ? num('entryHigh') : (t ? t.entryHigh : ''), sl: plan ? num('sl') : (t ? t.sl : ''), tp1: plan ? num('tp1') : (t ? t.tp1 : ''), tp2: plan ? num('tp2') : (t ? t.tp2 : '') });
+      Store.commit(opsUang(row)); sinkronMaterai();
+      try { localStorage.setItem('sa:shPf', x.akun); } catch (e) {}
+      UI.toast('Trade tersimpan.');
+      if (lagi) { ['lot', 'harga'].forEach(k => q(k).value = ''); W(''); prev(); q('lot').focus(); } else s.close();
+    };
+    s.el.querySelector('[data-ok]').onclick = () => simpan(false);
+    const lg = s.el.querySelector('[data-lagi]'); if (lg) lg.onclick = () => simpan(true);
+    const dl = s.el.querySelector('[data-del]'); if (dl) dl.onclick = () => { s.close(); hapusDialog(t); };
+    if (o.fokusPlan) setTimeout(() => { const e = q('sl'); if (e) e.focus(); }, 250);
+  };
+  /** Baris Saham + Transaksi uang yang berpasangan (txId). */
+  function opsUang(row) {
+    const now = new Date().toISOString(), txId = row.txId || U.uid('t'); row.txId = txId;
+    const base = { id: txId, tanggal: row.tanggal, walletId: row.walletId, walletTujuan: '', biaya: 0, dibayarOleh: row.oleh || me(), tag: 'saham', sumber: 'saham', refId: row.id, periodeRef: row.tanggal.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] };
+    let tx;
+    if (row.aksi === 'beli') tx = Object.assign(base, { jenis: 'aset_beli', jumlah: Math.round(row.lot * LB * row.harga + row.fee), kategoriId: '', catatan: `Beli ${row.kode} ${row.lot} lot @ ${nm(row.harga)}` });
+    else if (row.aksi === 'jual') tx = Object.assign(base, { jenis: 'aset_jual', jumlah: Math.round(row.lot * LB * row.harga - row.fee), kategoriId: '', catatan: `Jual ${row.kode} ${row.lot} lot @ ${nm(row.harga)}` });
+    else { const k = Store.t.Kategori.find(c => c.jenis === 'masuk' && !c.arsip && /divid|investasi|pasif|pemasukan lain/i.test(c.nama)); tx = Object.assign(base, { jenis: 'masuk', jumlah: Math.round(row.nominal), kategoriId: k ? k.id : '', catatan: `Dividen ${row.kode}` }); }
+    return [{ op: 'upsert', t: 'Saham', row }, { op: 'upsert', t: 'Transaksi', row: tx }];
+  }
+  function hapusDialog(t) {
+    const r = LOG().find(x => x.id === t.id) || { ty: t.aksi.toUpperCase(), amt: 0 };
+    const s = UI.sheet({ title: 'Hapus transaksi?', cls: 'small', body: `<div class="card tj-row">${bdg(r.ty)} <b>${U.esc(t.kode)}</b> · ${U.tgl(t.tanggal)} · ${rpK(r.amt, 1)}</div>
+      <p class="muted">Posisi, average, P&L, kas RDN & meterai dihitung ulang. Tidak dapat dibatalkan.</p>
+      <label class="check"><input type="checkbox" data-k><span>Saya mengerti dan ingin menghapus</span></label>`, foot: `<button class="btn ghost" data-x>Batal</button><button class="btn danger" data-ok disabled>${I('trash-2')} Hapus</button>` });
+    const ok = s.el.querySelector('[data-ok]');
+    s.el.querySelector('[data-k]').onchange = e => ok.disabled = !e.target.checked;
+    s.el.querySelector('[data-x]').onclick = () => s.close();
+    ok.onclick = () => { Store.commit(hapusOps(t)); sinkronMaterai(); s.close(); UI.toast('Data dihapus.'); };
+  }
+  UI.act('sh-catat', el => UI.tradeForm(null, el && el.dataset ? { side: el.dataset.aksi, kode: el.dataset.kode, akun: el.dataset.akun } : {}));
+  UI.act('sh-edit', el => {
+    const t = (Store.t.Saham || []).find(x => x.id === el.dataset.id); if (!t) return;
+    if (t.aksi === 'materai') return UI.toast('Bea meterai dihitung otomatis dari transaksi harian.', 'info');
+    if (t.aksi === 'dividen') return cashForm(null, t);
+    UI.tradeForm(t);
+  });
+
+  // ===== Modal: Cash flow (Top up / Tarik / Dividen / Penyesuaian) =====
+  function cashForm(tipe, divRow) {
+    const ak = akunList(); if (!ak.length) return portofolioBaru();
+    let ct = divRow ? 'Dividen' : tipe || 'Top up';
+    const akun0 = (divRow && divRow.walletId) || F.akun || ak[0].id, lain = Store.wallets().filter(w => w.jenis !== 'rdn');
+    const s = UI.sheet({ title: (divRow ? 'Ubah' : 'Catat') + ' cash flow', cls: 'small', body: `
+      <div class="seg tj-side four">${['Top up', 'Tarik', 'Dividen', 'Penyesuaian'].map(x => `<button type="button" data-ct="${x}">${x}</button>`).join('')}</div>
+      <div class="grid2">${UI.field('Portofolio', `<select name="akun">${ak.map(w => `<option value="${w.id}" ${w.id === akun0 ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${divRow ? divRow.tanggal : U.today()}">`)}</div>
+      ${UI.field('Nominal', UI.rpInput('nominal', divRow ? divRow.nominal : 0), '')}
+      <div data-f="Top up Tarik">${UI.field('Rekening bank', `<select name="bank">${lain.map(w => `<option value="${w.id}">${U.esc(w.nama)}</option>`).join('')}</select>`)}${UI.biayaField()}</div>
+      <div data-f="Dividen">${UI.field('Kode saham', `<input name="kode" maxlength="4" class="up" value="${divRow ? divRow.kode : ''}" placeholder="BBCA">`)}</div>
+      <div data-f="Penyesuaian">${UI.field('Saldo RDN sebenarnya', UI.rpInput('aktual', 0), 'Isi saldo yang terlihat di aplikasi sekuritas; selisihnya dicatat sebagai penyesuaian.')}</div>
+      ${UI.field('Catatan', `<input name="catatan" maxlength="120" value="${U.esc(divRow ? divRow.catatan : '')}">`)}<div class="tj-sum"></div><div class="warn-line bad" data-w></div>`,
+      foot: `${divRow ? `<button class="btn ghost danger" data-del>${I('trash-2')}</button>` : ''}<button class="btn" data-ok>Simpan</button>` });
+    UI.bindRp(s.el);
+    const q = k => s.el.querySelector(`[name=${k}]`);
+    const prev = () => {
+      s.el.querySelectorAll('[data-ct]').forEach(b => b.classList.toggle('on', b.dataset.ct === ct));
+      s.el.querySelectorAll('[data-f]').forEach(d => d.hidden = d.dataset.f.indexOf(ct) < 0);
+      q('nominal').closest('.field').hidden = ct === 'Penyesuaian';
+      const cash = ringkasAkun([q('akun').value]).cash, m = U.parseRp(q('nominal').value), a = U.parseRp(q('aktual').value);
+      const d = ct === 'Tarik' ? -m : ct === 'Penyesuaian' ? (a ? a - cash : 0) : m;
+      s.el.querySelector('.tj-sum').innerHTML = `<div class="kv"><span>Cash saat ini</span><b>${U.rp(cash)}</b></div><div class="kv"><span>Setelah transaksi</span><b>${U.rp(cash + d)}</b></div>`;
+      return { m, a, d, cash };
+    };
+    s.el.querySelectorAll('[data-ct]').forEach(b => b.onclick = () => { ct = b.dataset.ct; prev(); });
+    s.el.addEventListener('input', prev); s.el.addEventListener('change', prev); prev();
+    s.el.querySelector('[data-ok]').onclick = () => {
+      const v = UI.formData(s.el), x = prev(), akun = v.akun, tgl = v.tanggal || U.today(), now = new Date().toISOString(), W = m => { s.el.querySelector('[data-w]').textContent = m; };
+      if (ct === 'Penyesuaian') { if (!x.a && x.a !== 0) return W('Isi saldo sebenarnya.'); if (!x.d) return W('Tidak ada selisih.');
+        Store.upsert('Transaksi', { id: U.uid('t'), tanggal: tgl, jenis: 'penyesuaian', jumlah: x.d, kategoriId: '', walletId: akun, walletTujuan: '', biaya: 0, catatan: v.catatan || 'Penyesuaian saldo RDN', dibayarOleh: me(), tag: 'saham', sumber: 'saham', refId: '', periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] }); s.close(); return UI.toast('Penyesuaian dicatat.'); }
+      if (!x.m) return W('Nominal wajib diisi.');
+      if (ct === 'Dividen') { const kode = String(v.kode || '').toUpperCase(); if (!/^[A-Z]{4}$/.test(kode)) return W('Kode saham wajib untuk dividen.');
+        const row = Object.assign({}, divRow || { id: U.uid('sh'), dibuat: now, txId: '', oleh: me(), lot: 0, harga: 0, fee: 0, setup: '' }, { tanggal: tgl, kode, aksi: 'dividen', nominal: x.m, walletId: akun, catatan: v.catatan || '' });
+        Store.commit(opsUang(row)); s.close(); return UI.toast('Dividen ' + kode + ' dicatat.'); }
+      if (!v.bank) return W('Tambahkan rekening bank dulu di Kas & Bank.');
+      const masuk = ct === 'Top up';
+      Store.upsert('Transaksi', { id: U.uid('t'), tanggal: tgl, jenis: 'transfer', jumlah: x.m, kategoriId: '', walletId: masuk ? v.bank : akun, walletTujuan: masuk ? akun : v.bank, biaya: v.biayaLain || 0, catatan: v.catatan || (masuk ? 'Top up ' : 'Tarik dana ') + akunNama(akun), dibayarOleh: me(), tag: 'saham', sumber: 'saham', refId: '', periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] });
+      s.close(); UI.toast(ct + ' tercatat.');
+    };
+    const dl = s.el.querySelector('[data-del]'); if (dl) dl.onclick = () => { s.close(); hapusDialog(divRow); };
+  }
+  UI.act('sh-cash', () => cashForm());
+
+  // ===== Settings =====
+  UI.act('sh-set', () => {
+    const ak = akunList(), id = F.akun || (ak[0] || {}).id, c = cfg(id), w = Store.byId.Wallet[id];
+    const s = UI.sheet({ title: 'Pengaturan saham', body: `
+      ${w ? `${UI.field('Portofolio', `<select name="pf">${ak.map(x => `<option value="${x.id}" ${x.id === id ? 'selected' : ''}>${U.esc(x.nama)}</option>`).join('')}</select>`)}
+      <div class="grid2">${UI.field('Fee beli (%)', `<input type="number" step="0.001" name="beli" value="${c.beli}">`)}${UI.field('Fee jual (%)', `<input type="number" step="0.001" name="jual" value="${c.jual}">`)}</div>
+      <div class="grid2">${UI.field('Bea meterai (Rp)', `<input type="number" name="materai" value="${c.materai}">`)}${UI.field('Ambang meterai / hari', `<input type="number" name="ambang" value="${c.ambang}">`)}</div>
+      <p class="muted small">Perubahan fee hanya berlaku untuk transaksi baru. Isi meterai 0 untuk mematikan.</p>` : ''}
+      <h4 class="mini-h">Setup / strategi</h4>
+      <div class="chips" data-setups>${setups().map(x => `<span class="chip on tj-chip">${U.esc(x)}<button type="button" data-hs="${U.esc(x)}" aria-label="Hapus ${U.esc(x)}">${I('x')}</button></span>`).join('')}</div>
+      <div class="row-btns"><input name="baru" placeholder="Nama setup baru" maxlength="40"><button type="button" class="btn ghost" data-tambah>Tambah</button></div>
+      <h4 class="mini-h">Lainnya</h4>
+      <div class="list"><button type="button" class="row" data-a="harga">${I('pencil')}<div class="tx-txt"><b>Isi harga terakhir manual</b></div></button><button type="button" class="row" data-a="baru">${I('plus')}<div class="tx-txt"><b>Portofolio baru</b></div></button>
+        <button type="button" class="row" data-a="tg">${I('send')}<div class="tx-txt"><b>Alert SL/TP via Telegram</b><small>${App.tgSiap && App.tgSiap() ? 'Aktif — dikirim saat harga diperbarui' : 'Hubungkan Telegram di Lainnya › Notifikasi'}</small></div></button></div>`,
+      foot: `<button class="btn" data-ok>Simpan</button>` });
+    let sts = setups();
+    const drawS = () => { s.el.querySelector('[data-setups]').innerHTML = sts.map(x => `<span class="chip on tj-chip">${U.esc(x)}<button type="button" data-hs="${U.esc(x)}" aria-label="Hapus">${I('x')}</button></span>`).join(''); };
+    s.el.addEventListener('click', e => { const h = e.target.closest('[data-hs]'); if (h) { sts = sts.filter(x => x !== h.dataset.hs); drawS(); } });
+    s.el.querySelector('[data-tambah]').onclick = () => { const i = s.el.querySelector('[name=baru]'), v = i.value.trim(); if (v && sts.indexOf(v) < 0) { sts.push(v); drawS(); } i.value = ''; };
+    const pf = s.el.querySelector('[name=pf]'); if (pf) pf.onchange = () => { s.close(); F.akun = pf.value; UI.acts['sh-set'](); };
+    s.el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { s.close(); if (b.dataset.a === 'harga') hargaManual(); else if (b.dataset.a === 'baru') portofolioBaru(); else UI.go('pengaturan/notif'); });
+    s.el.querySelector('[data-ok]').onclick = () => {
+      const v = UI.formData(s.el);
+      if (w) { const sa = setAkun(); sa[id] = { beli: Number(v.beli) || 0, jual: Number(v.jual) || 0, materai: Number(v.materai) || 0, ambang: Number(v.ambang) || 10000000 }; setJson('sahamAkun', sa); }
+      setJson('sahamSetup', sts); s.close(); sinkronMaterai(); UI.toast('Pengaturan disimpan.');
+    };
+  });
+
+  // ===== Pintasan keyboard (desktop): T trade, C cash flow, H sembunyikan, / cari =====
+  document.addEventListener('keydown', e => {
+    if (UI.cur !== 'saham' || document.querySelector('.sheet-wrap, .sheet.open') || /INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 't') { e.preventDefault(); UI.tradeForm(); } else if (k === 'c') { e.preventDefault(); cashForm(); }
+    else if (k === 'h') { const b = document.querySelector('[data-act=toggle-hide]'); if (b) b.click(); }
+    else if (e.key === '/') { e.preventDefault(); UI.go('saham/aktivitas'); setTimeout(() => { const i = document.querySelector('[data-input=sh-q]'); if (i) i.focus(); }, 80); }
+  });
 })();

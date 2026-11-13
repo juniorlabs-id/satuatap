@@ -80,9 +80,15 @@
   };
 
   // ---------- Tampilan halaman ----------
+  let PEMILIK = '';   // '' = semua, 'bersama', atau email anggota
   UI.rdView = () => {
-    const list = apps(), sold = Calc.investasi('reksadana', true).filter(i => i.x.status === 'terjual');
-    if (!list.length) return `<div class="card rd-empty">${UI.empty('chart-pie', 'Catat reksa dana per aplikasi', 'Cukup satu angka per portofolio di tiap aplikasi (Bibit, Bareksa, Ajaib, …), masing-masing bisa ditautkan ke tujuan berbeda. Perbarui sebulan sekali — grafik pertumbuhan dibuat otomatis.', `<button class="btn" data-act="rd-add">${I('plus')} Tambah aplikasi</button>`)}</div>`;
+    const semua = apps(), sold = Calc.investasi('reksadana', true).filter(i => i.x.status === 'terjual');
+    const pemiliks = Array.from(new Set(semua.map(i => pemilik(i.x) || 'bersama')));
+    if (PEMILIK && pemiliks.indexOf(PEMILIK) < 0) PEMILIK = '';
+    const list = PEMILIK ? semua.filter(i => (pemilik(i.x) || 'bersama') === PEMILIK) : semua;
+    const chipPemilik = pemiliks.length > 1 ? `<div class="rd-own">${[['', 'Semua', semua]].concat(pemiliks.sort((a, b) => (b === me()) - (a === me())).map(p => [p, p === 'bersama' ? 'Bersama' : p === me() ? 'Saya' : Store.memberName(p), semua.filter(i => (pemilik(i.x) || 'bersama') === p)]))
+      .map(o => `<button class="rd-own-c ${PEMILIK === o[0] ? 'on' : ''}" data-act="rd-own" data-v="${o[0]}">${o[0] && o[0] !== 'bersama' ? UI.avatar(o[0], true) : `<span class="rd-own-ic">${I(o[0] ? 'users' : 'layout-grid')}</span>`}<span><b>${U.esc(o[1])}</b><small>${UI.ms(U.sum(o[2], i => i.nilai))}</small></span></button>`).join('')}</div>` : '';
+    if (!semua.length) return `<div class="card rd-empty">${UI.empty('chart-pie', 'Catat reksa dana per aplikasi', 'Cukup satu angka per portofolio di tiap aplikasi (Bibit, Bareksa, Ajaib, …), masing-masing bisa ditautkan ke tujuan berbeda. Perbarui sebulan sekali — grafik pertumbuhan dibuat otomatis.', `<button class="btn" data-act="rd-add">${I('plus')} Tambah aplikasi</button>`)}</div>`;
     const nilai = U.sum(list, i => i.nilai), modal = U.sum(list, i => i.modal), hasil = nilai - modal, pct = modal ? hasil / modal : 0;
     const deret = deretTotal(list), bul = hasilBulanan(list, 12), ini = bul[bul.length - 1];
     const umur = x => x.tglNilai ? U.diffDays(x.tglNilai, U.today()) : 999;
@@ -94,13 +100,13 @@
     if (pts.length === 1) pts = [Object.assign({}, pts[0], { d: U.addDays(pts[0].d, -1) }), pts[0]];
     const awal = pts[0], ubah = (pts[pts.length - 1].bal - awal.bal) - (pts[pts.length - 1].m - awal.m);
     const totHasil12 = U.sum(bul, r => r.hasil), naikBln = bul.filter(r => r.ada && r.hasil > 0).length, adaBln = bul.filter(r => r.ada).length;
-    return `
+    return `${chipPemilik}
       <div class="hero rd-hero">
-        <div class="hero-top"><small>${I('chart-pie')} Total reksa dana · ${grupApp(list).length} aplikasi${list.length > grupApp(list).length ? ' · ' + list.length + ' portofolio' : ''}</small></div>
+        <div class="hero-top"><small>${I('chart-pie')} ${PEMILIK ? 'Reksa dana ' + (PEMILIK === 'bersama' ? 'bersama' : PEMILIK === me() ? 'saya' : U.esc(Store.memberName(PEMILIK))) : 'Total reksa dana'} · ${grupApp(list).length} aplikasi${list.length > grupApp(list).length ? ' · ' + list.length + ' portofolio' : ''}</small></div>
         <div class="rd-big">${UI.m(nilai)}</div>
         <div class="rd-pill ${hasil >= 0 ? 'naik' : 'turun'}">${I(hasil >= 0 ? 'arrow-up-right' : 'arrow-down-left')} ${hasil >= 0 ? '+' : '−'}${UI.ms(Math.abs(hasil))} (${hasil >= 0 ? '+' : '−'}${U.pct(Math.abs(pct), 1)}) <span>sejak awal</span></div>
         <div class="rd-split"><div><small>Total disetor</small><b>${UI.ms(modal)}</b></div><div><small>Hasil bulan ini</small><b class="${ini.hasil >= 0 ? 'naik' : 'turun'}">${ini.hasil >= 0 ? '+' : '−'}${UI.ms(Math.abs(ini.hasil))}</b></div></div>
-        <button class="btn on-dark block" data-act="rd-update">${I('refresh-cw')} Perbarui nilai${terlama > 30 ? ' · terakhir ' + terlama + ' hari lalu' : ''}</button>
+        <button class="btn on-dark block" data-act="rd-update" ${PEMILIK && PEMILIK !== me() && PEMILIK !== 'bersama' ? 'data-semua="1"' : ''}>${I('refresh-cw')} Perbarui nilai${terlama > 30 ? ' · terakhir ' + terlama + ' hari lalu' : ''}</button>
       </div>
       ${terlama > 30 ? `<div class="alert warn" data-act="rd-update">${I('bell-ring')}<div><b>Waktunya update bulanan</b><small>${basiSaya} portofolio milik Anda belum diperbarui. Buka aplikasinya, salin total nilainya ke sini — 1 menit selesai.</small></div>${I('chevron-right')}</div>` : ''}
       <div class="card rd-trend">
@@ -138,6 +144,7 @@
       <p class="muted small">Angka hanya catatan dari nilai yang Anda masukkan, bukan rekomendasi investasi.</p><div class="spacer"></div>`;
   };
   UI.act('rd-per', el => { PERIODE = el.dataset.p; UI.render(); });
+  UI.act('rd-own', el => { PEMILIK = el.dataset.v; UI.render(); });
 
   // ---------- Simpan titik riwayat ----------
   const rowBaru = (x, nilai, modal, tgl) => {
@@ -148,11 +155,11 @@
   };
 
   /** Beli/setor ke portofolio (dipakai dari halaman Tujuan): saldo dompet turun, modal & nilai portofolio naik. */
-  UI.rdSetor = (id, jumlah, tgl, walletId, oleh, catatan) => {
+  UI.rdSetor = (id, jumlah, tgl, walletId, oleh, catatan, biayaLain) => {
     const i = Calc.investasi('reksadana').find(z => z.x.id === id); if (!i || !jumlah) return;
     const now = new Date().toISOString();
     Store.commit([{ op: 'upsert', t: 'Investasi', row: rowBaru(i.x, i.nilai + jumlah, i.modal + jumlah, tgl) },
-      { op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: tgl, jenis: 'aset_beli', jumlah, kategoriId: '', walletId, walletTujuan: '', biaya: 0, catatan: catatan || 'Beli reksa dana ' + lbl(i.x), dibayarOleh: oleh || me(), tag: '', sumber: 'aset', refId: id, periodeRef: tgl.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } }]);
+      { op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: tgl, jenis: 'aset_beli', jumlah, kategoriId: '', walletId, walletTujuan: '', biaya: biayaLain || 0, catatan: catatan || 'Beli reksa dana ' + lbl(i.x), dibayarOleh: oleh || me(), tag: '', sumber: 'aset', refId: id, periodeRef: tgl.slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } }]);
   };
 
   // ---------- Perbarui semua (layar bulanan) ----------
@@ -168,6 +175,7 @@
         <div class="grid2">${UI.field('Nilai sekarang', UI.rpInput('v_' + i.x.id, 0, U.fmtNum(Math.round(i.nilai))))}${UI.field('Setoran baru', UI.rpInput('s_' + i.x.id, 0))}</div>
         <small class="rd-upd-hint muted" data-hint="${i.x.id}"></small></div>`).join('')).join('')}
       <div class="grid2">${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}${UI.field('Setoran dibayar dari', `<select name="sumber">${UI.sumberDanaOpts(localStorage.getItem('sa:rdSumber') || '').replace('Sudah dimiliki sebelumnya (tidak memotong saldo)', 'Sudah tercatat / tidak memotong saldo')}</select>`)}</div>
+      ${UI.biayaField(0, 'Opsional — total biaya transfer/pembelian untuk setoran di atas.')}
       <small class="muted">Kotak nilai yang dikosongkan = tidak berubah.</small>`,
       foot: `<button class="btn" data-ok>Simpan semua</button>` });
     UI.bindRp(s.el);
@@ -180,13 +188,13 @@
     }); };
     s.el.addEventListener('input', hint);
     s.el.querySelector('[data-ok]').onclick = () => {
-      const f = UI.formData(s.el), tgl = f.tanggal || U.today(), ops = []; let n = 0;
+      const f = UI.formData(s.el), tgl = f.tanggal || U.today(), ops = []; let n = 0, biayaSisa = f.biayaLain || 0;
       list.forEach(i => {
         const v = Number(f['v_' + i.x.id]) || 0, st = Number(f['s_' + i.x.id]) || 0;
         if (!v && !st) return;
         const nilai = v || (i.nilai + st), modal = i.modal + st;
         ops.push({ op: 'upsert', t: 'Investasi', row: rowBaru(i.x, nilai, modal, tgl) });
-        if (st) ops.push(...UI.opsBeliAset(f.sumber, st, tgl, i.x.id, 'Setor reksa dana ' + lbl(i.x)));
+        if (st) { ops.push(...UI.opsBeliAset(f.sumber, st, tgl, i.x.id, 'Setor reksa dana ' + lbl(i.x), biayaSisa)); if (f.sumber) biayaSisa = 0; }
         n++;
       });
       if (!n) return UI.toast('Belum ada angka yang diisi.', 'warn');
@@ -205,7 +213,7 @@
       ${isNew && !appAwal ? `<div class="chips sm">${pilihan.slice(0, 9).map(a => `<button type="button" class="chip" data-app="${U.esc(a)}">${U.esc(a)}</button>`).join('')}</div>` : ''}
       <div class="grid2">${UI.field('Untuk tujuan', `<select name="tujuanId">${UI.tujuanOpts(x.tujuanId)}</select>`)}${UI.field('Nama portofolio', `<input name="kode" maxlength="40" value="${U.esc(porto(x))}" placeholder="ikut nama tujuan">`, 'Opsional')}</div>
       <div class="grid2">${UI.field('Total disetor', UI.rpInput('modal', x.modal), 'Total uang yang pernah Anda masukkan (bersih)')}${UI.field('Nilai sekarang', UI.rpInput('nilai', x.nilai), 'Total nilai portofolio di aplikasi')}</div>
-      ${isNew ? `<div class="grid2">${UI.field('Mulai berinvestasi', `<input type="date" name="tanggal" value="${x.tanggal}">`)}${UI.field('Dana dari', `<select name="sumber">${UI.sumberDanaOpts('')}</select>`)}</div>` : ''}
+      ${isNew ? `<div class="grid2">${UI.field('Mulai berinvestasi', `<input type="date" name="tanggal" value="${x.tanggal}">`)}${UI.field('Dana dari', `<select name="sumber">${UI.sumberDanaOpts('')}</select>`)}</div>${UI.biayaField()}` : ''}
       ${UI.kepemilikanField(x.kepemilikan)}
       <label class="check"><input type="checkbox" name="zakat" ${x.zakat ? 'checked' : ''}><span>Dihitung untuk zakat mal</span></label>
       ${UI.field('Catatan', `<input name="catatan" maxlength="120" value="${U.esc(x.catatan)}" placeholder="mis. RD pasar uang + saham, autodebet tgl 5">`)}`,
@@ -217,7 +225,7 @@
       if (!v.nama) return UI.toast('Nama aplikasi wajib diisi.', 'warn');
       if (!v.modal && !v.nilai) return UI.toast('Isi total disetor atau nilai sekarang.', 'warn');
       v.modal = v.modal || v.nilai; v.nilai = v.nilai || v.modal;
-      const sumber = v.sumber; delete v.sumber;
+      const sumber = v.sumber, biayaLain = v.biayaLain || 0; delete v.sumber; delete v.biayaLain;
       if (sumber && sumber.indexOf('g:') === 0 && !v.tujuanId) v.tujuanId = sumber.slice(2);
       v.nama = String(v.nama).trim(); const ada = appAda.find(a => a.toLowerCase() === v.nama.toLowerCase()); if (ada) v.nama = ada;   // satukan ejaan nama aplikasi
       v.kode = String(v.kode || '').trim();
@@ -226,7 +234,7 @@
       if (isNew) row.riwayatNilai = [[row.tanggal, row.modal, row.modal]].concat(row.nilai !== row.modal || row.tanggal !== U.today() ? [[U.today(), row.nilai, row.modal]] : []);
       if (isNew) row.tglNilai = U.today();
       else if (v.nilai !== Number(x.nilai) || v.modal !== Number(x.modal)) row = Object.assign(row, rowBaru(x, v.nilai, v.modal, U.today()));
-      Store.commit([{ op: 'upsert', t: 'Investasi', row }].concat(isNew ? UI.opsBeliAset(sumber, row.modal, row.tanggal, row.id, 'Reksa dana ' + lbl(row)) : []));
+      Store.commit([{ op: 'upsert', t: 'Investasi', row }].concat(isNew ? UI.opsBeliAset(sumber, row.modal, row.tanggal, row.id, 'Reksa dana ' + lbl(row), biayaLain) : []));
       s.close(); UI.toast(isNew ? lbl(row) + ' ditambahkan.' : 'Tersimpan.');
     };
     const d = s.el.querySelector('[data-del]');
@@ -257,6 +265,7 @@
     const s = UI.sheet({ title: 'Tarik dari ' + lbl(x), cls: 'small', body: `
       ${UI.field('Uang diterima', UI.rpInput('jumlah', 0), 'Nilai sekarang ' + U.rp(i.nilai))}
       <div class="grid2">${UI.field('Masuk ke', `<select name="walletId">${UI.walletOpts(localStorage.getItem('sa:lastWallet'))}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>
+      ${UI.biayaField(0, 'Opsional — biaya pencairan/transfer.')}
       <div class="calc-hint small"></div>`, foot: `<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
     const hint = s.el.querySelector('.calc-hint');
@@ -268,7 +277,7 @@
       const now = new Date().toISOString(), ops = [];
       if (r.frac > 0.999) ops.push({ op: 'upsert', t: 'Investasi', row: Object.assign(rowBaru(x, 0, i.modal, v.tanggal), { nilai: i.nilai, status: 'terjual', tglJual: v.tanggal, hargaJual: r.j }) });
       else ops.push({ op: 'upsert', t: 'Investasi', row: rowBaru(x, i.nilai - r.j, i.modal - r.modal, v.tanggal) });
-      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: r.j, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: 0, catatan: 'Tarik reksa dana ' + lbl(x), dibayarOleh: me(), tag: '', sumber: 'aset', refId: x.id, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
+      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: r.j, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: 'Tarik reksa dana ' + lbl(x), dibayarOleh: me(), tag: '', sumber: 'aset', refId: x.id, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
       Store.commit(ops); s.close(); UI.toast(U.rp(r.j) + ' masuk ke dompet.');
     };
   }

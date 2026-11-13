@@ -152,7 +152,7 @@
   AI.dataMinggu = () => {
     const a = U.addDays(U.today(), -6), b = U.addDays(U.today(), -13), c = U.addDays(U.today(), -7), per = (f, t) => {
       const m = {}; let tot = 0;
-      Store.t.Transaksi.forEach(x => { if (x.tanggal >= f && x.tanggal <= t) { const e = Calc.expAmount(x); const n = katNama(x.kategoriId); if (e && n) { m[n] = (m[n] || 0) + e; tot += e; } } });
+      Store.t.Transaksi.forEach(x => { if (x.tanggal >= f && x.tanggal <= t) Calc.expSplit(x).forEach(([k, e]) => { const n = katNama(k); if (e && n) { m[n] = (m[n] || 0) + e; tot += e; } }); });
       return { total: bulat(tot), kategori: Object.keys(m).sort((p, q) => m[q] - m[p]).slice(0, 8).map(k => [k, bulat(m[k])]) };
     };
     return { mingguIni: Object.assign({ dari: a, sampai: U.today() }, per(a, U.today())), mingguLalu: Object.assign({ dari: b, sampai: c }, per(b, c)),

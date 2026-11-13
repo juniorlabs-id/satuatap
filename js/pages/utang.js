@@ -46,13 +46,13 @@
     if (l.next) return UI.payOcc(l.next.id);
     // tidak terjadwal: catat pembayaran bebas
     const me = Store.me.email, pi = l.p.arah === 'piutang';
-    const s = UI.sheet({ title: (pi ? 'Terima pembayaran · ' : 'Bayar · ') + l.p.pihak, cls: 'small', body: `${UI.field('Jumlah', UI.rpInput('jumlah', Math.min(l.sisa, l.cicilan || l.sisa)))}<div class="grid2">${UI.field(pi ? 'Masuk ke' : 'Dari', `<select name="walletId">${UI.walletOpts(l.p.walletId)}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>`,
+    const s = UI.sheet({ title: (pi ? 'Terima pembayaran · ' : 'Bayar · ') + l.p.pihak, cls: 'small', body: `${UI.field('Jumlah', UI.rpInput('jumlah', Math.min(l.sisa, l.cicilan || l.sisa)))}<div class="grid2">${UI.field(pi ? 'Masuk ke' : 'Dari', `<select name="walletId">${UI.walletOpts(l.p.walletId)}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>${UI.biayaField(0, pi ? 'Opsional — potongan saat uang diterima.' : 'Opsional — denda, biaya admin, biaya transfer.')}`,
       foot: `<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
     s.el.querySelector('[data-ok]').onclick = () => {
       const f = UI.formData(s.el); if (!f.jumlah) return;
       const cic = (Store.t.Kategori.find(k => /cicilan/i.test(k.nama) && k.jenis === 'keluar') || {}).id || '';
-      Store.upsert('Transaksi', { id: U.uid('t'), tanggal: f.tanggal, jenis: pi ? 'pinjam_kembali' : 'keluar', jumlah: f.jumlah, kategoriId: pi ? '' : cic, walletId: f.walletId, walletTujuan: '', biaya: 0, catatan: (pi ? 'Pengembalian ' : 'Bayar ') + l.p.pihak, dibayarOleh: me, tag: '', sumber: 'app', refId: l.p.id, periodeRef: f.tanggal.slice(0, 7), dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
+      Store.upsert('Transaksi', { id: U.uid('t'), tanggal: f.tanggal, jenis: pi ? 'pinjam_kembali' : 'keluar', jumlah: f.jumlah, kategoriId: pi ? '' : cic, walletId: f.walletId, walletTujuan: '', biaya: f.biayaLain || 0, catatan: (pi ? 'Pengembalian ' : 'Bayar ') + l.p.pihak, dibayarOleh: me, tag: '', sumber: 'app', refId: l.p.id, periodeRef: f.tanggal.slice(0, 7), dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
       if (f.jumlah >= l.sisa) Store.upsert('Pinjaman', { id: l.p.id, lunas: true });
       s.close(); UI.toast(f.jumlah >= l.sisa ? 'Lunas! 🎉' : 'Tercatat.');
     };

@@ -27,14 +27,16 @@
     ${Calc.goals().filter(x => !x.t.arsip && !x.t.walletId && x.dana > 0).length ? `<optgroup label="Dari dana tujuan">${Calc.goals().filter(x => !x.t.arsip && !x.t.walletId && x.dana > 0).map(x => `<option value="g:${x.t.id}">${U.esc(x.t.nama)} — ${U.rpShort(x.dana)}</option>`).join('')}</optgroup>` : ''}`;
   UI.tujuanOpts = (sel) => `<option value="">— tidak ditautkan —</option>${Calc.goals().filter(x => !x.t.arsip).map(x => `<option value="${x.t.id}" ${x.t.id === sel ? 'selected' : ''}>${U.esc(x.t.nama)}</option>`).join('')}`;
   /** Operasi transaksi untuk pembelian aset sesuai sumber dana. */
-  UI.opsBeliAset = (sumber, jumlah, tanggal, refId, catatan) => {
+  /** Kolom "Biaya admin / lain" yang sama di semua form uang (dipotong dari dompet, dicatat ke kategori Biaya Admin). */
+  UI.biayaField = (val, ket) => UI.field('Biaya admin / lain', UI.rpInput('biayaLain', val || 0, '0'), ket || 'Opsional — mis. biaya transfer, admin bank, ongkir.');
+  UI.opsBeliAset = (sumber, jumlah, tanggal, refId, catatan, biayaLain) => {
     if (!sumber || !jumlah) return [];
     const now = new Date().toISOString(), m = me();
     const base = { kategoriId: '', walletTujuan: '', biaya: 0, dibayarOleh: m, tag: '', sumber: 'aset', periodeRef: '', dicatatOleh: m, dibuat: now, riwayat: [] };
-    if (sumber.indexOf('w:') === 0) return [{ op: 'upsert', t: 'Transaksi', row: Object.assign({}, base, { id: U.uid('t'), tanggal, jenis: 'aset_beli', jumlah, walletId: sumber.slice(2), refId, catatan }) }];
+    if (sumber.indexOf('w:') === 0) return [{ op: 'upsert', t: 'Transaksi', row: Object.assign({}, base, { id: U.uid('t'), tanggal, jenis: 'aset_beli', jumlah, walletId: sumber.slice(2), refId, catatan, biaya: biayaLain || 0 }) }];
     const gid = sumber.slice(2), w = Store.wallets()[0];
     return [{ op: 'upsert', t: 'Transaksi', row: Object.assign({}, base, { id: U.uid('t'), tanggal, jenis: 'tujuan_ambil', jumlah, walletId: w.id, refId: gid, catatan: 'Dipakai untuk ' + catatan }) },
-            { op: 'upsert', t: 'Transaksi', row: Object.assign({}, base, { id: U.uid('t'), tanggal, jenis: 'aset_beli', jumlah, walletId: w.id, refId, catatan }) }];
+            { op: 'upsert', t: 'Transaksi', row: Object.assign({}, base, { id: U.uid('t'), tanggal, jenis: 'aset_beli', jumlah, walletId: w.id, refId, catatan, biaya: biayaLain || 0 }) }];
   };
 
   // ---------- Form beli / ubah ----------
@@ -152,6 +154,7 @@
       ${e.jumlah > 1 ? UI.field('Keping yang dijual', `<input type="number" name="n" min="1" max="${e.jumlah}" value="${e.jumlah}">`, 'Dari ' + e.jumlah + ' keping @ ' + g(e.gramKeping) + ' g') : ''}
       ${UI.field('Harga buyback per gram', UI.rpInput('hb', h ? h.buyback : 0))}
       <div class="grid2">${UI.field('Masuk ke dompet', `<select name="walletId">${UI.walletOpts(localStorage.getItem('sa:lastWallet'))}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>
+      ${UI.biayaField(0, 'Opsional — mis. ongkos kirim/titip jual, biaya transfer.')}
       <label class="check"><input type="checkbox" name="npwp" ${Store.setting('punyaNpwp', 'true') !== 'false' ? 'checked' : ''}><span>Punya NPWP (tarif PPh 22 lebih rendah)</span></label>
       <div class="kv-list card" data-out></div>`, foot: `<button class="btn" data-ok>${I('check')} Catat penjualan</button>` });
     UI.bindRp(s.el);
@@ -174,7 +177,7 @@
         ops.push({ op: 'upsert', t: 'Emas', row: { id: e.id, jumlah: e.jumlah - r.n, hargaBeli: Math.round(e.hargaBeli * (1 - r.frac)), biaya: Math.round((e.biaya || 0) * (1 - r.frac)) } });
         ops.push({ op: 'upsert', t: 'Emas', row: Object.assign({}, e, { id: soldId, jumlah: r.n, hargaBeli: Math.round(e.hargaBeli * r.frac), biaya: Math.round((e.biaya || 0) * r.frac), status: 'terjual', tglJual: v.tanggal, hargaJual: r.net, dibuat: now }) });
       } else ops.push({ op: 'upsert', t: 'Emas', row: { id: e.id, status: 'terjual', tglJual: v.tanggal, hargaJual: r.net } });
-      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: r.net, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: 0, catatan: 'Jual emas ' + g(e.gramKeping * r.n) + ' g', dibayarOleh: me(), tag: '', sumber: 'aset', refId: soldId, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
+      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: r.net, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: 'Jual emas ' + g(e.gramKeping * r.n) + ' g', dibayarOleh: me(), tag: '', sumber: 'aset', refId: soldId, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
       Store.commit(ops); s.close(); UI.toast('Penjualan tercatat · ' + U.rp(r.net) + ' masuk ke dompet.');
     };
   }
@@ -184,14 +187,14 @@
     const s = UI.sheet({ title: 'Gadaikan emas', cls: 'small', body: `<p class="muted small">Emas ditandai "digadaikan" (tetap milik Anda) dan pinjamannya dicatat di Utang & Piutang.</p>
       <div class="grid2">${UI.field('Pinjaman diterima', UI.rpInput('pokok', Math.round(l.nilai * 0.85 / 100000) * 100000))}${UI.field('Pegadaian / lembaga', `<input name="pihak" value="Pegadaian">`)}</div>
       <div class="grid2">${UI.field('Sewa modal % / bulan', `<input type="number" step="0.01" name="sewa" value="1.2">`)}${UI.field('Jangka (bulan)', `<input type="number" name="tenor" min="1" value="4">`)}</div>
-      ${UI.field('Uang masuk ke', `<select name="walletId">${UI.walletOpts()}</select>`)}`, foot: `<button class="btn" data-ok>Simpan</button>` });
+      ${UI.field('Uang masuk ke', `<select name="walletId">${UI.walletOpts()}</select>`)}${UI.biayaField(0, 'Opsional — biaya administrasi / asuransi gadai yang dipotong.')}`, foot: `<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
     s.el.querySelector('[data-ok]').onclick = () => {
       const v = UI.formData(s.el); if (!v.pokok) return UI.toast('Isi nilai pinjaman.', 'warn');
       const pid = U.uid('p'), now = new Date().toISOString(), tenor = Math.max(1, Number(v.tenor) || 4);
       Store.commit([
         { op: 'upsert', t: 'Pinjaman', row: { id: pid, arah: 'utang', jenis: 'gadai', pihak: v.pihak || 'Pegadaian', pokok: v.pokok, bunga: (Number(v.sewa) || 0) * 12, metode: 'flat', tenor, mulai: U.today(), tanggalBayar: 0, cicilan: 0, walletId: v.walletId, lunas: false, catatan: 'Gadai emas ' + g(l.gram) + ' g', dibuat: now } },
-        { op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: U.today(), jenis: 'pinjam_terima', jumlah: v.pokok, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: 0, catatan: 'Gadai emas ' + g(l.gram) + ' g', dibayarOleh: me(), tag: '', sumber: 'gadai', refId: pid, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } },
+        { op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: U.today(), jenis: 'pinjam_terima', jumlah: v.pokok, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: 'Gadai emas ' + g(l.gram) + ' g', dibayarOleh: me(), tag: '', sumber: 'gadai', refId: pid, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } },
         { op: 'upsert', t: 'Emas', row: { id: e.id, status: 'gadai', pinjamanId: pid } }]);
       s.close(); UI.toast('Gadai tercatat. Jatuh tempo ' + U.tgl(U.addMonths(U.today(), tenor)) + '.');
     };
@@ -200,14 +203,14 @@
     const e = l.e, p = Store.byId.Pinjaman[e.pinjamanId], bln = p ? Math.max(1, Math.ceil(U.diffDays(p.mulai, U.today()) / 30)) : 1;
     const tot = p ? Math.round(p.pokok * (1 + (p.bunga / 12 / 100) * bln)) : 0;
     const s = UI.sheet({ title: 'Tebus emas', cls: 'small', body: `${p ? `<p class="muted small">Pinjaman ${U.rp(p.pokok)} sejak ${U.tgl(p.mulai)} (${bln} bulan).</p>` : ''}
-      ${UI.field('Total pelunasan', UI.rpInput('jumlah', tot))}${UI.field('Bayar dari', `<select name="walletId">${UI.walletOpts(p && p.walletId)}</select>`)}`, foot: `<button class="btn" data-ok>Tebus</button>` });
+      ${UI.field('Total pelunasan', UI.rpInput('jumlah', tot))}${UI.field('Bayar dari', `<select name="walletId">${UI.walletOpts(p && p.walletId)}</select>`)}${UI.biayaField()}`, foot: `<button class="btn" data-ok>Tebus</button>` });
     UI.bindRp(s.el);
     s.el.querySelector('[data-ok]').onclick = () => {
       const v = UI.formData(s.el), now = new Date().toISOString(), ops = [{ op: 'upsert', t: 'Emas', row: { id: e.id, status: 'simpan', pinjamanId: '' } }];
       if (p) {
         const cic = (Store.t.Kategori.find(k => /cicilan/i.test(k.nama) && k.jenis === 'keluar') || {}).id || '';
         ops.push({ op: 'upsert', t: 'Pinjaman', row: { id: p.id, lunas: true } });
-        if (v.jumlah) ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: U.today(), jenis: 'keluar', jumlah: v.jumlah, kategoriId: cic, walletId: v.walletId, walletTujuan: '', biaya: 0, catatan: 'Tebus gadai emas', dibayarOleh: me(), tag: '', sumber: 'gadai', refId: p.id, periodeRef: U.today().slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } });
+        if (v.jumlah) ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: U.today(), jenis: 'keluar', jumlah: v.jumlah, kategoriId: cic, walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: 'Tebus gadai emas', dibayarOleh: me(), tag: '', sumber: 'gadai', refId: p.id, periodeRef: U.today().slice(0, 7), dicatatOleh: me(), dibuat: now, riwayat: [] } });
       }
       Store.commit(ops); s.close(); UI.toast('Emas sudah ditebus.');
     };

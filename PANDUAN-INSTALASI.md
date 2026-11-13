@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.6 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.6.1 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -225,7 +225,8 @@ Fonnte adalah layanan pihak ketiga yang mengirim WA dari nomor WhatsApp milik ke
 **Khusus pembaruan ke 1.6:**
 1. Unggah semua file aplikasi baru. Ada file baru: `js/pages/saham.js` dan `api/saham.js`, dan `vercel.json` ikut berubah. Jangan menimpa `js/config.js` milik Anda — cukup ubah `VERSION: '1.6.0'`.
 2. Relay tidak berubah. Lembar baru **Jurnal Saham** dibuat otomatis di file keluarga saat pertama dipakai.
-3. Harga saham otomatis diambil lewat `/api/saham` (data Yahoo Finance, gratis, tanpa kunci). Bila sumber itu sedang tidak bisa diakses, aplikasi meminta harga diisi manual.
+3. Harga saham dan riwayat penutupan harian (untuk grafik Portofolio vs IHSG & max drawdown) diambil lewat `/api/saham` (data Yahoo Finance, gratis, tanpa kunci). Bila sumber itu sedang tidak bisa diakses, harga bisa diisi manual dan grafik menunggu data tersedia.
+4. Alert SL/TP saham dikirim lewat bot Telegram keluarga (Bagian G) saat harga diperbarui — tidak perlu pengaturan tambahan.
 
 **Yang baru di 1.6:** jurnal saham (Overview, Aktivitas trade & arus kas, Analitik, Kalkulator harga rata-rata, bea meterai otomatis), reksa dana per aplikasi & portofolio dengan setoran dari Tujuan, emas beberapa gramasi sekali catat dengan harga per keping, urutan prioritas Tujuan dengan seret, foto profil, hapus dompet/tujuan salah input, serta menu Aset, Lainnya, Anggaran dan Mutasi yang disederhanakan.
 

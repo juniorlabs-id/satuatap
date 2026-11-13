@@ -14,7 +14,7 @@
       <div class="grid2"><label class="field" data-unit><span>Jumlah <i data-unit-lb></i></span><input type="number" step="any" min="0" name="unit" value="${x.unit || ''}"></label>${UI.field('Tanggal perolehan', `<input type="date" name="tanggal" value="${x.tanggal || U.today()}">`)}</div>
       <div class="grid2">${UI.field('Modal / harga perolehan', UI.rpInput('modal', x.modal))}${UI.field('Nilai saat ini', UI.rpInput('nilai', x.nilai), 'Kosong = sama dengan modal')}</div>
       <div class="grid2" data-jt><label class="field"><span>Jatuh tempo</span><input type="date" name="jatuhTempo" value="${x.jatuhTempo || ''}"></label><label class="field"><span>Imbal hasil % / tahun</span><input type="number" step="0.01" name="imbal" value="${x.imbal || ''}"></label></div>
-      ${isNew ? UI.field('Sumber dana', `<select name="sumber">${UI.sumberDanaOpts('')}</select>`) : ''}
+      ${isNew ? UI.field('Sumber dana', `<select name="sumber">${UI.sumberDanaOpts('')}</select>`) + UI.biayaField(0, 'Opsional — mis. biaya notaris, admin bank, materai.') : ''}
       ${UI.field('Untuk tujuan', `<select name="tujuanId">${UI.tujuanOpts(x.tujuanId)}</select>`)}
       ${UI.kepemilikanField(x.kepemilikan)}
       <label class="check"><input type="checkbox" name="zakat" ${x.zakat ? 'checked' : ''}><span>Dihitung untuk zakat mal <small class="muted">(rumah tinggal & kendaraan pribadi umumnya tidak)</small></span></label>
@@ -33,12 +33,12 @@
       const v = UI.formData(s.el), kp = UI.readKepemilikan(s.el); if (kp === null) return;
       if (!v.nama || !v.modal) return UI.toast('Nama dan modal wajib diisi.', 'warn');
       v.unit = Number(v.unit) || 0; v.imbal = Number(v.imbal) || 0;
-      const sumber = v.sumber; delete v.sumber;
+      const sumber = v.sumber, biayaLain = v.biayaLain || 0; delete v.sumber; delete v.biayaLain;
       if (sumber && sumber.indexOf('g:') === 0 && !v.tujuanId) v.tujuanId = sumber.slice(2);
       const nilai = v.nilai || v.modal, rw = Array.isArray(x.riwayatNilai) ? x.riwayatNilai.slice() : [];
       if (nilai !== x.nilai) rw.push([U.today(), nilai]);
       const row = Object.assign({}, x, v, { nilai, tglNilai: nilai !== x.nilai ? U.today() : x.tglNilai, kepemilikan: kp, riwayatNilai: rw.slice(-60) });
-      Store.commit([{ op: 'upsert', t: 'Investasi', row }].concat(isNew ? UI.opsBeliAset(sumber, v.modal, v.tanggal, row.id, 'Beli ' + K()[v.kelas].label + ': ' + v.nama) : []));
+      Store.commit([{ op: 'upsert', t: 'Investasi', row }].concat(isNew ? UI.opsBeliAset(sumber, v.modal, v.tanggal, row.id, 'Beli ' + K()[v.kelas].label + ': ' + v.nama, biayaLain) : []));
       s.close(); UI.toast('Aset tersimpan.');
     };
     const d = s.el.querySelector('[data-del]');
@@ -87,7 +87,7 @@
     const s = UI.sheet({ title: (x.kelas === 'deposito' || x.kelas === 'sbn' ? 'Cairkan ' : 'Jual ') + x.nama, cls: 'small', body: `
       ${bisaSebagian ? UI.field('Jumlah dijual (' + def.unit + ')', `<input type="number" step="any" name="unit" min="0" max="${x.unit}" value="${x.unit}">`, 'Dari ' + fmtU(x.unit) + ' ' + def.unit) : ''}
       ${UI.field('Uang diterima (bersih)', UI.rpInput('hasil', i.nilai))}
-      <div class="grid2">${UI.field('Masuk ke', `<select name="walletId">${UI.walletOpts(localStorage.getItem('sa:lastWallet'))}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div><div class="calc-hint small"></div>`,
+      <div class="grid2">${UI.field('Masuk ke', `<select name="walletId">${UI.walletOpts(localStorage.getItem('sa:lastWallet'))}</select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>${UI.biayaField()}<div class="calc-hint small"></div>`,
       foot: `<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
     const hint = s.el.querySelector('.calc-hint');
@@ -103,7 +103,7 @@
         ops.push({ op: 'upsert', t: 'Investasi', row: { id: x.id, unit: x.unit - Number(v.unit), modal: i.modal - r.modal, nilai: Math.round((x.nilai || x.modal) * (1 - r.frac)) } });
         ops.push({ op: 'upsert', t: 'Investasi', row: Object.assign({}, x, { id: sid, unit: Number(v.unit), modal: r.modal, nilai: v.hasil, status: 'terjual', tglJual: v.tanggal, hargaJual: v.hasil, dibuat: now, riwayatNilai: [] }) });
       } else ops.push({ op: 'upsert', t: 'Investasi', row: { id: x.id, status: 'terjual', tglJual: v.tanggal, hargaJual: v.hasil } });
-      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: v.hasil, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: 0, catatan: 'Jual ' + x.nama, dibayarOleh: me(), tag: '', sumber: 'aset', refId: sid, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
+      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: v.hasil, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: 'Jual ' + x.nama, dibayarOleh: me(), tag: '', sumber: 'aset', refId: sid, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
       Store.commit(ops); s.close(); UI.toast('Tercatat · ' + U.rp(v.hasil) + ' masuk ke dompet.');
     };
   }
@@ -145,7 +145,7 @@
   UI.rutKelas = k => k === 'saham' ? 'saham' : ({ deposito: 'investasi/sbn', kripto: 'investasi/lain', kendaraan: 'investasi/lain' })[k] || 'investasi/' + k;
   const INV_TILES = () => [{ id: 'saham', icon: 'chart-candlestick', label: 'Saham', to: 'saham' }, { id: 'reksadana', icon: 'chart-pie', label: 'Reksa Dana', to: 'investasi/reksadana' }, { id: 'sbn', icon: 'file-badge', label: 'SBN & Deposito', to: 'investasi/sbn' }, { id: 'properti', icon: 'house', label: 'Properti & Tanah', to: 'investasi/properti' }, { id: 'lain', icon: 'package', label: 'Aset Lain', to: 'investasi/lain' }];
   /** Pindah antarkelas aset: strip geser horizontal agar tidak memakan layar. */
-  UI.invTiles = (sel) => `<nav class="inv-strip" aria-label="Kelas aset">${INV_TILES().map(t => `<a class="inv-pill ${t.id === sel ? 'on' : ''}" href="#/${t.to}">${I(t.icon)}<span>${U.esc(t.label)}</span></a>`).join('')}</nav>`;
+  UI.invTiles = () => '';   // navigasi antarkelas cukup dari menu Aset (tanpa tab ganda di atas halaman)
   UI.page('investasi', {
     head: p => ({ title: p === 'alokasi' ? 'Target Alokasi' : JUDUL[p] || (K()[p] || { label: 'Investasi & Aset' }).label, crumb: 'Aset', back: 'aset',
       right: p === 'reksadana' ? `<button class="icon-btn" data-act="rd-add" aria-label="Tambah aplikasi">${I('plus')}</button>` : p !== 'alokasi' ? `<button class="icon-btn" data-act="inv-add" data-kelas="${K()[p] ? p : 'saham'}" aria-label="Tambah">${I('plus')}</button>` : '' }),
