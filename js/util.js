@@ -17,6 +17,8 @@
     return s + 'Rp ' + a;
   };
   U.fmtNum = v => nf.format(Math.round(U.num(v)));
+  /** Berat emas/desimal: sampai 3 angka di belakang koma (0,5 · 2,25 · 10). */
+  U.gram = v => { const n = Math.round(U.num(v) * 1000) / 1000; return n.toLocaleString('id-ID', { maximumFractionDigits: 3 }); };
   U.pct = (v, d) => (U.num(v) * 100).toFixed(d == null ? 0 : d).replace('.', ',') + '%';
   U.parseRp = s => { s = String(s || '').replace(/[^\d,-]/g, '').replace(',', '.'); return Math.round(Number(s) || 0); };
   U.esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -48,7 +50,7 @@
     if (opt === 'long') return HARI[d.getDay()] + ', ' + d.getDate() + ' ' + BLN_L[d.getMonth()] + ' ' + d.getFullYear();
     if (opt === 'dm') return d.getDate() + ' ' + BLN[d.getMonth()];
     if (opt === 'my') return BLN_L[d.getMonth()] + ' ' + d.getFullYear();
-    if (opt === 'mys') return BLN[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2);
+    if (opt === 'mys') return BLN[d.getMonth()] + " '" + String(d.getFullYear()).slice(2);   // "Jan '25" — tanda ' agar 25 tidak dikira tanggal
     return d.getDate() + ' ' + BLN[d.getMonth()] + ' ' + d.getFullYear();
   };
   U.relDay = s => {
@@ -64,16 +66,18 @@
     if (s < 172800) return 'kemarin'; return Math.floor(s / 86400) + ' hari lalu';
   };
   // Hijriah (Umm al-Qura via Intl; perkiraan — penetapan resmi bisa berbeda 1 hari)
-  let hijriFmt = null;
-  try { hijriFmt = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {}
-  U.hijri = s => { try { return hijriFmt ? hijriFmt.format(U.parseDate(s)).replace(/ H$/, '') + ' H' : ''; } catch (e) { return ''; } };
+  // Nama bulan ditulis sendiri: sebagian HP Android tidak punya nama bulan Hijriah bahasa Indonesia
+  // sehingga Intl memakai nama bulan Masehi (Jumadilakhir → "Juni") dan era yang aneh.
+  U.BLN_H = ['Muharram', 'Safar', 'Rabiulawal', 'Rabiulakhir', 'Jumadilawal', 'Jumadilakhir', 'Rajab', 'Syakban', 'Ramadan', 'Syawal', 'Zulkaidah', 'Zulhijah'];
+  U.hijri = s => { const h = U.hijriParts(s); return h && h.m >= 1 && h.m <= 12 && h.y ? h.d + ' ' + U.BLN_H[h.m - 1] + ' ' + h.y + ' H' : ''; };
   let hpFmt = null; const hpMemo = {};
   U.hijriParts = s => {
     if (s in hpMemo) return hpMemo[s];
     try {
       hpFmt = hpFmt || new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric', year: 'numeric' });
-      const o = {}; hpFmt.formatToParts(U.parseDate(s)).forEach(x => o[x.type] = Number(x.value) || x.value);
-      return (hpMemo[s] = { d: o.day, m: o.month, y: parseInt(o.year, 10) });
+      const o = {}; hpFmt.formatToParts(U.parseDate(s)).forEach(x => { if (x.type === 'day' || x.type === 'month' || x.type === 'year') o[x.type] = parseInt(String(x.value).replace(/[^\d]/g, ''), 10); });
+      if (!o.day || !o.month || !o.year) return (hpMemo[s] = null);
+      return (hpMemo[s] = { d: o.day, m: o.month, y: o.year });
     } catch (e) { return (hpMemo[s] = null); }
   };
 

@@ -31,8 +31,9 @@
 
   // ---------- Data ----------
   const trades = () => (Store.t.Saham || []).slice().sort((a, b) => a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : String(a.dibuat) < String(b.dibuat) ? -1 : 1);
-  /** Akun yang dipakai jurnal: dompet RDN + dompet yang pernah dipakai trade. */
-  const akunList = () => { const ids = new Set(trades().map(t => t.walletId)); Store.wallets().forEach(w => { if (w.jenis === 'rdn') ids.add(w.id); }); return Array.from(ids).filter(id => Store.byId.Wallet[id]).map(id => Store.byId.Wallet[id]); };
+  /** Portofolio = dompet RDN saja. Trade lama yang tercatat di dompet lain (mis. Tunai) ditawarkan untuk dipindah. */
+  const akunList = () => Store.wallets(true).filter(w => w.jenis === 'rdn' && (!w.arsip || trades().some(t => t.walletId === w.id)));
+  const nyasar = () => { const rdn = {}; Store.t.Wallet.forEach(w => { if (w.jenis === 'rdn') rdn[w.id] = 1; }); return trades().filter(t => !rdn[t.walletId]); };
   const akunAktif = () => { const ak = akunList(); return F.akun && ak.some(w => w.id === F.akun) ? [F.akun] : ak.map(w => w.id); };
 
   /** Kalkulasi average cost (mengikuti Trading Journal): posisi, realisasi, dividen, fee. */
@@ -122,14 +123,32 @@
       const o = {}; kode.forEach(k => { const h = harga()[k], base = h ? Number(h[0]) : 1000; o[k] = [Math.max(50, Math.round(base * (1 + (Math.random() - 0.48) * 0.02) / 5) * 5), U.today(), 'Contoh', base]; });
       simpanHarga(o); if (!diam) UI.toast('Harga contoh diperbarui.'); alertSlTp(); return true;
     }
+    let alasan = '';
     try {
-      const r = await fetch('/api/saham?k=' + encodeURIComponent(kode.join(',')), { cache: 'no-store' }), j = await r.json();
-      const o = {}; Object.keys((j && j.data) || {}).forEach(k => { const d = j.data[k]; if (d && d.harga) o[k] = [d.harga, d.tanggal || U.today(), 'Yahoo Finance', d.prev || 0]; });
-      if (!Object.keys(o).length) throw new Error('kosong');
-      simpanHarga(o); if (!diam) UI.toast(Object.keys(o).length + ' harga diperbarui.'); alertSlTp(); return true;
-    } catch (e) { if (!diam) UI.toast('Harga otomatis belum tersedia — isi manual.', 'warn'); return false; }
+      const r = await fetch('/api/saham?k=' + encodeURIComponent(kode.join(',')) + '&t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' });
+      const ct = r.headers.get('content-type') || '';
+      if (!/json/.test(ct)) throw new Error(r.status === 404 ? 'file api/saham.js belum ter-deploy di Vercel' : 'server ' + r.status);
+      const j = await r.json(), o = {};
+      Object.keys((j && j.data) || {}).forEach(k => { const d = j.data[k]; if (d && d.harga) o[k] = [d.harga, d.tanggal || U.today(), d.sumber || j.sumber || 'Otomatis', d.prev || 0]; });
+      if (!Object.keys(o).length) throw new Error(Object.values((j && j.galat) || {})[0] || 'sumber harga tidak menjawab');
+      simpanHarga(o);
+      const gagal = kode.filter(k => !o[k]);
+      if (!diam) UI.toast(Object.keys(o).length + ' harga diperbarui' + (gagal.length ? ' · belum: ' + gagal.join(', ') : '') + '.');
+      alertSlTp(); try { localStorage.setItem('sa:shHargaOk', String(Date.now())); } catch (e) {}
+      return true;
+    } catch (e) { alasan = e && e.message || 'gagal'; }
+    try { localStorage.setItem('sa:shHargaErr', alasan); } catch (e) {}
+    if (!diam) UI.toast('Harga otomatis gagal (' + alasan + ') — isi manual dulu.', 'warn', { ms: 6000 });
+    return false;
   }
-  UI.sahamAutoHarga = () => { try { const t = Number(localStorage.getItem('sa:shHargaT') || 0); if (Date.now() - t < 30 * 60000 || Store.mode === 'demo' || !kodeDipegang().length) return; localStorage.setItem('sa:shHargaT', String(Date.now())); ambilHarga(true); } catch (e) {} };
+  /** Otomatis: saat buka Saham, paling sering tiap 15 menit di jam bursa (09.00–16.15 WIB hari kerja), selain itu tiap 3 jam. */
+  UI.sahamAutoHarga = () => { try {
+    if (Store.mode === 'demo' || !kodeDipegang().length) return;
+    const t = Number(localStorage.getItem('sa:shHargaT') || 0), d = new Date(), m = d.getHours() * 60 + d.getMinutes(), bursa = d.getDay() > 0 && d.getDay() < 6 && m >= 540 && m <= 975;
+    const hm = harga(), basi = kodeDipegang().some(k => !hm[k] || hm[k][1] !== U.today());
+    if (Date.now() - t < (bursa ? 15 : basi ? 30 : 180) * 60000) return;
+    localStorage.setItem('sa:shHargaT', String(Date.now())); ambilHarga(true).then(ok => { if (ok && UI.cur === 'saham') UI.render(); });
+  } catch (e) {} };
   UI.act('sh-harga', async () => { if (!(await ambilHarga())) hargaManual(); });
   function hargaManual() {
     const kode = kodeDipegang(); if (!kode.length) return UI.toast('Belum ada posisi terbuka.', 'warn');
@@ -157,18 +176,24 @@
   let HIST = null, SERI = { key: '', v: null };
   try { HIST = JSON.parse(localStorage.getItem('sa:shHist') || 'null'); } catch (e) {}
   const awalData = () => { const ids = akunAktif(); const d = trades().filter(t => ids.indexOf(t.walletId) > -1).map(t => t.tanggal).concat(Store.t.Transaksi.filter(t => t.jenis === 'transfer' && (ids.indexOf(t.walletTujuan) > -1)).map(t => t.tanggal)).sort(); return d[0] || ''; };
+  /** Muat riwayat harga (sekali per hari per susunan kode). Mengembalikan true hanya bila data baru masuk,
+   *  dan tidak mencoba ulang lebih dari sekali per 15 menit — mencegah render berulang tanpa henti saat gagal. */
+  const COBA = {};
   async function muatHist() {
     const kode = Array.from(new Set(trades().filter(t => t.kode && t.kode !== '-').map(t => t.kode))), dari = awalData();
-    if (!kode.length || !dari) return;
+    if (!kode.length || !dari) return false;
     const kunci = kode.slice().sort().join(',') + '|' + dari;
-    if (HIST && HIST.kunci === kunci && HIST.tgl === U.today()) return;
-    if (Store.mode === 'demo') { HIST = histContoh(kode, dari); HIST.kunci = kunci; SERI.key = ''; return; }
+    if (HIST && HIST.kunci === kunci && HIST.tgl === U.today()) return false;
+    if (COBA[kunci] && Date.now() - COBA[kunci] < 15 * 60000) return false;
+    COBA[kunci] = Date.now();
+    if (Store.mode === 'demo') { HIST = histContoh(kode, dari); HIST.kunci = kunci; SERI.key = ''; return true; }
     try {
       const r = await fetch('/api/saham?hist=1&k=' + encodeURIComponent(kode.join(',')) + '&dari=' + dari, { cache: 'no-store' }), j = await r.json();
-      if (!j || !j.ok) return;
+      if (!j || !j.ok) return false;
       HIST = { kunci, tgl: U.today(), data: j.data || {}, ihsg: j.ihsg || {} }; SERI.key = '';
       try { localStorage.setItem('sa:shHist', JSON.stringify(HIST)); } catch (e) {}
-    } catch (e) {}
+      return true;
+    } catch (e) { return false; }
   }
   function histContoh(kode, dari) {
     const ih = {}, data = {}, hm = harga(); let d = dari, x = 7050;
@@ -233,8 +258,23 @@
   // ---------- Halaman ----------
   const TABS = [['', 'layout-grid', 'Overview'], ['aktivitas', 'arrow-left-right', 'Activity'], ['analitik', 'chart-column', 'Analytics'], ['kalkulator', 'calculator', 'Avg Calc']];
   const tabs = p => `<nav class="tj-tabs">${TABS.map(t => `<a class="${(p || '') === t[0] ? 'on' : ''}" href="#/saham${t[0] ? '/' + t[0] : ''}">${I(t[1])}<span>${t[2]}</span></a>`).join('')}</nav>`;
-  const pfBar = () => { const ak = akunList(); if (!ak.length) return ''; return `<div class="tj-pf">${I('briefcase')}<select data-change="sh-pf" aria-label="Pilih portofolio">${ak.length > 1 ? `<option value="">Semua portofolio (${ak.length})</option>` : ''}${ak.map(w => `<option value="${w.id}" ${F.akun === w.id ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>
-    <button class="btn xs ghost" data-act="sh-cash">${I('plus')} Kas</button><button class="btn xs" data-act="sh-catat">${I('plus')} Trade</button></div>`; };
+  const pindahBanner = () => { const n = nyasar(); if (!n.length) return ''; const w = Array.from(new Set(n.map(t => akunNama(t.walletId)))).join(', ');
+    return `<div class="note warn">${I('triangle-alert')} <span>${n.length} transaksi saham tercatat di dompet <b>${U.esc(w)}</b>, bukan di portofolio RDN — kas ${U.esc(w)} jadi ikut berkurang.</span> <button class="btn xs" data-act="sh-pindah-rdn">Pindahkan ke RDN</button></div>`; };
+  UI.act('sh-pindah-rdn', () => {
+    const n = nyasar(), rdn = Store.wallets().filter(w => w.jenis === 'rdn'); if (!n.length) return;
+    if (!rdn.length) { UI.toast('Buat portofolio RDN dulu.', 'warn'); return portofolioBaru(); }
+    const asal = Array.from(new Set(n.map(t => t.walletId)));
+    const s = UI.sheet({ title: 'Pindahkan ke portofolio RDN', cls: 'small', body: `<p class="muted small">${n.length} transaksi (${Array.from(new Set(n.filter(t => t.kode !== '-').map(t => t.kode))).join(', ')}) di ${asal.map(akunNama).map(U.esc).join(', ')} dipindah beserta catatan uangnya. Saldo ${asal.map(akunNama).map(U.esc).join(', ')} kembali seperti semula dan kas RDN yang terpakai.</p>
+      ${UI.field('Portofolio tujuan', `<select name="w">${rdn.map(w => `<option value="${w.id}">${U.esc(w.nama)}</option>`).join('')}</select>`)}`, foot: `<button class="btn" data-ok>${I('check')} Pindahkan</button>` });
+    s.el.querySelector('[data-ok]').onclick = () => {
+      const ke = UI.formData(s.el).w, ops = [];
+      n.forEach(t => { ops.push({ op: 'upsert', t: 'Saham', row: { id: t.id, walletId: ke } }); if (t.txId && Store.byId.Transaksi[t.txId]) ops.push({ op: 'upsert', t: 'Transaksi', row: { id: t.txId, walletId: ke } }); });
+      Store.commit(ops); sinkronMaterai(); F.akun = ''; try { localStorage.setItem('sa:shPf', ''); } catch (e) {}
+      s.close(); UI.toast(n.length + ' transaksi dipindah ke ' + akunNama(ke) + '.');
+    };
+  });
+  const pfBar = () => { const ak = akunList(); if (!ak.length) return pindahBanner(); return `<div class="tj-pf">${I('briefcase')}<select data-change="sh-pf" aria-label="Pilih portofolio">${ak.length > 1 ? `<option value="">Semua portofolio (${ak.length})</option>` : ''}${ak.map(w => `<option value="${w.id}" ${F.akun === w.id ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>
+    <button class="btn xs ghost" data-act="sh-cash">${I('plus')} Kas</button><button class="btn xs" data-act="sh-catat">${I('plus')} Trade</button></div>${pindahBanner()}`; };
   UI.act('sh-pf', el => { F.akun = el.value; try { localStorage.setItem('sa:shPf', F.akun); } catch (e) {} SERI.key = ''; UI.render(); });
 
   UI.page('saham', {
@@ -243,13 +283,13 @@
     nav: () => 'aset',
     render(p) {
       if (!Store.can('aset', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Aset.');
-      if (!akunList().length && !(Store.t.Saham || []).length) return tabs(p) + mulai();
+      if (!akunList().length) return tabs(p) + pindahBanner() + mulai();
       const body = p === 'aktivitas' ? aktivitas() : p === 'analitik' ? analitik() : p === 'kalkulator' ? kalkulator() : overview();
       return tabs(p) + pfBar() + body + '<div class="spacer"></div>';
     },
     after(v, p) {
       if (p === 'kalkulator') kalkHitung();
-      if (!p) { UI.sahamAutoHarga(); pasangGrafik(); if (!HIST || HIST.tgl !== U.today()) muatHist().then(() => { if (UI.cur === 'saham' && !UI.param) UI.render(); }); }
+      if (!p) { UI.sahamAutoHarga(); pasangGrafik(); if (!HIST || HIST.tgl !== U.today()) muatHist().then(baru => { if (baru && UI.cur === 'saham' && !UI.param) UI.render(); }); }
     }
   });
   function mulai() {
@@ -289,6 +329,7 @@
         <div class="rd-big">${UI.m(aum)}</div>
         <div class="rd-pill ${tr >= 0 ? 'naik' : 'turun'}">${I(tr >= 0 ? 'arrow-up-right' : 'arrow-down-left')} ${tanda(tr)}${Math.abs(tr).toFixed(2).replace('.', ',')}% <span>total return · ${tanda(aum - ak.nc)}${UI.ms(Math.abs(aum - ak.nc))} vs modal</span></div>
         <button class="btn on-dark block" data-act="sh-harga">${I('refresh-cw')} Perbarui harga${tgl ? ' · ' + U.relDay(tgl).toLowerCase() : ''}${harian ? ' · hari ini ' + tanda(harian) + UI.ms(Math.abs(harian)) : ''}</button>
+        ${H.some(h => !h.l) ? (() => { let er = ''; try { er = localStorage.getItem('sa:shHargaErr') || ''; } catch (e) {} return `<small class="tj-herr">${I('info')} ${H.filter(h => !h.l).map(h => h.kode).join(', ')} belum punya harga${er ? ' · ' + U.esc(er) : ''}. <a data-act="sh-harga-manual">Isi manual</a></small>`; })() : ''}
       </section>
       <div class="tj-kpi">
         ${k('Realized P&L', 'net fee', rpK(real, 1), r.R.length + ' penjualan', cls(real))}

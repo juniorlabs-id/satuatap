@@ -86,7 +86,7 @@
       ${acts('Utang', `<button class="btn ghost" data-act="go" data-to="utang" data-tutup>${I('landmark')} Utang</button>`)}` });
     // 6. aset & emas
     cards.push({ cls: a.emas && a.emas.gram ? 'gold-slide' : '', html: `<p class="kicker">${I('gem')} Aset & emas</p><div class="big">${UI.ms(a.nw.bersih)}</div><p>kekayaan bersih saat ini</p>
-      ${a.emas && a.emas.gram ? `<div class="kv-list"><div class="kv"><span>Emas</span><b>${U.fmtNum(Math.round(a.emas.gram * 100) / 100)} g · ${UI.ms(a.emas.nilai)}</b></div><div class="kv"><span>Untung/rugi emas</span><b>${a.emas.untung >= 0 ? '+' : '−'}${UI.ms(Math.abs(a.emas.untung))}</b></div></div>` : ''}
+      ${a.emas && a.emas.gram ? `<div class="kv-list"><div class="kv"><span>Emas</span><b>${U.gram(a.emas.gram)} g · ${UI.ms(a.emas.nilai)}</b></div><div class="kv"><span>Untung/rugi emas</span><b>${a.emas.untung >= 0 ? '+' : '−'}${UI.ms(Math.abs(a.emas.untung))}</b></div></div>` : ''}
       ${acts('Aset & emas', `<button class="btn ghost" data-act="emas-alert">${I('bell')} Alert emas</button>`)}` });
     // 7. tugas berjalan
     cards.push({ html: `<p class="kicker">${I('list-checks')} Tugas dari rapat sebelumnya</p>

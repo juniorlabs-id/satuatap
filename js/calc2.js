@@ -67,7 +67,8 @@
       const gram = gramOf(e), gm = murni(e), modal = (e.hargaBeli || 0) + (e.biaya || 0), hl = C.hargaLot(e), harga = hl ? hl.buyback * f : 0;
       const nilai = e.status === 'terjual' ? (e.hargaJual || 0) : Math.round(gm * harga);
       const umur = U.diffDays(e.tanggal || U.today(), U.today());
-      return { e, gram, gramMurni: gm, modal, nilai, hargaGram: harga, hargaSumber: hl ? hl.sumber : '', untung: nilai - modal, pct: modal ? (nilai - modal) / modal : 0, umur, haul: umur >= HAUL_HARI, perGram: gram ? modal / gram : 0 };
+      const hadiah = modal <= 1;   // hadiah/warisan: tanpa harga beli → untung/rugi tidak dihitung
+      return { e, gram, gramMurni: gm, modal, nilai, hargaGram: harga, hargaSumber: hl ? hl.sumber : '', untung: hadiah ? 0 : nilai - modal, pct: !hadiah && modal ? (nilai - modal) / modal : 0, umur, haul: umur >= HAUL_HARI, perGram: !hadiah && gram ? modal / gram : 0, hadiah };
     }).sort((a, b) => (b.e.tanggal || '').localeCompare(a.e.tanggal || ''));
   });
   /** Bagian kepemilikan {email|'bersama': fraksi}. */
@@ -90,7 +91,8 @@
     // realisasi dari penjualan
     const sold = Store.t.Emas.filter(e => e.status === 'terjual');
     const realisasi = U.sum(sold, e => (e.hargaJual || 0) - (e.hargaBeli || 0) - (e.biaya || 0));
-    return { lots: aktif, gram, gramMurni: gm, modal, nilai, untung: nilai - modal, pct: modal ? (nilai - modal) / modal : 0, gadai, perGramasi, perMerek, perPemilik, realisasi, rata: gram ? modal / gram : 0 };
+    const beli = aktif.filter(l => !l.hadiah), mB = U.sum(beli, l => l.modal), nB = U.sum(beli, l => l.nilai), gB = U.sum(beli, l => l.gram);
+    return { lots: aktif, gram, gramMurni: gm, modal, nilai, untung: nB - mB, pct: mB ? (nB - mB) / mB : 0, gadai, perGramasi, perMerek, perPemilik, realisasi, rata: gB ? mB / gB : 0, gramHadiah: gram - gB };
   });
   /** Akumulasi gram dari waktu ke waktu (titik per transaksi). */
   C.emasAkumulasi = () => M('emasAkum', () => {
@@ -174,7 +176,7 @@
     Store.wallets().forEach(w => { const v = Math.max(0, b[w.id] || 0); if (v) items.push({ grup: 'Kas & tabungan', nama: w.nama, v }); });
     C.goals().filter(g => !g.t.walletId && g.dana > 0).forEach(g => items.push({ grup: 'Kas & tabungan', nama: 'Dana tujuan: ' + g.t.nama, v: g.dana }));
     const hb = h ? h.buyback : 0;
-    C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.fmtNum(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
+    C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.gram(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
     C.investasi().filter(i => i.x.zakat).forEach(i => items.push({ grup: (C.KELAS[i.x.kelas] || C.KELAS.lain).label, nama: i.x.nama, v: i.nilai }));
     if (Store.setting('zakatPiutang', 'true') !== 'false') C.loans().filter(l => !l.lunas && l.p.arah === 'piutang').forEach(l => items.push({ grup: 'Piutang', nama: l.p.pihak, v: l.sisa }));
     const modeUtang = Store.setting('zakatUtang', 'jatuhTempo');
@@ -236,7 +238,7 @@
       harta.push({ kode: w.jenis === 'tunai' ? '011' : w.jenis === 'bank' ? '012' : '019', nama: w.nama, tahun: '', v, ket: w.jenis === 'tunai' ? 'Uang tunai' : w.jenis === 'bank' ? 'Tabungan' : 'Setara kas lainnya (dompet digital)' });
     });
     Store.t.Emas.filter(e => e.tanggal && e.tanggal <= end && !(e.status === 'terjual' && e.tglJual && e.tglJual <= end)).forEach(e =>
-      harta.push({ kode: '051', nama: (e.bentuk === 'perhiasan' ? 'Perhiasan emas ' : 'Emas ' + (e.merek || '') + ' ') + U.fmtNum(gramOf(e)) + ' gram', tahun: thn(e.tanggal), v: (e.hargaBeli || 0) + (e.biaya || 0), ket: 'Logam mulia' }));
+      harta.push({ kode: '051', nama: (e.bentuk === 'perhiasan' ? 'Perhiasan emas ' : 'Emas ' + (e.merek || '') + ' ') + U.gram(gramOf(e)) + ' gram', tahun: thn(e.tanggal), v: (e.hargaBeli || 0) + (e.biaya || 0), ket: 'Logam mulia' }));
     Store.t.Investasi.filter(x => (x.tanggal || '0') <= end && !(x.status === 'terjual' && x.tglJual && x.tglJual <= end)).forEach(x => {
       const k = C.KELAS[x.kelas] || C.KELAS.lain;
       harta.push({ kode: x.kelas === 'kendaraan' && /motor/i.test(x.nama) ? '042' : k.spt, nama: x.nama + (x.kode ? ' (' + x.kode + ')' : ''), tahun: thn(x.tanggal), v: x.modal || 0, ket: k.label });

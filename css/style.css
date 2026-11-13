@@ -713,3 +713,6 @@ input.up:not(:placeholder-shown) { text-transform: uppercase; }
 .rd-own-c b { display: block; font-size: 12.5px; } .rd-own-c small { font-size: 11px; color: var(--muted); }
 .rd-own-c.on { border-color: var(--primary); background: var(--primary-c); box-shadow: 0 0 0 1px var(--primary) inset; }
 .rd-own-c .avatar.xs { width: 28px; height: 28px; font-size: 11px; } .rd-own-ic { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--primary-c); color: var(--primary); } .rd-own-ic .ic { width: 15px; height: 15px; }
+
+.note .btn.xs { margin-top: 8px; display: inline-flex; }
+.tj-herr { display: block; margin-top: 8px; font-size: 12px; opacity: .85; } .tj-herr a { text-decoration: underline; cursor: pointer; color: inherit; font-weight: 600; } .tj-herr .ic { width: 13px; height: 13px; vertical-align: -2px; }

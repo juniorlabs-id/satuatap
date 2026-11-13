@@ -30,8 +30,8 @@
         ${k.zakat ? `<div class="kv"><span>Zakat & sedekah</span><b>${UI.ms(k.zakat)}</b></div>` : ''}</div>` });
     if (k.tercapai.length) cards.push({ cls: 'hero-slide', html: `<p class="kicker">${I('trophy')} Tujuan tercapai</p><div class="big">${k.tercapai.length}</div>
         <div class="list">${k.tercapai.map(g => `<div class="row"><span class="cat-ic">${I(g.t.ikon || 'target')}</span><div class="tx-txt"><b>${U.esc(g.t.nama)}</b><small>${UI.ms(g.target)}</small></div>${I('circle-check')}</div>`).join('')}</div>` });
-    if (k.gramBeli || k.gramJual) cards.push({ cls: 'gold-slide', html: `<p class="kicker">${I('gem')} Brankas Emas</p><div class="big">${k.gramBeli - k.gramJual >= 0 ? '+' : ''}${U.fmtNum(Math.round((k.gramBeli - k.gramJual) * 100) / 100)} g</div>
-        <p>Dibeli ${U.fmtNum(k.gramBeli)} g${k.gramJual ? ', dijual ' + U.fmtNum(k.gramJual) + ' g' : ''} sepanjang ${th}.</p>` });
+    if (k.gramBeli || k.gramJual) cards.push({ cls: 'gold-slide', html: `<p class="kicker">${I('gem')} Brankas Emas</p><div class="big">${k.gramBeli - k.gramJual >= 0 ? '+' : ''}${U.gram(k.gramBeli - k.gramJual)} g</div>
+        <p>Dibeli ${U.gram(k.gramBeli)} g${k.gramJual ? ', dijual ' + U.gram(k.gramJual) + ' g' : ''} sepanjang ${th}.</p>` });
     if (k.nw) cards.push({ html: `<p class="kicker">${I('landmark')} Kekayaan bersih</p><div class="big ${k.nw.naik >= 0 ? 'ok' : 'bad'}">${k.nw.naik >= 0 ? '+' : '−'}${UI.ms(Math.abs(k.nw.naik))}</div>
         <p>${UI.ms(k.nw.awal)} → ${UI.ms(k.nw.akhir)} (31 Des ${th - 1} → 31 Des ${th})</p><small class="muted">Dihitung dari nilai perolehan, sama dengan Ringkasan SPT.</small>` });
     cards.push({ cls: 'hero-slide', html: `<p class="kicker">${I('flag')} Tahun depan</p><h2>Apa target ${th + 1}?</h2>
@@ -53,7 +53,7 @@
           <button class="btn block on-dark" data-act="kilas-putar">${I('play')} Putar Kilas Balik</button></section>
         ${k.adaData ? `${UI.sec('Kategori terbesar')}<div class="card list">${k.kat.slice(0, 5).map(x => `<div class="row"><span class="cat-ic">${I(x.ikon)}</span><div class="tx-txt"><b>${U.esc(x.nama)}</b></div><b>${UI.ms(x.v)}</b></div>`).join('')}</div>
           <div class="card kv-list"><div class="kv"><span>Ditabung ke Tujuan</span><b>${UI.ms(k.tabung)}</b></div><div class="kv"><span>Tujuan tercapai</span><b>${k.tercapai.length}</b></div>
-            <div class="kv"><span>Emas bertambah</span><b>${U.fmtNum(Math.round((k.gramBeli - k.gramJual) * 100) / 100)} g</b></div>${k.nw ? `<div class="kv"><span>Kekayaan bersih</span><b class="${k.nw.naik >= 0 ? 'ok' : 'bad'}">${k.nw.naik >= 0 ? '+' : '−'}${UI.ms(Math.abs(k.nw.naik))}</b></div>` : ''}</div>`
+            <div class="kv"><span>Emas bertambah</span><b>${U.gram(k.gramBeli - k.gramJual)} g</b></div>${k.nw ? `<div class="kv"><span>Kekayaan bersih</span><b class="${k.nw.naik >= 0 ? 'ok' : 'bad'}">${k.nw.naik >= 0 ? '+' : '−'}${UI.ms(Math.abs(k.nw.naik))}</b></div>` : ''}</div>`
           : UI.empty('history', 'Belum ada catatan di ' + th, 'Kilas Balik muncul setelah ada transaksi di tahun ini.')}
         <div class="spacer"></div>`;
     }
