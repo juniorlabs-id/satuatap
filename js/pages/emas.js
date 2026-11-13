@@ -7,18 +7,24 @@
   const g = v => U.gram(v);
   const me = () => Store.me.email;
 
-  // ---------- Komponen bersama: kepemilikan multi-pemilik ----------
+  // ---------- Komponen bersama: kepemilikan (tinggal pilih pemilik / bersama) ----------
+  // Disimpan sebagai {} (bersama) atau {email: 100}. Catatan lama yang dibagi persen tetap dipertahankan
+  // sebagai pilihan "Dibagi …" sampai pengguna memilih pemilik lain.
   UI.kepemilikanField = (kp) => {
-    const sh = kp && typeof kp === 'object' ? kp : {}, ms = Store.members();
-    return `<div class="field"><span>Kepemilikan</span><div class="own-grid">${ms.map(m => `<label class="own"><span class="avatar xs" style="background:${m.warna || '#5b7a78'}">${U.esc(U.initials(m.nama))}</span><b>${U.esc(m.nama)}</b>
-      <input type="number" min="0" max="100" step="5" data-own="${U.esc(m.email)}" value="${sh[m.email] != null ? sh[m.email] : ''}" placeholder="0"><i>%</i></label>`).join('')}</div>
-      <small>Kosongkan semua = milik bersama. Bisa lebih dari 2 pemilik (mis. 50/30/20).</small><small class="own-err bad"></small></div>`;
+    const sh = kp && typeof kp === 'object' ? kp : {}, ms = Store.members(), ks = Object.keys(sh).filter(k => Number(sh[k]) > 0);
+    const satu = ks.length === 1 ? ks[0] : '', bagi = ks.length > 1, sel = bagi ? '__bagi' : satu;
+    const opt = (v, isi, on) => `<label class="own-opt"><input type="radio" name="__own" value="${U.esc(v)}" ${on ? 'checked' : ''}>${isi}</label>`;
+    return `<div class="field"><span>Pemilik</span><div class="own-pick" data-ownpick="${U.esc(JSON.stringify(bagi ? sh : {}))}">
+      ${opt('', `<span class="own-ic">${I('users')}</span><b>Bersama</b>`, sel === '')}
+      ${ms.map(m => opt(m.email, `${UI.avaHtml(m.email, m.nama, m.warna, 'xs')}<b>${U.esc(m.nama)}</b>`, sel === m.email)).join('')}
+      ${satu && !ms.some(m => m.email === satu) ? opt(satu, `<b>${U.esc(Store.memberName(satu))}</b>`, true) : ''}
+      ${bagi ? opt('__bagi', `<span class="own-ic">${I('chart-pie')}</span><b>Dibagi · ${U.esc(ks.map(e => Store.memberName(e) + ' ' + Math.round(sh[e]) + '%').join(' / '))}</b>`, true) : ''}
+    </div></div>`;
   };
   UI.readKepemilikan = (root) => {
-    const o = {}; let tot = 0;
-    root.querySelectorAll('[data-own]').forEach(i => { const v = Number(i.value) || 0; if (v > 0) { o[i.dataset.own] = v; tot += v; } });
-    if (tot && Math.abs(tot - 100) > 0.5) { const e = root.querySelector('.own-err'); if (e) e.textContent = 'Total kepemilikan ' + tot + '% — harus 100%.'; return null; }
-    return o;
+    const r = root.querySelector('input[name=__own]:checked'), v = r ? r.value : '';
+    if (v === '__bagi') { try { return JSON.parse(root.querySelector('[data-ownpick]').dataset.ownpick) || {}; } catch (e) { return {}; } }
+    return v ? { [v]: 100 } : {};
   };
   UI.ownLabel = (kp) => { const sh = Calc.shares(kp); return sh.bersama ? 'Bersama' : Object.keys(sh).map(e => Store.memberName(e) + ' ' + Math.round(sh[e] * 100) + '%').join(' · '); };
   /** Pilihan sumber dana: sudah dimiliki / dompet / dana tujuan. */
