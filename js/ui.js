@@ -67,6 +67,7 @@
         <button class="avatar sm${UI.foto(Store.me && Store.me.email) ? ' has-foto' : ''}" style="background:${(Store.me && Store.me.warna) || '#0F5E59'}${UI.foto(Store.me && Store.me.email) ? `;background-image:url('${UI.foto(Store.me.email)}')` : ''}" data-act="go" data-to="pengaturan" aria-label="Profil">${UI.foto(Store.me && Store.me.email) ? '' : U.esc(U.initials(Store.me && Store.me.nama))}</button></div>`;
     }
     $('#fab').hidden = !!def.noFab;
+    { const fm = $('#fab-mic'); if (fm) fm.hidden = !!def.noFab || !(window.Voice && Voice.supported()); }
     $('#demo-banner').hidden = Store.mode !== 'demo';
     document.title = (hd ? hd.title + ' · ' : '') + 'SatuAtap';
   };
@@ -93,6 +94,7 @@
         </aside>
         <main id="main"><header id="topbar"></header><div id="view" class="view"></div></main>
       </div>
+      <button id="fab-mic" class="fab-mic" data-act="voice-catat" aria-label="Catat pakai suara" hidden>${I('mic')}</button>
       <button id="fab" class="fab" data-act="catat" aria-label="Catat cepat (tahan untuk bicara)">${I('plus')}</button>
       <nav id="bottomnav">${NAV.map(n => `<a href="#/${n[0]}" data-nav="${n[0]}">${I(n[1])}<span>${n[2]}</span></a>`).join('')}</nav>
       <div id="sheet-root"></div><div id="toast-root" aria-live="polite"></div>`;

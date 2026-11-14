@@ -87,7 +87,7 @@ code.wrap { word-break: break-all; }
   #sidebar hr { border: 0; border-top: 1px solid var(--line); margin: 8px 4px; width: 100%; }
   .side-fab { margin-top: 12px; height: 48px; border-radius: 14px; background: var(--gold); color: #0E2B2C; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .side-me { margin-top: auto; padding: 12px; font-weight: 600; font-size: 13px; } .side-me small { display: block; color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
-  #bottomnav, .fab { display: none; }
+  #bottomnav, .fab, .fab-mic { display: none; }
   #main { padding-bottom: 32px; }
   .brand img, .brand b { display: none; }
   #topbar { padding: 14px 40px; }
@@ -725,3 +725,14 @@ input.up:not(:placeholder-shown) { text-transform: uppercase; }
 .own-opt .own-ic .ic { width: 15px; height: 15px; }
 .own-opt:has(input:checked) { border-color: var(--primary); background: var(--primary-c, var(--surface-2)); color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
 .own-opt:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.fab-mic { position: fixed; right: 22px; bottom: calc(var(--nav-h) + 16px + 60px + 12px + env(safe-area-inset-bottom)); z-index: 31; width: 48px; height: 48px; border-radius: 50%; padding: 0;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--line-2); box-shadow: 0 6px 18px rgba(14, 43, 44, .18); display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
+.fab-mic[hidden] { display: none; } .fab-mic .ic { width: 22px; height: 22px; stroke-width: 2.4; } .fab-mic:active { transform: scale(.95); }
+button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opacity: .85; } button.mic-pulse.on { animation: pulse 1.4s infinite; opacity: 1; }
+.vq-hint { margin: 4px 0 0; }
+.vq-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.vq-row { border: 1px solid var(--line-2); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+.vq-row.kurang { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.vq-top { display: flex; gap: 8px; align-items: center; } .vq-top .rp-input { flex: 1; } .vq-top .chip { flex: none; }
+.vq-row select, .vq-row .vq-cat { width: 100%; }

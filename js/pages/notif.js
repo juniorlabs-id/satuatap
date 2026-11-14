@@ -72,41 +72,67 @@
     <button class="btn ghost sm" data-act="pend-salin">${I('copy')} Salin pengaturan Pendamping</button>`;
 
   // ---------- Kotak: catatan dari Telegram / WA ----------
-  App.ambilKotak = async (force) => {
-    if (!relayOk() || (!force && Date.now() - N.kotakAt < 120e3)) return;
-    N.kotakAt = Date.now();
-    const r = await Relay.call('tg.ambil', { fileId: Store.fileId });
-    if (r.success && r.data.item && r.data.item.length) {
-      const a = bacaKotak(), ada = new Set(a.map(x => x.id));
-      r.data.item.forEach(x => { if (!ada.has(x.id)) a.push(x); });
-      tulisKotak(a); if (UI.cur === 'beranda') UI.render();
-    }
-  };
-  UI.kotakAlert = () => {
-    const a = bacaKotak(); if (!a.length) return '';
-    return `<div class="alert" data-act="kotak-buka">${I('inbox')}<div><b>${a.length} catatan dari chat menunggu</b><small>${U.esc(a.slice(0, 2).map(x => x.teks).join(' · ').slice(0, 70))}</small></div>${I('chevron-right')}</div>`;
-  };
+  // Relay menyimpan pesan sampai aplikasi menandainya selesai (tg.selesai), jadi catatan tidak hilang walau
+  // diambil perangkat lain. Pesan yang lengkap (nominal + kategori + dompet terbaca) langsung dicatat ke Mutasi;
+  // sisanya menunggu di Beranda & Mutasi untuk dipilih kategori/dompetnya.
   const W = id => (Store.byId.Wallet[id] || {}).nama || 'pilih dompet', K = id => (Store.byId.Kategori[id] || {}).nama || 'pilih kategori';
+  const txId = x => 't_k' + String(x.id).replace(/[^A-Za-z0-9]/g, '');
+  const lengkap = r => r.jumlah && r.kategoriId && r.walletId && !(Store.byId.Kategori[r.kategoriId] || {}).pribadi;
+  const rowOf = (x, r) => ({ op: 'upsert', t: 'Transaksi', row: { id: txId(x), tanggal: String(x.waktu || '').slice(0, 10) || U.today(), jenis: r.jenis, jumlah: r.jumlah, kategoriId: r.kategoriId, walletId: r.walletId, walletTujuan: '', biaya: 0,
+    catatan: r.catatan || x.teks, dibayarOleh: Store.me.email, tag: '', sumber: x.sumber || 'telegram', refId: '', periodeRef: '', dicatatOleh: Store.me.email, dibuat: new Date().toISOString(), riwayat: [] } });
+  const ringkas = (r) => (r.catatan ? r.catatan + ' · ' : '') + U.rp(r.jumlah) + ' · ' + K(r.kategoriId) + ' · ' + W(r.walletId);
+  const selesai = (ids, info) => { if (ids.length && relayOk()) Relay.call('tg.selesai', { fileId: Store.fileId, ids, info: info || {} }).catch(() => {}); };
+  App.ambilKotak = async (force) => {
+    if (!relayOk() || N.kotakJalan || (!force && Date.now() - N.kotakAt < 60e3)) return;
+    N.kotakAt = Date.now(); N.kotakJalan = true;
+    try {
+      const r = await Relay.call('tg.ambil', { fileId: Store.fileId });
+      if (!r.success || !r.data) return;
+      const datang = r.data.item || [], lama = bacaKotak();
+      // relay baru (ack) = sumber kebenaran; relay lama: gabungkan dengan yang tersimpan di perangkat
+      let a = r.data.ack ? datang.slice() : lama.concat(datang.filter(x => !lama.some(y => y.id === x.id)));
+      const simpan = [], info = {}, sudah = [];
+      a = a.filter(x => {
+        if (Store.byId.Transaksi[txId(x)]) { sudah.push(x.id); return false; }     // sudah dicatat perangkat lain
+        const p = Voice.parse(x.teks); if (!lengkap(p)) return true;
+        simpan.push(rowOf(x, p)); info[x.id] = ringkas(p); return false;
+      });
+      if (simpan.length) {
+        Store.commit(simpan);
+        UI.toast(simpan.length === 1 ? 'Dari Telegram tercatat: ' + Object.values(info)[0] : simpan.length + ' catatan dari Telegram masuk ke Mutasi.', 'ok', { ms: 5000 });
+      }
+      selesai(Object.keys(info).concat(sudah), info);
+      const berubah = JSON.stringify(a.map(x => x.id)) !== JSON.stringify(lama.map(x => x.id));
+      tulisKotak(a);
+      if ((berubah || simpan.length) && (UI.cur === 'beranda' || UI.cur === 'mutasi')) UI.render();
+    } catch (e) {} finally { N.kotakJalan = false; }
+  };
+  // Ambil juga saat aplikasi dibuka lagi dari latar belakang
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && window.App && App.ready) App.ambilKotak().catch(() => {}); });
+  UI.kotakAlert = () => {
+    const a = bacaKotak(); if (App.ready) setTimeout(() => App.ambilKotak().catch(() => {}), 300);
+    if (!a.length) return '';
+    return `<div class="alert" data-act="kotak-buka">${I('inbox')}<div><b>${a.length} catatan dari chat perlu dilengkapi</b><small>${U.esc(a.slice(0, 2).map(x => x.teks).join(' · ').slice(0, 70))}</small></div>${I('chevron-right')}</div>`;
+  };
   UI.act('kotak-buka', () => {
     const a = bacaKotak(); if (!a.length) return;
     const p = a.map(x => Object.assign({}, x, { r: Voice.parse(x.teks) }));
-    const s = UI.sheet({ title: 'Catatan dari chat', body: `<p class="muted small">Pesan Telegram/WA Anda. Periksa kategori & dompet, lalu simpan.</p>
+    const s = UI.sheet({ title: 'Catatan dari chat', body: `<p class="muted small">Kategori atau dompetnya belum terbaca. Ketuk ${I('pencil')} untuk melengkapi, atau ${I('check')} bila sudah benar.</p>
       <div class="list">${p.map((x, i) => `<div class="row kotak-row"><span class="cat-ic">${I(x.sumber === 'wa' ? 'message-circle' : 'send')}</span><div class="tx-txt"><b>${U.esc(x.teks)}</b>
         <small>${x.r.jumlah ? UI.ms(x.r.jumlah) + ' · ' : ''}${U.esc(K(x.r.kategoriId))} · ${U.esc(W(x.r.walletId))} · ${U.timeAgo(x.waktu)}</small></div>
         <div class="row-btns"><button class="btn xs" data-i="${i}" data-a="ubah">${I('pencil')}</button>${x.r.jumlah && x.r.kategoriId && x.r.walletId ? `<button class="btn xs" data-i="${i}" data-a="simpan">${I('check')}</button>` : ''}<button class="btn ghost xs" data-i="${i}" data-a="buang" aria-label="Buang">${I('trash-2')}</button></div></div>`).join('')}</div>`,
       foot: p.some(x => x.r.jumlah && x.r.kategoriId && x.r.walletId) ? `<button class="btn" data-semua>${I('check-check')} Simpan yang lengkap</button>` : '' });
     const hapus = ids => tulisKotak(bacaKotak().filter(x => ids.indexOf(x.id) < 0));
-    const rowOf = (x) => ({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: String(x.waktu || '').slice(0, 10) || U.today(), jenis: x.r.jenis, jumlah: x.r.jumlah, kategoriId: x.r.kategoriId, walletId: x.r.walletId, walletTujuan: '', biaya: 0,
-      catatan: x.r.catatan || x.teks, dibayarOleh: Store.me.email, tag: '', sumber: x.sumber || 'telegram', refId: '', periodeRef: '', dicatatOleh: Store.me.email, dibuat: new Date().toISOString(), riwayat: [] } });
     s.el.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
       const x = p[+b.dataset.i];
-      if (b.dataset.a === 'buang') { hapus([x.id]); b.closest('.row').remove(); if (!bacaKotak().length) s.close(); UI.render(); return; }
-      if (b.dataset.a === 'simpan') { if (await UI.commitPriv([rowOf(x)])) { hapus([x.id]); b.closest('.row').remove(); UI.toast('Disimpan.'); if (!bacaKotak().length) s.close(); } return; }
-      hapus([x.id]); s.close();
-      UI.catat({ preset: { jenis: x.r.jenis, jumlah: x.r.jumlah, kategoriId: x.r.kategoriId, walletId: x.r.walletId, catatan: x.r.catatan || x.teks, tanggal: String(x.waktu || '').slice(0, 10), sumber: x.sumber || 'telegram' } });
+      if (b.dataset.a === 'buang') { hapus([x.id]); selesai([x.id]); b.closest('.row').remove(); if (!bacaKotak().length) s.close(); UI.render(); return; }
+      if (b.dataset.a === 'simpan') { if (await UI.commitPriv([rowOf(x, x.r)])) { hapus([x.id]); selesai([x.id], { [x.id]: ringkas(x.r) }); b.closest('.row').remove(); UI.toast('Disimpan.'); if (!bacaKotak().length) s.close(); } return; }
+      s.close();
+      UI.catat({ preset: { jenis: x.r.jenis, jumlah: x.r.jumlah, kategoriId: x.r.kategoriId, walletId: x.r.walletId, catatan: x.r.catatan || x.teks, tanggal: String(x.waktu || '').slice(0, 10), sumber: x.sumber || 'telegram' },
+        onSaved: () => { hapus([x.id]); selesai([x.id]); } });
     });
     const sm = s.el.querySelector('[data-semua]');
-    if (sm) sm.onclick = async () => { const ok = p.filter(x => x.r.jumlah && x.r.kategoriId && x.r.walletId); if (await UI.commitPriv(ok.map(rowOf))) { hapus(ok.map(x => x.id)); s.close(); UI.toast(ok.length + ' catatan disimpan.'); } };
+    if (sm) sm.onclick = async () => { const ok = p.filter(x => x.r.jumlah && x.r.kategoriId && x.r.walletId); if (await UI.commitPriv(ok.map(x => rowOf(x, x.r)))) { hapus(ok.map(x => x.id)); const inf = {}; ok.forEach(x => { inf[x.id] = ringkas(x.r); }); selesai(ok.map(x => x.id), inf); s.close(); UI.toast(ok.length + ' catatan disimpan.'); } };
   });
 
   // ---------- Pengingat yang dikirim dari aplikasi (melengkapi Skrip Pendamping) ----------

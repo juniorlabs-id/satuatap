@@ -3,7 +3,7 @@
 (function () {
   const ANGKA = { nol: 0, satu: 1, dua: 2, tiga: 3, empat: 4, lima: 5, enam: 6, tujuh: 7, delapan: 8, sembilan: 9, sepuluh: 10, sebelas: 11, seratus: 100, seribu: 1000, sejuta: 1e6, setengah: 0.5 };
   const KATA_KAT = [
-    [/makan|soto|bakso|nasi|warteg|padang|ayam|mie|sate|siang|malam|sarapan|resto|gofood|grabfood/, /makan/i],
+    [/makan|soto|bakso|nasi|warteg|padang|ayam|mie|sate|siang|malam|sarapan|resto|gofood|grabfood|gudeg|pecel|rawon|gado|seblak|lontong|ketoprak|bakmi|pempek|geprek|kfc|mcd|burger|pizza|warung|lauk|nasgor|bubur|siomay|batagor|dimsum|sushi|ramen|lalapan|penyetan|shopeefood/, /makan/i],
     [/sayur|dapur|superindo|alfamart|indomaret|pasar|beras|minyak|telur|groceries|belanja bulanan/, /dapur/i],
     [/bensin|pertamax|pertalite|parkir|tol|gojek|grab|ojek|transport|taksi|kereta|krl|busway/, /transport/i],
     [/kopi|kafe|cafe|jajan|martabak|boba|snack|es teh|cemilan/, /jajan/i],
@@ -63,7 +63,10 @@
     // kategori
     let kategoriId = '';
     const kats = Store.kategori(jenis);
-    for (const [re, katRe] of KATA_KAT) { if (re.test(s)) { const k = kats.find(x => katRe.test(x.nama)); if (k) { kategoriId = k.id; break; } } }
+    // kata yang pernah dipilihkan kategorinya oleh pengguna (belajar dari koreksi)
+    const ajar = V.ajaran(); s.split(/[^a-z]+/).some(w => { const id = w.length >= 3 && ajar[w]; if (id && kats.some(k => k.id === id)) { kategoriId = id; return true; } return false; });
+    if (!kategoriId)
+    for (const [re, katRe] of KATA_KAT) { if (kategoriId) break; if (re.test(s)) { const k = kats.find(x => katRe.test(x.nama)); if (k) { kategoriId = k.id; break; } } }
     if (!kategoriId) { const k = kats.find(x => s.includes(x.nama.toLowerCase().split(' ')[0])); if (k) kategoriId = k.id; }
     // wallet: cocokkan kata unik nama wallet
     let walletId = '';
@@ -83,8 +86,22 @@
     return { jenis, jumlah: Math.round(jumlah), kategoriId, walletId, catatan, raw: text };
   }
 
+  /** Pecah satu kalimat berisi beberapa catatan: "gudeg 45 ribu tunai dan bensin 50 ribu gopay". */
+  function parseBanyak(text) {
+    const bag = String(text || '').split(/\s*(?:,|;|\bdan\b|\bterus\b|\blalu\b|\bsama\b|\bkemudian\b)\s*/i).map(x => x.trim()).filter(Boolean);
+    const hasil = bag.map(parse).filter(r => r.jumlah);
+    return hasil.length > 1 ? hasil : [parse(text)];
+  }
   const V = {
-    parse,
+    parse, parseBanyak,
+    ajaran() { try { return JSON.parse(localStorage.getItem('sa:vkat') || '{}') || {}; } catch (e) { return {}; } },
+    /** Ingat: kata-kata di catatan → kategori yang dipilih pengguna. */
+    ajari(teks, kategoriId) {
+      if (!kategoriId) return; const a = V.ajaran(), stop = /^(dan|yang|untuk|beli|bayar|pakai|pake|dari|via|lewat|tunai|cash|ribu|juta|rupiah|siang|malam|pagi|sore|tadi|buat)$/;
+      String(teks || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 4 && !stop.test(w)).slice(0, 3).forEach(w => { a[w] = kategoriId; });
+      const k = Object.keys(a); if (k.length > 300) k.slice(0, k.length - 300).forEach(x => delete a[x]);
+      try { localStorage.setItem('sa:vkat', JSON.stringify(a)); } catch (e) {}
+    },
     supported: () => !!(window.SpeechRecognition || window.webkitSpeechRecognition),
     rec: null,
     start(onPartial, onFinal, onError) {

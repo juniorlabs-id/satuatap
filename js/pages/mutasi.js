@@ -117,6 +117,7 @@
           </div>
           <div class="sumline" id="mut-sum"></div>
         </div>
+        ${F.off === 0 && !F.all && UI.kotakAlert ? UI.kotakAlert() : ''}
         ${drafts.length ? `<div class="day-h"><b>Menunggu konfirmasi</b><span>geser kanan untuk konfirmasi</span></div><div class="card list">${drafts.map(UI.draftRow).join('')}</div>` : ''}
         <div id="mut-list"></div><div class="spacer"></div>`;
     },

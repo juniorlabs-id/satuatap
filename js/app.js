@@ -39,6 +39,8 @@
     if (!location.hash || location.hash === '#') location.replace('#/beranda');
     UI.route();
     App.loop();
+    // Pintasan ikon aplikasi "Catat suara" (manifest) → buka perekam suara
+    if (/[?&]aksi=suara\b/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {} setTimeout(() => UI.voiceCatat && UI.voiceCatat(), 600); }
     Priv.decryptAll();
     if (Store.needAuth) UI.authState(true);
   };

@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.6.5 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.6.6 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -289,6 +289,7 @@ Telegram mengirim pesan ke `https://satuatap.vercel.app/api/tg`, lalu fungsi Ver
 4. **Sambungkan Vercel ke relay.** Vercel › proyek satuatap › **Settings › Environment Variables** › tambahkan `RELAY_URL` = URL `/exec` relay. Lalu **Deployments › ⋯ › Redeploy** agar variabel terbaca.
 5. **Bila bot diam,** jalankan `cekTelegram` di editor relay dan ikuti petunjuk di log.
 6. **Uji.** Di aplikasi: **Lainnya › Notifikasi › Hubungkan Telegram saya** › Buka Telegram › **Start**. Bot membalas "Terhubung". Lalu ketuk **Kirim pesan uji**. Kirim juga `makan siang 25rb gopay` ke bot; catatannya muncul di Beranda untuk dikonfirmasi.
+   Pesan yang nominal, kategori, dan dompetnya terbaca langsung masuk **Mutasi** (bot membalas "✅ Tercatat"); yang belum lengkap menunggu di Beranda & Mutasi. Catatan baru diambil saat aplikasi dibuka.
 
 Batas: maksimal 60 pesan per jam per keluarga. Kode penghubung berlaku 15 menit dan sekali pakai. Ketik `/putus` di bot untuk memutus.
 

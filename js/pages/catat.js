@@ -402,20 +402,73 @@
     s.el.querySelector('[data-y]').onclick = () => { s.close(); UI.bagiJumlah = j; UI.go('anggaran/bagi'); };
   };
 
-  // ---------- Catat pakai suara ----------
+  // ---------- Catat cepat pakai suara ----------
+  // Ketuk mikrofon (tombol 🎤 di atas tombol +, atau tahan tombol +) → bicara → periksa → Simpan.
+  // Satu kalimat bisa berisi beberapa catatan: "gudeg 45 ribu tunai dan bensin 50 ribu gopay".
+  UI.act('voice-catat', () => UI.voiceCatat());
   UI.voiceCatat = () => {
     if (!Voice.supported()) return UI.toast('Browser ini belum mendukung input suara. Coba Chrome di Android.', 'warn');
     if (navigator.vibrate) navigator.vibrate(30);
-    const s = UI.sheet({ title: 'Catat pakai suara', cls: 'small', body: `<div class="voice"><div class="mic-pulse">${I('mic', 'big')}</div><p class="muted">Contoh: <i>"makan siang empat puluh lima ribu pakai gopay"</i></p><div class="voice-txt">Mendengarkan…</div></div>`,
-      foot: `<button class="btn ghost" data-stop>Selesai</button>`, onClose: () => Voice.stop() });
-    const txt = s.el.querySelector('.voice-txt');
-    s.el.querySelector('[data-stop]').onclick = () => Voice.stop();
-    Voice.start(p => { txt.textContent = p; }, final => {
-      const r = Voice.parse(final);
+    let items = [], dengar = false, teks = '';
+    const s = UI.sheet({ title: 'Catat cepat pakai suara', cls: 'small', body: `<div class="voice"><button type="button" class="mic-pulse" data-mic aria-label="Mulai / berhenti bicara">${I('mic', 'big')}</button>
+        <div class="voice-txt">Menyiapkan mikrofon…</div><p class="muted small vq-hint">Contoh: <i>"gudeg empat puluh lima ribu tunai"</i> · <i>"gaji masuk 7,5 juta bca"</i> · bisa beberapa sekaligus dengan kata <i>"dan"</i></p></div>
+      <div class="vq-list"></div>`,
+      foot: `<button class="btn ghost" data-ulang>${I('mic')} Ulangi</button><button class="btn" data-ok disabled>${I('check')} Simpan</button>`, onClose: () => Voice.stop() });
+    const mic = s.el.querySelector('[data-mic]'), txt = s.el.querySelector('.voice-txt'), list = s.el.querySelector('.vq-list'), ok = s.el.querySelector('[data-ok]');
+    const lengkap = r => r.jumlah > 0 && r.kategoriId && r.walletId;
+    const gambar = () => {
+      list.innerHTML = items.map((r, i) => `<div class="vq-row ${lengkap(r) ? '' : 'kurang'}" data-i="${i}">
+        <div class="vq-top"><button type="button" class="chip ${r.jenis === 'masuk' ? 'on' : ''}" data-jenis>${r.jenis === 'masuk' ? I('arrow-down-left') + ' Masuk' : I('arrow-up-right') + ' Keluar'}</button>
+          ${UI.rpInput('j' + i, r.jumlah)}<button type="button" class="icon-btn" data-hapus aria-label="Hapus">${I('x')}</button></div>
+        <input class="vq-cat" data-f="catatan" value="${U.esc(r.catatan)}" placeholder="Catatan" maxlength="140">
+        <div class="grid2"><select data-f="kategoriId"><option value="">— kategori —</option>${UI.katOpts(r.jenis, r.kategoriId)}</select>
+          <select data-f="walletId"><option value="">— dompet —</option>${UI.walletOpts(r.walletId)}</select></div></div>`).join('');
+      UI.bindRp(list);
+      const n = items.filter(lengkap).length;
+      ok.disabled = !items.length || n < items.length;
+      ok.innerHTML = I('check') + (items.length > 1 ? ' Simpan ' + items.length + ' catatan' : ' Simpan');
+    };
+    list.addEventListener('input', e => { const row = e.target.closest('.vq-row'); if (!row) return; const r = items[+row.dataset.i];
+      if (e.target.name && e.target.name[0] === 'j') r.jumlah = U.parseRp(e.target.value); else if (e.target.dataset.f === 'catatan') r.catatan = e.target.value;
+      row.classList.toggle('kurang', !lengkap(r)); ok.disabled = items.some(x => !lengkap(x)); });
+    list.addEventListener('change', e => { const row = e.target.closest('.vq-row'); if (!row || !e.target.dataset.f) return; const r = items[+row.dataset.i]; r[e.target.dataset.f] = e.target.value; if (e.target.dataset.f === 'kategoriId') r.dipilih = true; gambar(); });
+    list.addEventListener('click', e => { const row = e.target.closest('.vq-row'); if (!row) return; const i = +row.dataset.i;
+      if (e.target.closest('[data-hapus]')) { items.splice(i, 1); gambar(); }
+      else if (e.target.closest('[data-jenis]')) { const r = items[i]; r.jenis = r.jenis === 'masuk' ? 'keluar' : 'masuk'; r.kategoriId = Voice.parse(r.raw + (r.jenis === 'masuk' ? ' masuk' : '')).kategoriId || ''; gambar(); } });
+    const mulai = () => {
+      if (dengar) { Voice.stop(); return; }
+      dengar = true; mic.classList.add('on'); txt.textContent = 'Mendengarkan… silakan bicara'; teks = '';
+      Voice.start(p => { txt.textContent = p; teks = p; }, final => {
+        dengar = false; mic.classList.remove('on');
+        const f = final || teks;
+        if (!f) { if (!items.length) txt.textContent = 'Ketuk mikrofon lalu bicara.'; return; }
+        txt.textContent = '“' + f + '”';
+        const baru = Voice.parseBanyak(f).map(r => Object.assign(r, { walletId: r.walletId || (items[0] && items[0].walletId) || UI.defWallet() }));
+        items = items.concat(baru); gambar();
+        if (baru.some(r => !r.jumlah)) UI.toast('Nominalnya belum terdengar — ketik di kotak Rp.', 'warn');
+      }, err => { dengar = false; mic.classList.remove('on'); txt.textContent = err + ' Ketuk mikrofon untuk mencoba lagi.'; });
+    };
+    mic.onclick = mulai;
+    s.el.querySelector('[data-ulang]').onclick = () => { items = []; gambar(); mulai(); };
+    ok.onclick = async () => {
+      if (items.some(r => !lengkap(r))) return;
+      const now = new Date().toISOString(), today = U.today();
+      const ops = items.map(r => ({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: today, jenis: r.jenis, jumlah: r.jumlah, kategoriId: r.kategoriId, walletId: r.walletId, walletTujuan: '', biaya: 0,
+        catatan: r.catatan || '', dibayarOleh: Store.me.email, tag: '', sumber: 'suara', refId: '', periodeRef: '', dicatatOleh: Store.me.email, dibuat: now, riwayat: [] } }));
+      if (!(await UI.commitPriv(ops))) return;
+      items.forEach(r => { if (r.dipilih) Voice.ajari(r.raw || r.catatan, r.kategoriId); });
+      const ids = ops.map(o => o.row.id);
       s.close();
-      if (!r.jumlah) { UI.toast('Jumlahnya belum terdengar: "' + final + '"', 'warn'); UI.catat({ preset: { catatan: r.catatan } }); return; }
-      UI.catat({ preset: { jenis: r.jenis, jumlah: r.jumlah, kategoriId: r.kategoriId, walletId: r.walletId, catatan: r.catatan, sumber: 'suara' } });
-    }, err => { txt.textContent = err; });
+      UI.toast(ops.length > 1 ? ops.length + ' catatan tersimpan.' : 'Tersimpan · ' + (items[0].catatan ? items[0].catatan + ' ' : '') + U.rp(items[0].jumlah), 'ok', { undo: () => Store.commit(ids.map(id => ({ op: 'delete', t: 'Transaksi', id }))), ms: 4500 });
+    };
+    gambar(); setTimeout(mulai, 250);
+  };
+  /** Dompet bawaan untuk catat cepat: dompet yang paling sering dipakai 30 hari terakhir. */
+  UI.defWallet = () => {
+    const n = {}, dari = U.addDays(U.today(), -30);
+    Store.t.Transaksi.forEach(t => { if (t.tanggal >= dari && t.jenis === 'keluar' && t.walletId && Store.byId.Wallet[t.walletId]) n[t.walletId] = (n[t.walletId] || 0) + 1; });
+    const top = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+    return top || ((Store.wallets()[0] || {}).id || '');
   };
 
   // ---------- Bayar tagihan / konfirmasi rutin ----------
