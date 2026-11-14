@@ -219,6 +219,7 @@
   .gold-band{margin-top:48px;display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:linear-gradient(120deg,var(--gold-c),#FFE9B0);border:1px solid #F0D58A;border-radius:var(--r);padding:30px 34px}
   .gold-band h3{font-size:clamp(20px,2.6vw,26px);margin:6px 0} .gold-band p{margin:0;color:#5b4a1d;max-width:560px}
   @media (max-width:860px){.minis{grid-template-columns:1fr}.hero-vid{margin-bottom:-24px}}
+  .vplay{position:absolute;inset:0;margin:auto;width:64px;height:64px;border-radius:50%;border:0;background:rgba(15,94,89,.92);color:#fff;font-size:24px;box-shadow:0 8px 24px rgba(0,0,0,.3);cursor:pointer}
 </style>
 </head>
 <body>
@@ -265,9 +266,10 @@
           <span><svg><use href="#i-phone"/></svg>Pasang di HP tanpa Play Store</span>
         </div>
       </div>
-      <div class="hero-vid">
-        <div class="vphone big"><video data-v="catat" poster="vid/catat.jpg" muted loop playsinline preload="none" aria-label="Demo mencatat pengeluaran dengan suara"></video></div>
-        <small class="vcap">Ini rekaman asli aplikasinya: catat dua pengeluaran hanya dengan bicara.</small>
+      <div class="phones" aria-hidden="true">
+        <div class="phone p1"><img src="img/tujuan.webp" alt="" loading="lazy"></div>
+        <div class="phone p2"><img src="img/beranda.webp" alt=""></div>
+        <div class="phone p3"><img src="img/emas.webp" alt="" loading="lazy"></div>
       </div>
     </div>
   </section>
@@ -292,7 +294,7 @@
     </div>
     <div class="wrap">
       <div class="spot reveal">
-        <div class="spot-img"><div class="vphone"><video data-v="catat" poster="vid/catat.jpg" muted loop playsinline preload="none" aria-label="Demo catat deng2 suara"></video></div></div>
+        <div class="spot-img"><div class="vphone"><video data-v="catat" poster="vid/catat.jpg" muted loop playsinline preload="metadata" aria-label="Demo catat deng2 suara"></video></div></div>
         <div>
           <span class="eyebrow">1 · Catat cepat & pengingat</span>
           <h3>Catat secepat bicara, ingat tanpa repot</h3>
@@ -301,7 +303,7 @@
         </div>
       </div>
       <div class="spot rev reveal">
-        <div class="spot-img"><div class="vphone"><video data-v="rapat" poster="vid/rapat.jpg" muted loop playsinline preload="none" aria-label="Demo rapat keuangan"></video></div></div>
+        <div class="spot-img"><div class="vphone"><video data-v="rapat" poster="vid/rapat.jpg" muted loop playsinline preload="metadata" aria-label="Demo rapat keuangan"></video></div></div>
         <div>
           <span class="eyebrow">2 · Rapat Keuangan</span>
           <h3>Bahas uang berdua, tanpa debat kusir</h3>
@@ -310,7 +312,7 @@
         </div>
       </div>
       <div class="spot reveal">
-        <div class="spot-img gold"><div class="vphone"><video data-v="emas" poster="vid/emas.jpg" muted loop playsinline preload="none" aria-label="Demo brankas emas dan zakat"></video></div></div>
+        <div class="spot-img gold"><div class="vphone"><video data-v="emas" poster="vid/emas.jpg" muted loop playsinline preload="metadata" aria-label="Demo brankas emas dan zakat"></video></div></div>
         <div>
           <span class="eyebrow">3 · Brankas emas & zakat</span>
           <h3>Nabung emas yang terpantau, zakat terhitung</h3>
@@ -324,9 +326,9 @@
       <h2 style="margin-top:10px;font-size:clamp(22px,3vw,30px)">Keputusan keuangan lebih tenang</h2>
     </div>
     <div class="wrap minis">
-      <div class="mini reveal"><div class="vphone sm"><video data-v="skor" poster="vid/skor.jpg" muted loop playsinline preload="none" aria-label="Demo skor"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Skor & rasio kesehatan keuangan</h3><p>Dana darurat, rasio utang, dan tabungan dirangkum jadi skor, lengkap dengan langkah perbaikannya.</p></div>
-      <div class="mini reveal"><div class="vphone sm"><video data-v="ai" poster="vid/ai.jpg" muted loop playsinline preload="none" aria-label="Demo AI"></video></div><div class="ic gold"><svg><use href="#i-spark"/></svg></div><h3>Insight AI & Simulator</h3><p>Tanya soal uang keluarga sendiri, lalu simulasikan KPR atau cicilan sebelum memutuskan. AI sudah bisa dicoba di mode demo.</p></div>
-      <div class="mini reveal"><div class="vphone sm"><video data-v="saham" poster="vid/saham.jpg" muted loop playsinline preload="none" aria-label="Demo saham"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Harga saham otomatis</h3><p>Portofolio saham dan reksa dana menyesuaikan harga pasar sendiri. Di demo memakai harga contoh.</p></div>
+      <div class="mini reveal"><div class="vphone sm"><video data-v="skor" poster="vid/skor.jpg" muted loop playsinline preload="metadata" aria-label="Demo skor"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Skor & rasio kesehatan keuangan</h3><p>Dana darurat, rasio utang, dan tabungan dirangkum jadi skor, lengkap dengan langkah perbaikannya.</p></div>
+      <div class="mini reveal"><div class="vphone sm"><video data-v="ai" poster="vid/ai.jpg" muted loop playsinline preload="metadata" aria-label="Demo AI"></video></div><div class="ic gold"><svg><use href="#i-spark"/></svg></div><h3>Insight AI & Simulator</h3><p>Tanya soal uang keluarga sendiri, lalu simulasikan KPR atau cicilan sebelum memutuskan. AI sudah bisa dicoba di mode demo.</p></div>
+      <div class="mini reveal"><div class="vphone sm"><video data-v="saham" poster="vid/saham.jpg" muted loop playsinline preload="metadata" aria-label="Demo saham"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Harga saham otomatis</h3><p>Harga saham di portofolio Anda diperbarui otomatis, jadi nilai dan untung/ruginya selalu terkini. Di demo memakai harga contoh.</p></div>
     </div>
     <div class="wrap">
       <div class="gold-band reveal">
@@ -564,14 +566,22 @@
   const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 }) : null;
   document.querySelectorAll('.reveal').forEach(el => io ? io.observe(el) : el.classList.add('in'));
 
-  /* Video lazy: muat & putar saat terlihat, jeda saat keluar layar */
+  /* Video: src diset langsung (poster tetap tampil), putar saat terlihat, tombol ▶ bila autoplay ditolak */
   (function(){
     const vs=[...document.querySelectorAll('video[data-v]')];
-    const muat=v=>{ if(!v.src){ v.src='vid/'+v.dataset.v+'.mp4'; } };
-    if(!('IntersectionObserver' in window)){ vs.forEach(v=>{muat(v);v.play&&v.play().catch(()=>{});}); return; }
-    const io=new IntersectionObserver(es=>es.forEach(e=>{ const v=e.target; if(e.isIntersecting){ muat(v); const p=v.play(); p&&p.catch(()=>{}); } else v.pause(); }),{threshold:.35,rootMargin:'120px 0px'});
+    vs.forEach(v=>{
+      v.muted=true; v.setAttribute('muted',''); v.setAttribute('webkit-playsinline','');
+      v.src='vid/'+v.dataset.v+'.mp4';
+      const f=v.parentNode; const b=document.createElement('button');
+      b.type='button'; b.className='vplay'; b.setAttribute('aria-label','Putar video'); b.innerHTML='▶'; b.hidden=true; f.appendChild(b);
+      const coba=()=>{ const p=v.play(); if(p&&p.catch) p.catch(()=>{ b.hidden=false; }); };
+      b.onclick=()=>{ b.hidden=true; v.play().catch(()=>{ b.hidden=false; }); };
+      v.addEventListener('playing',()=>{ b.hidden=true; });
+      v._coba=coba;
+    });
+    if(!('IntersectionObserver' in window)){ vs.forEach(v=>v._coba()); return; }
+    const io=new IntersectionObserver(es=>es.forEach(e=>{ const v=e.target; if(e.isIntersecting) v._coba(); else v.pause(); }),{threshold:.25});
     vs.forEach(v=>io.observe(v));
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches) vs.forEach(v=>{v.removeAttribute('loop');});
   })();
 </script>
 </body>
