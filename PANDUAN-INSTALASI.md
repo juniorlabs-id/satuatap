@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.6.7 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.6.8 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -181,30 +181,27 @@ Skrip ini dipasang **Admin keluarga** di akun Google-nya sendiri, untuk hal yang
 
 Tanpa Pendamping, pengingat Telegram tetap terkirim **saat salah satu anggota membuka aplikasi** (tagihan ≤ 3 hari, amplop 80%/100%, insight mingguan, alert harga emas dari relay).
 
-### C1. Pasang
-1. Di aplikasi, buka **Lainnya › Notifikasi › Salin pengaturan Pendamping**. Yang tersalin adalah dua baris `FILE_ID` dan `RELAY_URL`.
-2. Buka <https://script.google.com> dengan akun **Admin keluarga** (pemilik file), lalu buat **Proyek baru** bernama `SatuAtap Pendamping`.
-3. Buka ⚙️ **Setelan Proyek**, centang **Tampilkan file manifes appsscript.json**, lalu tempel isi `appsscript-pendamping.json` ke `appsscript.json`.
-4. Tempel isi `Pendamping.gs` ke `Kode.gs`. Ganti dua baris `const FILE_ID = …` dan `const RELAY_URL = …` di bagian atas dengan dua baris yang disalin di langkah 1. Simpan.
-5. Pilih fungsi **`setupPendamping`** lalu tekan **▶ Jalankan**.
-   - Akan muncul layar **"Google belum memverifikasi aplikasi ini"**. Ini normal untuk skrip yang Anda pasang sendiri di akun Anda. Klik **Lanjutan** → **Buka SatuAtap Pendamping (tidak aman)** → **Izinkan**.
-   - Log menampilkan "✅ Pendamping aktif …" dan langsung menjalankan pengiriman pertama.
-6. Agar pasangan melihat kalender yang sama: buka Google Calendar, lalu pilih **Keuangan …** › **Setelan & berbagi** › tambahkan email pasangan.
+### C1. Pasang — ikuti panduan di aplikasi
+Buka **Lainnya › Pengaturan › Notifikasi › Skrip Pendamping › Panduan pasang langkah demi langkah**. Panduan 7 langkah itu memandu dari membuat proyek di script.google.com sampai mengecek hasilnya, lengkap dengan tombol:
+- **Salin appsscript.json**, dan
+- **Salin kode Pendamping**: kodenya **sudah berisi** `FILE_ID` keluarga dan `RELAY_URL`, jadi tidak ada yang perlu diketik ulang.
 
-Untuk berhenti, jalankan fungsi `hentikanPendamping`. Kalender bisa dimatikan dengan mengubah `const KALENDER = false`.
+Ringkasnya: buat proyek `SatuAtap Pendamping` → tampilkan & isi `appsscript.json` → tempel kode ke `Kode.gs` → jalankan `setupPendamping` → izinkan (layar "Google belum memverifikasi" itu normal untuk skrip milik sendiri: **Lanjutan › Buka … (tidak aman) › Izinkan**) → log menampilkan "✅ Pendamping aktif".
 
-> **Sudah memasang Pendamping versi lama?** Tempel `Pendamping.gs` dan `appsscript-pendamping.json` yang baru (ada izin baru: kirim ke internet & alamat email), isi `RELAY_URL`, lalu jalankan `setupPendamping` sekali lagi dan izinkan.
+Untuk berhenti, jalankan `hentikanPendamping`. Kalender bisa dimatikan dengan `const KALENDER = false`.
+
+> **Memperbarui Pendamping:** buka panduan yang sama, salin kode baru (langkah 4–5), tempel menimpa yang lama, lalu jalankan `setupPendamping` sekali lagi. Properti skrip (token Fonnte, nomor WA) tidak hilang.
 
 ### C2. WhatsApp lewat Fonnte (opsional)
-Fonnte adalah layanan pihak ketiga yang mengirim WA dari nomor WhatsApp milik keluarga sendiri. Tokennya **hanya** disimpan di Script Properties Pendamping keluarga, tidak di aplikasi dan tidak di JuniorLabs.
+Buka **Notifikasi › WhatsApp › Pasang WhatsApp**. Panduan 9 langkah: daftar & sambungkan Fonnte → salin token → isi nomor WA anggota (aplikasi menyusun nilai `WA_ANGGOTA` untuk disalin) → isi **Properti skrip** `FONNTE_TOKEN` & `WA_ANGGOTA` → jalankan `setupWA` (pesan uji masuk) → **Terapkan › Deployment baru › Aplikasi web** → jalankan **`cekWA`** (memeriksa token, status perangkat Fonnte, dan menampilkan **alamat webhook** siap tempel) → tempel di fonnte.com › Device › Edit › Webhook → uji kirim "makan siang 45rb gopay".
 
-1. Daftar di <https://fonnte.com>, tambahkan **Device** dengan nomor WA keluarga (nomor pengirim), lalu scan QR-nya. Salin **Token** device.
-2. Di editor Pendamping: ⚙️ **Setelan Proyek › Script Properties**, tambahkan:
-   - `FONNTE_TOKEN` = token dari langkah 1;
-   - `WA_ANGGOTA` = daftar nomor dan email anggota, contoh `6281234567890=dimas@gmail.com,6281398765432=rini@gmail.com`.
-3. Jalankan fungsi **`setupWA`**. Pesan uji dikirim ke setiap nomor, dan log menampilkan kunci webhook.
-4. **Agar bisa mencatat lewat chat WA:** buka **Deploy › New deployment › Web app** (Execute as: **Me**, Who has access: **Anyone**) lalu salin URL `/exec`. Di fonnte.com › **Device › Edit › Webhook**, tempel `URL_/exec?k=KUNCI` persis seperti yang tertulis di log `setupWA`.
-5. Uji: dari nomor anggota kirim WA ke nomor keluarga, misalnya `makan siang 45rb gopay`. Buka aplikasi; Beranda menampilkan **"1 catatan dari chat menunggu"**; ketuk untuk memilih kategori dan menyimpan.
+Token Fonnte **hanya** disimpan di Properti skrip Pendamping keluarga — tidak di aplikasi, tidak di JuniorLabs.
+
+### C3. Agar Telegram tidak putus saat update
+- Sambungan Telegram setiap anggota tersimpan di relay; update aplikasi/relay **tidak** menghapusnya.
+- **Update relay selalu lewat Kelola deployment › ✏️ › Versi baru** — jangan "Deployment baru", karena alamat `/exec` akan berubah.
+- Vercel kini mencari alamat relay di dua tempat: Environment Variable `RELAY_URL` **atau** `RELAY_URL` di `js/config.js`. Bila salah satu usang, yang lain dipakai otomatis.
+- Relay memeriksa bot setiap 3 jam: webhook yang hilang dipasang ulang otomatis; bila jalur Vercel → relay gagal, Admin JuniorLabs melihat peringatan di **Notifikasi**. Diagnosis manual: jalankan `cekTelegram` di editor relay.
 
 ---
 

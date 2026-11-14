@@ -40,9 +40,17 @@
   // ---------- Foto struk (T-11) ----------
   UI.fotoStruk = () => {
     if (!AI.siap()) { UI.toast('Sambungkan kunci Gemini dulu di Lainnya › Tanya AI.', 'warn'); return UI.go('ai'); }
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment');
+    // Pilih sumber dulu: kamera (langsung foto) atau galeri (struk yang sudah difoto / screenshot e-struk).
+    const pil = UI.sheet({ title: 'Foto struk', cls: 'small', body: `<p class="muted small">Gemini membaca total, tanggal & nama toko, lalu mengisikan form catat.</p>
+      <div class="setor-via dua"><button type="button" data-src="kamera">${I('camera')}Kamera<small>foto sekarang</small></button><button type="button" data-src="galeri">${I('image')}Galeri<small>foto / screenshot</small></button></div>` });
+    pil.el.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { pil.close(); pilihFoto(b.dataset.src === 'kamera'); });
+  };
+  function pilihFoto(kamera) {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+    if (kamera) inp.setAttribute('capture', 'environment');
+    inp.style.display = 'none'; document.body.appendChild(inp);
     inp.onchange = async () => {
-      const f = inp.files[0]; if (!f) return;
+      const f = inp.files[0]; inp.remove(); if (!f) return;
       const s = UI.sheet({ title: 'Membaca struk', cls: 'small', body: `<div class="voice"><div class="mic-pulse">${I('scan-line', 'big')}</div><p class="muted">Gemini sedang membaca total, tanggal, dan nama toko…</p></div>` });
       try {
         const gb = await AI.kecilkan(f), r = await AI.bacaStruk(gb);
@@ -55,7 +63,7 @@
       } catch (e) { s.close(); UI.toast(e.message, 'warn'); }
     };
     inp.click();
-  };
+  }
   UI.act('ai-struk', () => UI.fotoStruk());
 
   // ---------- Insight mingguan (kartu Beranda) ----------

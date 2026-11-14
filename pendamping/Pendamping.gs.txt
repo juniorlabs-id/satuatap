@@ -1,0 +1,246 @@
+/**
+ * ============================================================
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.6.8)
+ *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
+ *  harus berjalan walau aplikasi tidak dibuka:
+ *   1. Jadwal tagihan, cicilan & acara di Google Calendar (kalender "Keuangan <nama>").
+ *   2. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (lewat @SatuAtapBot, bila anggota sudah
+ *      menghubungkan Telegram di aplikasi) + pengingat Rapat Keuangan.
+ *   3. (Opsional) WhatsApp lewat akun Fonnte MILIK KELUARGA: pengingat yang sama ke nomor WA,
+ *      dan catat lewat chat WA ("makan 45rb gopay") yang masuk ke aplikasi untuk dikonfirmasi.
+ *
+ *  Skrip MEMBACA file "SatuAtap – Data …" milik Anda, menulis ke kalender Anda, dan mengirim teks
+ *  pengingat (nama tagihan & nominal) ke relay JuniorLabs → Telegram. Tidak mengirim email.
+ *
+ *  Cara pasang: ikuti panduan langkah demi langkah di aplikasi (Lainnya › Notifikasi ›
+ *  "Panduan pasang Skrip Pendamping" / "Panduan pasang WhatsApp"). Ringkasnya:
+ *   1. Kode ini disalin dari aplikasi dengan FILE_ID & RELAY_URL sudah terisi.
+ *   2. Jalankan setupPendamping() → izinkan akses.
+ *   3. WhatsApp (opsional): isi Script Properties FONNTE_TOKEN & WA_ANGGOTA, jalankan setupWA(),
+ *      Terapkan sebagai Aplikasi web, lalu jalankan cekWA() untuk alamat webhook Fonnte.
+ * ============================================================
+ */
+const FILE_ID = 'TEMPEL_ID_FILE_DI_SINI';
+const RELAY_URL = 'TEMPEL_ALAMAT_RELAY_DI_SINI';   // alamat /exec relay JuniorLabs (disalin dari aplikasi)
+const JAM_KIRIM = 8;          // jam pengingat & pembaruan kalender setiap pagi (Asia/Jakarta)
+const HARI_KALENDER = 60;     // berapa hari ke depan disalin ke Google Calendar
+const KALENDER = true;        // false = tidak membuat/mengisi Google Calendar
+const PENGINGAT = [7, 3, 1, 0];  // H-7, H-3, H-1, hari H
+
+const PROPS = PropertiesService.getScriptProperties();
+
+function setupPendamping() {
+  if (/TEMPEL/.test(FILE_ID)) throw new Error('Isi dulu FILE_ID di baris atas (salin dari aplikasi: Lainnya › Notifikasi › Skrip Pendamping).');
+  const st = bacaData_();
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'tugasHarian') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('tugasHarian').timeBased().everyDays(1).atHour(JAM_KIRIM).nearMinute(5).create();
+  Logger.log('✅ Pendamping aktif untuk "' + (st.setting.namaKeluarga || 'Keluarga') + '" — ' + Object.keys(st.Transaksi).length + ' transaksi terbaca.');
+  Logger.log('   Setiap hari sekitar pukul ' + JAM_KIRIM + '.00: ' + [KALENDER ? 'kalender' : '', relayOk_() ? 'pengingat Telegram' : '', waOk_() ? 'pengingat WA' : ''].filter(String).join(', ') + '.');
+  if (!relayOk_()) Logger.log('   ⚠️ RELAY_URL belum diisi — pengingat Telegram nonaktif.');
+  Logger.log('   Menjalankan sekali sekarang…');
+  Logger.log(JSON.stringify(tugasHarian_(st)));
+}
+function jalankanSekarang() { Logger.log(JSON.stringify(tugasHarian_(bacaData_()))); }
+function tugasHarian() { tugasHarian_(bacaData_()); }
+function hentikanPendamping() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  Logger.log('Pendamping dihentikan. Kalender "Keuangan …" tetap ada; hapus manual bila tidak diperlukan.');
+}
+
+/** Baca & susun ulang data dari sheet tersembunyi _log (sama seperti aplikasi). */
+function bacaData_() {
+  const sh = SpreadsheetApp.openById(FILE_ID).getSheetByName('_log');
+  if (!sh) throw new Error('Sheet _log tidak ditemukan. Pastikan FILE_ID adalah file "SatuAtap – Data …".');
+  const last = sh.getLastRow();
+  const v = last > 1 ? sh.getRange(2, 1, last - 1, 6).getValues() : [];
+  const st = { Anggota: {}, Pengaturan: {}, Rutin: {}, Pinjaman: {}, Acara: {}, Transaksi: {}, Rapat: {}, setting: {} };
+  v.forEach(function (r) {
+    const t = String(r[2]), id = String(r[3]), op = String(r[4]);
+    if (!st[t] || !id) return;
+    if (op === 'd') { delete st[t][id]; return; }
+    let d = {}; try { d = JSON.parse(String(r[5] || '{}')); } catch (e) { return; }
+    const o = st[t][id] || (st[t][id] = { id: id });
+    Object.keys(d).forEach(function (k) { o[k] = d[k] == null ? '' : String(d[k]); });
+  });
+  Object.keys(st.Pengaturan).forEach(function (k) { st.setting[k] = st.Pengaturan[k].nilai; });
+  return st;
+}
+function tugasHarian_(st) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const out = {};
+  if (KALENDER) { try { out.kalender = kalender_(st, today); } catch (e) { out.kalender = 'gagal: ' + e.message; } }
+  const pesan = pengingat_(st, today);
+  out.pengingat = pesan.length;
+  if (pesan.length && relayOk_()) { try { out.telegram = kirimTelegram_(pesan); } catch (e) { out.telegram = 'gagal: ' + e.message; } }
+  if (pesan.length && waOk_()) { try { out.wa = kirimWA_(pesan.map(function (p) { return p.teks.replace(/<[^>]+>/g, ''); }).join('\n\n')); } catch (e) { out.wa = 'gagal: ' + e.message; } }
+  return out;
+}
+
+/** Pengingat hari ini: tagihan/cicilan/acara H-7, H-3, H-1, H yang belum lunas + rapat keuangan H-1 & H. */
+function pengingat_(st, today) {
+  const items = jadwal_(st, today, Math.max.apply(null, PENGINGAT)).filter(function (x) { return x.arah === 'keluar' && !x.lunas && PENGINGAT.indexOf(x.h) > -1; });
+  const pesan = items.map(function (x) {
+    const kapan = x.h === 0 ? '<b>hari ini</b>' : x.h === 1 ? '<b>besok</b>' : x.h + ' hari lagi (' + tglId_(x.tanggal) + ')';
+    return { ke: 'semua', kunci: 'occ|' + x.occ + '|H-' + x.h, teks: (x.h <= 1 ? '🔔 ' : '🗓️ ') + esc_(x.nama) + ' · <b>' + rp_(x.jumlah) + '</b> jatuh tempo ' + kapan + '.' + (x.h === 0 ? '\nTandai lunas di aplikasi setelah dibayar.' : '') };
+  });
+  // Rapat keuangan rutin (tanggal dari Pengaturan, bawaan tgl 1)
+  const hariRapat = Math.min(28, Math.max(1, Number(st.setting.rapatTanggal) || 1));
+  [0, 1].forEach(function (h) {
+    const d = new Date(today.getTime() + h * 864e5);
+    if (d.getDate() !== hariRapat) return;
+    const ym = ymd_(d).slice(0, 7), sudah = Object.keys(st.Rapat).some(function (k) { return String(st.Rapat[k].tanggal || '').slice(0, 7) === ym; });
+    if (sudah) return;
+    pesan.push({ ke: 'semua', kunci: 'rapat|' + ym + '|H-' + h, teks: '👥 Rapat keuangan keluarga ' + (h === 0 ? '<b>hari ini</b>' : '<b>besok</b>') + (d.getMonth() === 11 ? ' — rapat tahunan dengan Kilas Balik.' : '.') + '\nAgendanya sudah disusun otomatis di aplikasi (Lainnya › Rapat Keuangan).' });
+  });
+  return pesan;
+}
+
+// ---------- Telegram lewat relay JuniorLabs ----------
+function relayOk_() { return /^https:\/\/script\.google\.com\//.test(RELAY_URL); }
+function relay_(action, data) {
+  const r = UrlFetchApp.fetch(RELAY_URL, { method: 'post', contentType: 'text/plain;charset=utf-8', muteHttpExceptions: true, followRedirects: true,
+    payload: JSON.stringify({ action: action, token: ScriptApp.getOAuthToken(), data: Object.assign({ fileId: FILE_ID }, data) }) });
+  let j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) { throw new Error('relay tidak membalas JSON (HTTP ' + r.getResponseCode() + ')'); }
+  if (!j.success) throw new Error(j.message || 'relay menolak');
+  return j.data;
+}
+function kirimTelegram_(pesan) { let n = 0; for (let i = 0; i < pesan.length; i += 20) n += relay_('tg.kirim', { pesan: pesan.slice(i, i + 20) }).terkirim || 0; return n; }
+
+// ---------- WhatsApp lewat Fonnte milik keluarga (opsional) ----------
+// Script Properties (Setelan Proyek › Properti skrip):
+//   FONNTE_TOKEN  = token perangkat dari dashboard fonnte.com (rahasia — jangan tulis di kode)
+//   WA_ANGGOTA    = daftar "nomor=email", pisahkan koma. Contoh: 6281234567890=dimas@gmail.com,6281398765432=rini@gmail.com
+//   WA_KUNCI      = dibuat otomatis oleh setupWA() untuk mengamankan alamat webhook
+function waOk_() { return !!PROPS.getProperty('FONNTE_TOKEN') && !!PROPS.getProperty('WA_ANGGOTA'); }
+function waAnggota_() {
+  const out = {};
+  String(PROPS.getProperty('WA_ANGGOTA') || '').split(',').forEach(function (x) { const p = x.split('='); const no = nomor_(p[0]); if (no && p[1]) out[no] = String(p[1]).trim().toLowerCase(); });
+  return out;
+}
+function nomor_(s) { let n = String(s || '').replace(/[^\d]/g, ''); if (/^0/.test(n)) n = '62' + n.slice(1); return n.length >= 9 ? n : ''; }
+function kirimWA_(teks, target) {
+  const tok = PROPS.getProperty('FONNTE_TOKEN'); if (!tok || !teks) return 0;
+  const nomor = target ? [target] : Object.keys(waAnggota_());
+  if (!nomor.length) return 0;
+  const r = UrlFetchApp.fetch('https://api.fonnte.com/send', { method: 'post', muteHttpExceptions: true, headers: { Authorization: tok },
+    payload: { target: nomor.join(','), message: String(teks).slice(0, 4000), countryCode: '62' } });
+  let j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+  if (j.status === false) throw new Error(j.reason || 'Fonnte menolak');
+  return nomor.length;
+}
+/** Jalankan setelah mengisi FONNTE_TOKEN & WA_ANGGOTA. Lalu Deploy › New deployment › Web app (Execute as: Me, Who has access: Anyone) dan tempel URL + "?k=WA_KUNCI" ke Webhook Fonnte. */
+function setupWA() {
+  if (!PROPS.getProperty('FONNTE_TOKEN')) throw new Error('Isi Script Property FONNTE_TOKEN dulu (dari dashboard fonnte.com › Device › Token).');
+  if (!Object.keys(waAnggota_()).length) throw new Error('Isi Script Property WA_ANGGOTA, contoh: 6281234567890=dimas@gmail.com,6281398765432=rini@gmail.com');
+  if (!PROPS.getProperty('WA_KUNCI')) PROPS.setProperty('WA_KUNCI', Utilities.getUuid().replace(/-/g, ''));
+  const n = kirimWA_('✅ SatuAtap tersambung ke WhatsApp keluarga ini.\nPengingat tagihan dikirim setiap pagi. Untuk mencatat, balas misalnya: makan siang 45rb gopay');
+  Logger.log('✅ Pesan uji dikirim ke ' + n + ' nomor: ' + Object.keys(waAnggota_()).join(', ') + '. Cek WhatsApp masing-masing.');
+  Logger.log('   Langkah berikut (agar bisa CATAT lewat WA): Terapkan › Deployment baru › Aplikasi web › Terapkan, lalu jalankan cekWA.');
+}
+/** Periksa WhatsApp: token Fonnte, nomor anggota, dan ALAMAT WEBHOOK yang harus ditempel di fonnte.com. */
+function cekWA() {
+  const L = function (ok, t) { Logger.log((ok === true ? '✅ ' : ok === false ? '❌ ' : 'ℹ️ ') + t); };
+  const tok = PROPS.getProperty('FONNTE_TOKEN');
+  L(!!tok, 'FONNTE_TOKEN ' + (tok ? 'ada' : 'belum diisi — ⚙️ Setelan Proyek › Properti skrip'));
+  const ang = waAnggota_(); L(Object.keys(ang).length > 0, 'WA_ANGGOTA: ' + (Object.keys(ang).map(function (k) { return k + ' → ' + ang[k]; }).join(', ') || 'belum diisi'));
+  if (tok) {
+    try {
+      const r = UrlFetchApp.fetch('https://api.fonnte.com/device', { method: 'post', muteHttpExceptions: true, headers: { Authorization: tok } });
+      const j = JSON.parse(r.getContentText());
+      if (j.status === false) L(false, 'Fonnte menolak token: ' + (j.reason || '') + ' — salin ulang token dari fonnte.com › Device');
+      else L(/connect/i.test(String(j.device_status || '')), 'Perangkat Fonnte ' + (j.device || '') + ': ' + (j.device_status || '?') + (/connect/i.test(String(j.device_status || '')) ? '' : ' — buka fonnte.com › Device › Connect lalu scan QR dari WhatsApp'));
+    } catch (e) { L(null, 'Status perangkat Fonnte tidak bisa dicek (' + e.message + ').'); }
+  }
+  if (!PROPS.getProperty('WA_KUNCI')) PROPS.setProperty('WA_KUNCI', Utilities.getUuid().replace(/-/g, ''));
+  let url = ''; try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  const k = PROPS.getProperty('WA_KUNCI');
+  if (/\/exec$/.test(url)) { L(true, 'Alamat webhook — salin SELURUH baris berikut ke fonnte.com › Device › Edit › Webhook:'); Logger.log(url + '?k=' + k); }
+  else {
+    L(null, 'Alamat webhook = URL Aplikasi web Anda + ?k=' + k);
+    Logger.log('   1) Terapkan › Kelola deployment › salin "URL Aplikasi web" (berakhiran /exec). Belum ada? Terapkan › Deployment baru › Aplikasi web › Terapkan.');
+    Logger.log('   2) Tempel di fonnte.com › Device › Edit › Webhook, lalu ketik di ujungnya:  ?k=' + k);
+    Logger.log('   Contoh hasil: https://script.google.com/macros/s/AKfy…/exec?k=' + k);
+  }
+}
+/** Webhook Fonnte: pesan WA masuk → Kotak aplikasi pengirim (dikonfirmasi di aplikasi). */
+function doPost(e) {
+  const k = e && e.parameter && e.parameter.k;
+  if (!k || k !== PROPS.getProperty('WA_KUNCI')) return ContentService.createTextOutput('forbidden');
+  let d = {};
+  try { d = e.postData && /json/.test(e.postData.type || '') ? JSON.parse(e.postData.contents) : (e.parameter || {}); } catch (x) { d = e.parameter || {}; }
+  const no = nomor_(d.sender || d.from || ''), teks = String(d.message || d.text || '').trim(), email = waAnggota_()[no];
+  if (!no || !teks || !email || d.isgroup === true || d.isgroup === 'true') return ContentService.createTextOutput('ok');
+  const c = CacheService.getScriptCache(), dup = 'wa_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, no + teks + String(d.timestamp || '')));
+  if (c.get(dup)) return ContentService.createTextOutput('ok');
+  c.put(dup, '1', 3600);
+  if (/^(bantuan|help|\?)$/i.test(teks)) { kirimWA_('Kirim catatan seperti: makan siang 45rb gopay · bensin 50.000 · gaji 7,5 jt bca. Catatan masuk ke aplikasi SatuAtap Anda untuk dikonfirmasi.', no); return ContentService.createTextOutput('ok'); }
+  const v = nominalTeks_(teks);
+  if (!v) { kirimWA_('Nominalnya belum terbaca 🤔 Contoh: makan siang 45rb gopay', no); return ContentService.createTextOutput('ok'); }
+  try { relay_('kotak.tambah', { email: email, teks: teks.slice(0, 300), sumber: 'wa' }); kirimWA_('📝 Diterima: ' + rp_(v) + ' — ' + teks.slice(0, 80) + '\nMasuk sebagai draf — konfirmasi di aplikasi SatuAtap › Mutasi › Menunggu konfirmasi.', no); }
+  catch (x) { kirimWA_('Maaf, catatan belum tersimpan (' + x.message + '). Coba lagi nanti.', no); }
+  return ContentService.createTextOutput('ok');
+}
+function doGet() { return ContentService.createTextOutput('SatuAtap Pendamping aktif'); }
+function nominalTeks_(t) {
+  t = String(t || '').toLowerCase().replace(/rp\.?\s*/g, '');
+  const m = /(\d+(?:[.,]\d+)*)\s*(rb|ribu|k|jt|juta)?\b/.exec(t);
+  if (!m) return 0;
+  let v = m[1];
+  if (m[2]) v = Number(v.replace(',', '.')) * (/^(jt|juta)$/.test(m[2]) ? 1e6 : 1e3);
+  else v = Number(v.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'));
+  return Math.round(v) || 0;
+}
+
+/** Jadwal rutin, cicilan, acara dalam N hari (logika sama dengan aplikasi). */
+function jadwal_(st, today, hari) {
+  const out = [], bayar = {};
+  Object.keys(st.Transaksi).forEach(function (k) { const t = st.Transaksi[k]; if (t.refId && t.periodeRef) { const key = t.refId + '|' + t.periodeRef; bayar[key] = (bayar[key] || 0) + (Number(t.jumlah) || 0); } });
+  const end = new Date(today.getTime() + hari * 864e5);
+  const rutin = Object.keys(st.Rutin).map(function (k) { return st.Rutin[k]; }), pinj = Object.keys(st.Pinjaman).map(function (k) { return st.Pinjaman[k]; });
+  for (let d = new Date(today); d <= end; d = new Date(d.getTime() + 864e5)) {
+    const tgl = d.getDate(), bln = d.getMonth() + 1, last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(), h = Math.round((d - today) / 864e5), s = ymd_(d);
+    rutin.forEach(function (r) {
+      if (r.aktif === 'false') return;
+      if (Math.min(Number(r.tanggal) || 1, last) !== tgl) return;
+      if (r.frekuensi === 'tahunan' && (Number(r.bulan) || 1) !== bln) return;
+      if (r.mulai && s < r.mulai) return; if (r.selesai && s > r.selesai) return;
+      const key = r.frekuensi === 'tahunan' ? s.slice(0, 4) : s.slice(0, 7), j = Number(r.jumlah) || 0;
+      out.push({ occ: r.id + '|' + key, nama: r.nama, jumlah: j, h: h, arah: r.jenis === 'masuk' ? 'masuk' : 'keluar', lunas: (bayar[r.id + '|' + key] || 0) >= j * 0.999 && j > 0, tanggal: s, jenis: 'rutin' });
+    });
+    pinj.forEach(function (p) {
+      const c = Number(p.cicilan) || 0;
+      if (p.lunas === 'true' || !Number(p.tanggalBayar) || !c) return;
+      if (Math.min(Number(p.tanggalBayar), last) !== tgl) return;
+      if (p.mulai && s < p.mulai) return;
+      const key = s.slice(0, 7);
+      out.push({ occ: p.id + '|' + key, nama: (p.arah === 'piutang' ? 'Piutang: ' : 'Cicilan: ') + p.pihak, jumlah: c, h: h, arah: p.arah === 'piutang' ? 'masuk' : 'keluar', lunas: (bayar[p.id + '|' + key] || 0) >= c * 0.999, tanggal: s, jenis: 'pinjaman' });
+    });
+  }
+  Object.keys(st.Acara).forEach(function (k) {
+    const a = st.Acara[k]; if (!a.tanggal) return;
+    const h = Math.round((new Date(a.tanggal + 'T00:00:00') - today) / 864e5);
+    if (h >= 0 && h <= hari) out.push({ occ: 'a|' + a.id, nama: a.nama, jumlah: Number(a.estimasi) || 0, h: h, arah: 'keluar', lunas: false, tanggal: a.tanggal, jenis: 'acara' });
+  });
+  return out;
+}
+
+/** Sinkron satu arah ke kalender "Keuangan <nama>". Acara buatan skrip ditandai [SatuAtap]. */
+function kalender_(st, today) {
+  const nama = 'Keuangan ' + (st.setting.namaKeluarga || 'Keluarga');
+  let cal = null, id = PROPS.getProperty('CALENDAR_ID');
+  if (id) { try { cal = CalendarApp.getCalendarById(id); } catch (e) { cal = null; } }
+  if (!cal) { cal = CalendarApp.createCalendar(nama, { color: CalendarApp.Color.TEAL }); PROPS.setProperty('CALENDAR_ID', cal.getId()); }
+  const end = new Date(today.getTime() + HARI_KALENDER * 864e5);
+  cal.getEvents(today, end).forEach(function (ev) { if (/\[SatuAtap\]/.test(ev.getDescription())) ev.deleteEvent(); });
+  const items = jadwal_(st, today, HARI_KALENDER);
+  items.forEach(function (x) {
+    const ev = cal.createAllDayEvent((x.lunas ? '✓ ' : '') + x.nama + ' · ' + rp_(x.jumlah), new Date(x.tanggal + 'T00:00:00'), { description: '[SatuAtap] ' + x.jenis });
+    if (!x.lunas && x.arah === 'keluar') { try { ev.addPopupReminder(9 * 60); } catch (e) {} }   // pop-up pukul 15.00 sehari sebelumnya
+  });
+  return items.length;
+}
+
+function esc_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function tglId_(s) { const b = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']; const p = String(s).split('-'); return Number(p[2]) + ' ' + b[Number(p[1]) - 1]; }
+function rp_(n) { return 'Rp ' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function ymd_(d) { return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
