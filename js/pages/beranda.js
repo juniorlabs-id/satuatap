@@ -14,7 +14,7 @@
   UI.page('beranda', {
     render() {
       const p = Calc.period(), tot = Calc.periodTotals(p), safe = Calc.safeDaily(), di = Calc.dayIndex(p);
-      const liq = Calc.liquidTotal(), gaj = UI.gajian(), drafts = UI.drafts();
+      const liq = Calc.liquidTotal(), gaj = UI.gajian(), drafts = UI.drafts(), kotak = UI.kotakList ? UI.kotakList() : [];
       const up = Calc.occurrences(U.addDays(U.today(), 1), U.addDays(U.today(), 7)).filter(o => !o.lunas && o.arah !== 'info' && !UI.isTunda(o));
       const proj = Calc.projection(30);
       const env = Calc.envelopes(p).filter(e => e.status === 'hampir' || e.status === 'lewat').sort((a, b) => b.pct - a.pct).slice(0, 3);
@@ -50,7 +50,7 @@
       ${(() => { const z = Calc.zakatMal(); return z.haul && z.wajib && z.kurang > 0 && z.haul.sisa <= 14 ? `<div class="alert" data-act="go" data-to="zakat">${I('hand-heart')}<div><b>Haul zakat mal ${z.haul.sisa <= 0 ? 'sudah tiba' : z.haul.sisa + ' hari lagi'}</b><small>Perkiraan zakat ${UI.m(z.kurang)} (2,5% dari harta bersih).</small></div>${I('chevron-right')}</div>` : ''; })()}
       ${proj.kritis ? `<div class="alert warn" data-act="go" data-to="kalender/arus">${I('triangle-alert')}<div><b>Siaga Dana ${U.tgl(proj.kritis.d, 'dm')}</b><small>Perkiraan saldo tinggal ${UI.m(proj.kritis.bal)} saat ada tagihan. Siapkan dana atau geser jadwal.</small></div>${I('chevron-right')}</div>` : ''}
 
-      ${drafts.length ? `${UI.sec('Menunggu konfirmasi <span class="count">' + drafts.length + '</span>', '<small class="muted">geser kanan ✓</small>')}<div class="card list">${drafts.slice(0, 4).map(UI.draftRow).join('')}</div>` : ''}
+      ${drafts.length || kotak.length ? `${UI.sec('Menunggu konfirmasi <span class="count">' + (drafts.length + kotak.length) + '</span>', '<small class="muted">geser kanan ✓</small>')}<div class="card list">${kotak.slice(0, 4).map(UI.kotakRow).join('')}${drafts.slice(0, Math.max(0, 4 - kotak.length)).map(UI.draftRow).join('')}</div>${drafts.length + kotak.length > 4 ? `<button class="link small" data-act="go" data-to="mutasi">Lihat semua (${drafts.length + kotak.length})</button>` : ''}` : ''}
 
       ${up.length ? `${UI.sec('7 hari ke depan', '<a href="#/kalender" class="link">Kalender</a>')}<div class="card list">${up.slice(0, 5).map(o => `
         <div class="row" data-act="occ-pay" data-occ="${U.esc(o.id)}"><div class="date-chip"><b>${U.parseDate(o.tanggal).getDate()}</b><small>${U.BLN[U.parseDate(o.tanggal).getMonth()]}</small></div>

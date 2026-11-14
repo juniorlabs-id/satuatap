@@ -79,7 +79,7 @@
       if (walletId) break;
     }
     // catatan: kalimat tanpa angka & nama wallet
-    let catatan = raw.replace(/(\d+(?:[.,]\d+)?)\s*(rb|ribu|k|jt|juta)?/g, '').replace(/\b(nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|seratus|seribu|sejuta|belas|puluh|ratus|ribu|juta|rupiah|koma)\b/g, '');
+    let catatan = raw.replace(/\brp\.?\s*/g, ' ').replace(/(\d+(?:[.,]\d+)*)\s*(rb|ribu|k|jt|juta)?/g, '').replace(/\b(nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|seratus|seribu|sejuta|belas|puluh|ratus|ribu|juta|rupiah|koma|rp)\b/g, '');
     if (walletId) { const wn = Store.byId.Wallet[walletId].nama.toLowerCase().split(/\s+/); wn.forEach(t => { if (t.length >= 3) catatan = catatan.replace(new RegExp('\\b' + t + '\\b', 'g'), ''); }); catatan = catatan.replace(/\b(pakai|pake|dari|via|lewat)\b/g, ''); }
     catatan = catatan.replace(/\s+/g, ' ').trim();
     catatan = catatan ? catatan[0].toUpperCase() + catatan.slice(1) : '';

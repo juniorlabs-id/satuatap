@@ -80,12 +80,10 @@
     const lastW = localStorage.getItem('sa:lastWallet');
     const def = wl.find(w => w.id === lastW) || wl[0];
     const sug = ambil ? 0 : Math.min(g.sisa, g.t.setoranBulanan || g.perluPerBulan || 0);
-    // portofolio reksa dana yang ditautkan ke tujuan ini → setoran bisa langsung menjadi pembelian reksa dana
-    const rd = ambil ? [] : Calc.investasi('reksadana').filter(i => i.x.tujuanId === g.t.id);
-    const namaRd = i => i.x.nama + (i.x.kode && i.x.kode !== 'aplikasi' ? ' · ' + i.x.kode : '');
+
     const s = UI.sheet({ title: (ambil ? 'Ambil dari ' : 'Setor ke ') + g.t.nama, cls: 'small', body: `
       ${ambil ? `<p class="muted">Dana terkumpul ${U.rp(g.saldo)}. Uang yang diambil masuk ke dompet pilihan.</p>` : `<p class="muted">Sisa menuju target ${U.rp(g.sisa)}.</p>`}
-      ${rd.length ? UI.field('Disimpan sebagai', `<div class="seg wrap" role="radiogroup">${rd.map((i, k) => `<label><input type="radio" name="ke" value="${i.x.id}" ${k === 0 ? 'checked' : ''}><span>${I('chart-pie')} Beli ${U.esc(namaRd(i))}</span></label>`).join('')}<label><input type="radio" name="ke" value=""><span>${I('piggy-bank')} Tabungan biasa</span></label></div>`, 'Beli reksa dana: saldo rekening berkurang, total setoran portofolio naik, dan checklist tujuan tercentang.') : ''}
+      ${ambil ? '' : `<div class="setor-via" role="tablist" aria-label="Setor lewat"><button type="button" class="on" data-via="kas">${I('landmark')}Kas & bank<small>pindah dana</small></button><button type="button" data-via="emas">${I('gem')}Emas<small>beli emas</small></button><button type="button" data-via="rd">${I('chart-pie')}Reksa dana<small>beli unit</small></button></div>`}
       ${UI.field('Jumlah', UI.rpInput('jumlah', Math.round(sug)))}
       <div class="chips">${ambil ? '' : [g.t.setoranBulanan, 100000, 500000, 1000000].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map(v => `<button class="chip" data-q="${v}">${U.rpShort(v)}</button>`).join('')}</div>
       ${UI.field(ambil ? 'Masukkan ke dompet' : 'Ambil dari dompet', `<select name="walletId">${wl.map(w => `<option value="${w.id}" ${w.id === def.id ? 'selected' : ''}>${U.esc(w.nama)} — ${U.rpShort(bal[w.id] || 0)}</option>`).join('')}</select>`,
@@ -100,19 +98,21 @@
     const chk = () => { const v = U.parseRp(inp.value), b = bal[sel.value] || 0; warn.innerHTML = !ambil && v > b ? `<span class="bad small">${I('triangle-alert')} Melebihi saldo dompet (${U.rp(b)}).</span>` : ambil && v > g.saldo ? `<span class="bad small">Melebihi dana terkumpul.</span>` : ''; };
     inp.addEventListener('input', chk); sel.addEventListener('change', chk); chk();
     s.el.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { inp.value = U.fmtNum(b.dataset.q); chk(); });
+    // Setor lewat emas / reksa dana → buka form pembeliannya dengan tujuan ini sudah terisi
+    s.el.querySelectorAll('[data-via]').forEach(b => b.onclick = () => {
+      const via = b.dataset.via; if (via === 'kas') return;
+      const f = UI.formData(s.el); s.close();
+      setTimeout(() => {
+        if (via === 'emas') UI.emasForm(null, { tujuanId: g.t.id, sumber: f.walletId ? 'w:' + f.walletId : '' });
+        else UI.rdBeli(null, { tujuanId: g.t.id, jumlah: f.jumlah || Math.round(sug) });
+      }, 220);
+    });
     s.el.querySelector('[data-ok]').onclick = () => {
       const f = UI.formData(s.el);
       if (!f.jumlah) return UI.toast('Isi jumlah.', 'warn');
       if (ambil && f.jumlah > g.saldo) return UI.toast('Melebihi dana terkumpul ' + U.rp(g.saldo) + '.', 'warn');
       const before = g.pct, me = Store.me.email;
       localStorage.setItem('sa:lastWallet', f.walletId);
-      if (f.ke && UI.rdSetor) {
-        UI.rdSetor(f.ke, f.jumlah, f.tanggal || U.today(), f.walletId, f.dibayarOleh || me, f.catatan, f.biayaLain || 0);
-        s.close();
-        const after = Calc.goal(id).pct, ms = [1, 0.75, 0.5, 0.25].find(m => before < m && after >= m);
-        if (ms) UI.celebrate(ms, g.t.nama); else UI.toast('Beli reksa dana ' + U.rp(f.jumlah) + ' · ' + U.pct(Math.min(1, after)));
-        return;
-      }
       Store.upsert('Transaksi', { id: U.uid('t'), tanggal: f.tanggal || U.today(), jenis: ambil ? 'tujuan_ambil' : 'tujuan', jumlah: f.jumlah, kategoriId: '', walletId: f.walletId, walletTujuan: g.t.walletId || '',
         biaya: f.biayaLain || 0, catatan: f.catatan || ((ambil ? 'Ambil dari ' : 'Setor ke ') + g.t.nama), dibayarOleh: f.dibayarOleh || me, tag: '', sumber: 'app', refId: g.t.id, periodeRef: (f.tanggal || U.today()).slice(0, 7), dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
       s.close();

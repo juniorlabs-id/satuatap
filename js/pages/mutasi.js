@@ -101,7 +101,7 @@
   UI.page('mutasi', {
     render() {
       const p = Calc.periodShift(Calc.period(), F.off);
-      const drafts = F.off === 0 && !F.all ? UI.drafts() : [];
+      const drafts = F.off === 0 && !F.all ? UI.drafts() : [], kotak = F.off === 0 && !F.all && UI.kotakList ? UI.kotakList() : [];
       const nf = (F.kat ? 1 : 0) + (F.wallet ? 1 : 0) + (F.who ? 1 : 0);
       return `
         <div class="toolbar">
@@ -118,7 +118,7 @@
           <div class="sumline" id="mut-sum"></div>
         </div>
         ${F.off === 0 && !F.all && UI.kotakAlert ? UI.kotakAlert() : ''}
-        ${drafts.length ? `<div class="day-h"><b>Menunggu konfirmasi</b><span>geser kanan untuk konfirmasi</span></div><div class="card list">${drafts.map(UI.draftRow).join('')}</div>` : ''}
+        ${drafts.length || kotak.length ? `<div class="day-h"><b>Menunggu konfirmasi</b><span>geser kanan untuk konfirmasi</span></div><div class="card list">${kotak.map(UI.kotakRow).join('')}${drafts.map(UI.draftRow).join('')}</div>` : ''}
         <div id="mut-list"></div><div class="spacer"></div>`;
     },
     after() { renderList(); }

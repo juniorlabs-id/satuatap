@@ -84,7 +84,7 @@
       if (mode !== 'x') return;
       UI._swiped = Date.now();
       s.classList.remove('arm-l');
-      if (dx > 90 && s.dataset.draft) { main.style.transform = ''; if (s.dataset.occ) UI.payOcc(s.dataset.occ, { quick: true }); return; }
+      if (dx > 90 && s.dataset.draft) { main.style.transform = ''; if (s.dataset.kotak) UI.kotakSimpan(s.dataset.kotak); else if (s.dataset.occ) UI.payOcc(s.dataset.occ, { quick: true }); return; }
       if (dx < -60 || (s.classList.contains('open-r') && dx < 30)) { main.style.transform = 'translateX(-150px)'; s.classList.add('open-r'); open = s; }
       else { main.style.transform = ''; s.classList.remove('open-r'); if (open === s) open = null; }
     };
@@ -410,29 +410,37 @@
     if (!Voice.supported()) return UI.toast('Browser ini belum mendukung input suara. Coba Chrome di Android.', 'warn');
     if (navigator.vibrate) navigator.vibrate(30);
     let items = [], dengar = false, teks = '';
-    const s = UI.sheet({ title: 'Catat cepat pakai suara', cls: 'small', body: `<div class="voice"><button type="button" class="mic-pulse" data-mic aria-label="Mulai / berhenti bicara">${I('mic', 'big')}</button>
-        <div class="voice-txt">Menyiapkan mikrofon…</div><p class="muted small vq-hint">Contoh: <i>"gudeg empat puluh lima ribu tunai"</i> · <i>"gaji masuk 7,5 juta bca"</i> · bisa beberapa sekaligus dengan kata <i>"dan"</i></p></div>
-      <div class="vq-list"></div>`,
+    const s = UI.sheet({ title: 'Catat cepat pakai suara', cls: 'small vq-sheet', body: `<div class="voice vq-voice"><button type="button" class="mic-pulse" data-mic aria-label="Mulai / berhenti bicara">${I('mic', 'big')}</button>
+        <div class="vq-say"><div class="voice-txt">Menyiapkan mikrofon…</div><p class="muted small vq-hint">Contoh: <i>"gudeg empat puluh lima ribu tunai"</i> · <i>"gaji masuk 7,5 juta bca"</i> · beberapa sekaligus pakai kata <i>"dan"</i></p></div></div>
+      <div class="vq-list"></div><div class="vq-sum"></div>`,
       foot: `<button class="btn ghost" data-ulang>${I('mic')} Ulangi</button><button class="btn" data-ok disabled>${I('check')} Simpan</button>`, onClose: () => Voice.stop() });
-    const mic = s.el.querySelector('[data-mic]'), txt = s.el.querySelector('.voice-txt'), list = s.el.querySelector('.vq-list'), ok = s.el.querySelector('[data-ok]');
+    const mic = s.el.querySelector('[data-mic]'), txt = s.el.querySelector('.voice-txt'), list = s.el.querySelector('.vq-list'), ok = s.el.querySelector('[data-ok]'), sum = s.el.querySelector('.vq-sum'), box = s.el.querySelector('.vq-voice');
     const lengkap = r => r.jumlah > 0 && r.kategoriId && r.walletId;
-    const gambar = () => {
-      list.innerHTML = items.map((r, i) => `<div class="vq-row ${lengkap(r) ? '' : 'kurang'}" data-i="${i}">
-        <div class="vq-top"><button type="button" class="chip ${r.jenis === 'masuk' ? 'on' : ''}" data-jenis>${r.jenis === 'masuk' ? I('arrow-down-left') + ' Masuk' : I('arrow-up-right') + ' Keluar'}</button>
-          ${UI.rpInput('j' + i, r.jumlah)}<button type="button" class="icon-btn" data-hapus aria-label="Hapus">${I('x')}</button></div>
-        <input class="vq-cat" data-f="catatan" value="${U.esc(r.catatan)}" placeholder="Catatan" maxlength="140">
-        <div class="grid2"><select data-f="kategoriId"><option value="">— kategori —</option>${UI.katOpts(r.jenis, r.kategoriId)}</select>
-          <select data-f="walletId"><option value="">— dompet —</option>${UI.walletOpts(r.walletId)}</select></div></div>`).join('');
-      UI.bindRp(list);
-      const n = items.filter(lengkap).length;
-      ok.disabled = !items.length || n < items.length;
+    const kat = id => Store.byId.Kategori[id] || null;
+    const ringkas = () => {
+      const kel = U.sum(items.filter(r => r.jenis !== 'masuk'), r => r.jumlah || 0), mas = U.sum(items.filter(r => r.jenis === 'masuk'), r => r.jumlah || 0), kurang = items.filter(r => !lengkap(r)).length;
+      sum.innerHTML = items.length ? `<span>${items.length} catatan</span>${kel ? `<b class="bad">−${U.rp(kel)}</b>` : ''}${mas ? `<b class="ok">+${U.rp(mas)}</b>` : ''}${kurang ? `<span class="vq-need">${I('circle-alert')} ${kurang} perlu dilengkapi</span>` : ''}` : '';
+      ok.disabled = !items.length || kurang > 0;
       ok.innerHTML = I('check') + (items.length > 1 ? ' Simpan ' + items.length + ' catatan' : ' Simpan');
     };
-    list.addEventListener('input', e => { const row = e.target.closest('.vq-row'); if (!row) return; const r = items[+row.dataset.i];
+    const gambar = () => {
+      box.classList.toggle('kecil', items.length > 0);
+      list.innerHTML = items.map((r, i) => { const k = kat(r.kategoriId);
+        return `<div class="vq-card ${r.jenis === 'masuk' ? 'masuk' : 'keluar'} ${lengkap(r) ? '' : 'kurang'}" data-i="${i}">
+        <div class="vq-head"><span class="cat-ic">${I(k ? k.ikon || 'tag' : 'circle-help')}</span>
+          <input class="vq-note" data-f="catatan" value="${U.esc(r.catatan)}" placeholder="Tambah catatan…" maxlength="140" aria-label="Catatan">
+          <button type="button" class="icon-btn vq-x" data-hapus aria-label="Hapus">${I('x')}</button></div>
+        <div class="vq-amt"><button type="button" class="vq-sign" data-jenis aria-label="Ganti keluar/masuk">${r.jenis === 'masuk' ? '+' : '−'}</button><span>Rp</span><input name="j${i}" data-rp inputmode="numeric" autocomplete="off" value="${r.jumlah ? U.fmtNum(r.jumlah) : ''}" placeholder="0" aria-label="Nominal"></div>
+        <div class="vq-meta"><label class="vq-pill ${r.kategoriId ? '' : 'kosong'}">${I('tag')}<select data-f="kategoriId" aria-label="Kategori"><option value="">Pilih kategori</option>${UI.katOpts(r.jenis, r.kategoriId)}</select>${I('chevron-down')}</label>
+          <label class="vq-pill ${r.walletId ? '' : 'kosong'}">${I('wallet')}<select data-f="walletId" aria-label="Dompet"><option value="">Pilih dompet</option>${UI.walletOpts(r.walletId)}</select>${I('chevron-down')}</label>
+</div></div>`; }).join('');
+      UI.bindRp(list); ringkas();
+    };
+    list.addEventListener('input', e => { const row = e.target.closest('.vq-card'); if (!row) return; const r = items[+row.dataset.i];
       if (e.target.name && e.target.name[0] === 'j') r.jumlah = U.parseRp(e.target.value); else if (e.target.dataset.f === 'catatan') r.catatan = e.target.value;
-      row.classList.toggle('kurang', !lengkap(r)); ok.disabled = items.some(x => !lengkap(x)); });
-    list.addEventListener('change', e => { const row = e.target.closest('.vq-row'); if (!row || !e.target.dataset.f) return; const r = items[+row.dataset.i]; r[e.target.dataset.f] = e.target.value; if (e.target.dataset.f === 'kategoriId') r.dipilih = true; gambar(); });
-    list.addEventListener('click', e => { const row = e.target.closest('.vq-row'); if (!row) return; const i = +row.dataset.i;
+      row.classList.toggle('kurang', !lengkap(r)); ringkas(); });
+    list.addEventListener('change', e => { const row = e.target.closest('.vq-card'); if (!row || !e.target.dataset.f) return; const r = items[+row.dataset.i]; r[e.target.dataset.f] = e.target.value; if (e.target.dataset.f === 'kategoriId') r.dipilih = true; gambar(); });
+    list.addEventListener('click', e => { const row = e.target.closest('.vq-card'); if (!row) return; const i = +row.dataset.i;
       if (e.target.closest('[data-hapus]')) { items.splice(i, 1); gambar(); }
       else if (e.target.closest('[data-jenis]')) { const r = items[i]; r.jenis = r.jenis === 'masuk' ? 'keluar' : 'masuk'; r.kategoriId = Voice.parse(r.raw + (r.jenis === 'masuk' ? ' masuk' : '')).kategoriId || ''; gambar(); } });
     const mulai = () => {

@@ -46,9 +46,9 @@
   };
 
   // ---------- Form beli / ubah ----------
-  UI.emasForm = (e) => {
-    const isNew = !e, h = Calc.hargaEmas();
-    e = e || { id: U.uid('e'), tanggal: U.today(), merek: 'Antam', bentuk: 'batangan', gramKeping: 1, jumlah: 1, kadar: 24, hargaBeli: 0, biaya: 0, walletId: '', tujuanId: '', kepemilikan: {}, status: 'simpan', zakat: true, tglJual: '', hargaJual: 0, pinjamanId: '', sertifikat: '', catatan: '', dibuat: new Date().toISOString() };
+  UI.emasForm = (e, pre) => {
+    const isNew = !e, h = Calc.hargaEmas(); pre = pre || {};
+    e = e || { id: U.uid('e'), tanggal: U.today(), merek: 'Antam', bentuk: 'batangan', gramKeping: 1, jumlah: 1, kadar: 24, hargaBeli: 0, biaya: 0, walletId: '', tujuanId: '', kepemilikan: {}, status: 'simpan', zakat: true, tglJual: '', hargaJual: 0, pinjamanId: '', sertifikat: '', catatan: '', dibuat: new Date().toISOString(), tujuanId: pre.tujuanId || '' };
     // Baris keping: [{gram, n, harga (per keping)}]. Pembelian baru boleh beberapa gramasi sekaligus.
     const awal = isNew ? [{ gram: 1, n: 1, harga: 0 }] : [{ gram: Number(e.gramKeping) || 1, n: Number(e.jumlah) || 1, harga: Math.round((Number(e.hargaBeli) || 0) / (Number(e.jumlah) || 1)) }];
     const baris = (r, i) => {
@@ -70,7 +70,7 @@
       <label class="check"><input type="checkbox" name="hadiah" ${!isNew && (Number(e.hargaBeli) || 0) + (Number(e.biaya) || 0) <= 1 ? 'checked' : ''}><span>Hadiah / warisan — tidak ada harga beli <small class="muted">(boleh dikosongkan; untung/rugi tidak dihitung)</small></span></label>
       ${h ? `<button type="button" class="link" data-hari>${I('wand-sparkles')} Isi harga/keping dengan harga hari ini</button>` : ''}
       <div class="keping-total"></div>
-      ${isNew ? UI.field('Sumber dana', `<select name="sumber">${UI.sumberDanaOpts('')}</select>`, 'Pembelian dari dompet mengurangi saldo dompet itu, bukan dicatat sebagai pengeluaran.') : ''}
+      ${isNew ? UI.field('Sumber dana', `<select name="sumber">${UI.sumberDanaOpts(pre.sumber || '')}</select>`, 'Pembelian dari dompet mengurangi saldo dompet itu, bukan dicatat sebagai pengeluaran.') : ''}
       ${UI.field('Untuk tujuan', `<select name="tujuanId">${UI.tujuanOpts(e.tujuanId)}</select>`, 'Nilai emas ini ikut dihitung sebagai dana tujuan tersebut.')}
       ${UI.kepemilikanField(e.kepemilikan)}
       <label class="check"><input type="checkbox" name="zakat" ${e.zakat ? 'checked' : ''}><span>Dihitung untuk zakat mal <small class="muted">(perhiasan yang dipakai sehari-hari umumnya tidak)</small></span></label>
