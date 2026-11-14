@@ -10,8 +10,8 @@
 <meta property="og:description" content="Catat bareng pasangan, capai tujuan keluarga, pantau emas & investasi. Mulai Rp50.000.">
 <meta property="og:image" content="https://satuatap.vercel.app/img/icon-512.png">
 <meta property="og:type" content="website">
-<link rel="icon" href="../img/favicon-32.png" sizes="32x32">
-<link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+<link rel="icon" href="/img/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -220,6 +220,17 @@
   .gold-band h3{font-size:clamp(20px,2.6vw,26px);margin:6px 0} .gold-band p{margin:0;color:#5b4a1d;max-width:560px}
   @media (max-width:860px){.minis{grid-template-columns:1fr}.hero-vid{margin-bottom:-24px}}
   .vplay{position:absolute;inset:0;margin:auto;width:64px;height:64px;border-radius:50%;border:0;background:rgba(15,94,89,.92);color:#fff;font-size:24px;box-shadow:0 8px 24px rgba(0,0,0,.3);cursor:pointer}
+  /* Carousel hero */
+  .hcar{align-self:end;width:100%;max-width:330px;margin-inline:auto;margin-bottom:-36px}
+  .hcar-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  .hcar-track::-webkit-scrollbar{display:none}
+  .hs{flex:0 0 100%;scroll-snap-align:center;text-align:center;padding:0 14px}
+  .hs-ph{border-radius:34px;background:#0b1f20;padding:7px;box-shadow:0 24px 50px rgba(0,0,0,.35),0 0 0 1.5px rgba(255,255,255,.18) inset;max-width:260px;margin-inline:auto}
+  .hs-ph img{width:100%;height:auto;border-radius:28px;display:block;background:#E3F1EF}
+  .hs b{display:inline-block;margin:12px 0 4px;color:#fff;font-size:14px;letter-spacing:.04em}
+  .hcar-dots{display:flex;justify-content:center;gap:7px;padding:2px 0 44px}
+  .hcar-dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.35);transition:.25s;cursor:pointer}
+  .hcar-dots i.on{width:22px;border-radius:5px;background:var(--gold-s)}
 </style>
 </head>
 <body>
@@ -243,7 +254,7 @@
 
 <header class="nav" id="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#atas"><img src="../img/icon-192.png" alt="" width="36" height="36">SatuAtap</a>
+    <a class="brand" href="#atas"><img src="/img/icon-192.png" alt="" width="36" height="36">SatuAtap</a>
     <nav class="nav-links" aria-label="Navigasi"><a href="#fitur">Fitur</a><a href="#cara">Cara mulai</a><a href="#harga">Harga</a><a href="#faq">FAQ</a></nav>
     <a class="btn btn-pri" href="#harga">Beli sekarang</a>
   </div>
@@ -258,7 +269,7 @@
         <p class="lead">Untuk pasangan muda yang ingin uang rumah tangga rapi tanpa ribet: catat lewat chat atau suara, rapat keuangan berdua, dan nabung emas yang terpantau. Data tetap di Google Drive Anda sendiri.</p>
         <div class="hero-cta">
           <a class="btn btn-gold" href="#harga">Lihat harga promo</a>
-          <a class="btn btn-ghost" href="../?demo" target="_blank" rel="noopener"><svg><use href="#i-play"/></svg>Coba sendiri, gratis</a>
+          <a class="btn btn-ghost" href="/?demo" target="_blank" rel="noopener"><svg><use href="#i-play"/></svg>Coba sendiri, gratis</a>
         </div>
         <div class="hero-trust">
           <span><svg><use href="#i-users"/></svg>Suami & istri dalam 1 akun keluarga</span>
@@ -266,10 +277,9 @@
           <span><svg><use href="#i-phone"/></svg>Pasang di HP tanpa Play Store</span>
         </div>
       </div>
-      <div class="phones" aria-hidden="true">
-        <div class="phone p1"><img src="img/tujuan.webp" alt="" loading="lazy"></div>
-        <div class="phone p2"><img src="img/beranda.webp" alt=""></div>
-        <div class="phone p3"><img src="img/emas.webp" alt="" loading="lazy"></div>
+      <div class="hcar" aria-roledescription="carousel" aria-label="Tampilan menu SatuAtap">
+        <div class="hcar-track" id="hcar"><div class="hs" role="group" aria-label="Beranda"><div class="hs-ph"><img src="/beli/img/slide-beranda.webp" alt="Layar Beranda SatuAtap" width="560" height="1212"></div><b>Beranda</b></div><div class="hs" role="group" aria-label="Mutasi"><div class="hs-ph"><img src="/beli/img/slide-mutasi.webp" alt="Layar Mutasi SatuAtap" width="560" height="1212" loading="lazy"></div><b>Mutasi</b></div><div class="hs" role="group" aria-label="Kalender"><div class="hs-ph"><img src="/beli/img/slide-kalender.webp" alt="Layar Kalender SatuAtap" width="560" height="1212" loading="lazy"></div><b>Kalender</b></div><div class="hs" role="group" aria-label="Aset"><div class="hs-ph"><img src="/beli/img/slide-aset.webp" alt="Layar Aset SatuAtap" width="560" height="1212" loading="lazy"></div><b>Aset</b></div><div class="hs" role="group" aria-label="Rapor"><div class="hs-ph"><img src="/beli/img/slide-rapor.webp" alt="Layar Rapor SatuAtap" width="560" height="1212" loading="lazy"></div><b>Rapor</b></div><div class="hs" role="group" aria-label="Lainnya"><div class="hs-ph"><img src="/beli/img/slide-lainnya.webp" alt="Layar Lainnya SatuAtap" width="560" height="1212" loading="lazy"></div><b>Lainnya</b></div></div>
+        <div class="hcar-dots" id="hdots"><i data-i="0"></i><i data-i="1"></i><i data-i="2"></i><i data-i="3"></i><i data-i="4"></i><i data-i="5"></i></div>
       </div>
     </div>
   </section>
@@ -294,7 +304,7 @@
     </div>
     <div class="wrap">
       <div class="spot reveal">
-        <div class="spot-img"><div class="vphone"><video data-v="catat" poster="vid/catat.jpg" muted loop playsinline preload="metadata" aria-label="Demo catat deng2 suara"></video></div></div>
+        <div class="spot-img"><div class="vphone"><video data-v="catat" poster="/beli/vid/catat.jpg" muted loop playsinline preload="metadata" aria-label="Demo catat deng2 suara"></video></div></div>
         <div>
           <span class="eyebrow">1 · Catat cepat & pengingat</span>
           <h3>Catat secepat bicara, ingat tanpa repot</h3>
@@ -303,7 +313,7 @@
         </div>
       </div>
       <div class="spot rev reveal">
-        <div class="spot-img"><div class="vphone"><video data-v="rapat" poster="vid/rapat.jpg" muted loop playsinline preload="metadata" aria-label="Demo rapat keuangan"></video></div></div>
+        <div class="spot-img"><div class="vphone"><video data-v="rapat" poster="/beli/vid/rapat.jpg" muted loop playsinline preload="metadata" aria-label="Demo rapat keuangan"></video></div></div>
         <div>
           <span class="eyebrow">2 · Rapat Keuangan</span>
           <h3>Bahas uang berdua, tanpa debat kusir</h3>
@@ -312,7 +322,7 @@
         </div>
       </div>
       <div class="spot reveal">
-        <div class="spot-img gold"><div class="vphone"><video data-v="emas" poster="vid/emas.jpg" muted loop playsinline preload="metadata" aria-label="Demo brankas emas dan zakat"></video></div></div>
+        <div class="spot-img gold"><div class="vphone"><video data-v="emas" poster="/beli/vid/emas.jpg" muted loop playsinline preload="metadata" aria-label="Demo brankas emas dan zakat"></video></div></div>
         <div>
           <span class="eyebrow">3 · Brankas emas & zakat</span>
           <h3>Nabung emas yang terpantau, zakat terhitung</h3>
@@ -326,9 +336,9 @@
       <h2 style="margin-top:10px;font-size:clamp(22px,3vw,30px)">Keputusan keuangan lebih tenang</h2>
     </div>
     <div class="wrap minis">
-      <div class="mini reveal"><div class="vphone sm"><video data-v="skor" poster="vid/skor.jpg" muted loop playsinline preload="metadata" aria-label="Demo skor"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Skor & rasio kesehatan keuangan</h3><p>Dana darurat, rasio utang, dan tabungan dirangkum jadi skor, lengkap dengan langkah perbaikannya.</p></div>
-      <div class="mini reveal"><div class="vphone sm"><video data-v="ai" poster="vid/ai.jpg" muted loop playsinline preload="metadata" aria-label="Demo AI"></video></div><div class="ic gold"><svg><use href="#i-spark"/></svg></div><h3>Insight AI & Simulator</h3><p>Tanya soal uang keluarga sendiri, lalu simulasikan KPR atau cicilan sebelum memutuskan. AI sudah bisa dicoba di mode demo.</p></div>
-      <div class="mini reveal"><div class="vphone sm"><video data-v="saham" poster="vid/saham.jpg" muted loop playsinline preload="metadata" aria-label="Demo saham"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Harga saham otomatis</h3><p>Harga saham di portofolio Anda diperbarui otomatis, jadi nilai dan untung/ruginya selalu terkini. Di demo memakai harga contoh.</p></div>
+      <div class="mini reveal"><div class="vphone sm"><video data-v="skor" poster="/beli/vid/skor.jpg" muted loop playsinline preload="metadata" aria-label="Demo skor"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Skor & rasio kesehatan keuangan</h3><p>Dana darurat, rasio utang, dan tabungan dirangkum jadi skor, lengkap dengan langkah perbaikannya.</p></div>
+      <div class="mini reveal"><div class="vphone sm"><video data-v="ai" poster="/beli/vid/ai.jpg" muted loop playsinline preload="metadata" aria-label="Demo AI"></video></div><div class="ic gold"><svg><use href="#i-spark"/></svg></div><h3>Insight AI & Simulator</h3><p>Tanya soal uang keluarga sendiri, lalu simulasikan KPR atau cicilan sebelum memutuskan. AI sudah bisa dicoba di mode demo.</p></div>
+      <div class="mini reveal"><div class="vphone sm"><video data-v="saham" poster="/beli/vid/saham.jpg" muted loop playsinline preload="metadata" aria-label="Demo saham"></video></div><div class="ic"><svg><use href="#i-chart"/></svg></div><h3>Harga saham otomatis</h3><p>Harga saham di portofolio Anda diperbarui otomatis, jadi nilai dan untung/ruginya selalu terkini. Di demo memakai harga contoh.</p></div>
     </div>
     <div class="wrap">
       <div class="gold-band reveal">
@@ -384,7 +394,7 @@
       <details class="reveal"><summary>Di mana data keuangan saya disimpan?</summary><p>Di file Google Sheets pada Google Drive keluarga Anda sendiri. Kami tidak menyimpan saldo maupun transaksi Anda. Anda bisa mengekspor data kapan saja dari menu Pengaturan.</p></details>
       <details class="reveal"><summary>Apakah harus menghubungkan rekening bank?</summary><p>Tidak. SatuAtap tidak meminta akses ke rekening atau m-banking. Catatan diisi sendiri — lewat aplikasi, chat, suara, foto struk, atau impor mutasi CSV.</p></details>
       <details class="reveal"><summary>Apa yang terjadi saat paket 6 bulan / 1 tahun habis?</summary><p>Aplikasi berubah menjadi baca-saja: data tetap bisa dilihat dan diunduh, tetapi tidak bisa menambah catatan baru. Perpanjang kapan saja dari menu Lainnya › Langganan atau dari halaman ini — masa baru ditambahkan dari tanggal habis, dan data di Google Drive Anda tidak pernah dihapus. Pengingat muncul di aplikasi 14 hari sebelum masa berakhir.</p></details>
-      <details class="reveal"><summary>Bisakah dicoba dulu sebelum membeli?</summary><p>Bisa. Buka <a href="../?demo" target="_blank" rel="noopener">mode demo</a> untuk mencoba semua fitur dengan data contoh, tanpa perlu masuk.</p></details>
+      <details class="reveal"><summary>Bisakah dicoba dulu sebelum membeli?</summary><p>Bisa. Buka <a href="/?demo" target="_blank" rel="noopener">mode demo</a> untuk mencoba semua fitur dengan data contoh, tanpa perlu masuk.</p></details>
     </div>
   </section>
 
@@ -393,7 +403,7 @@
       <div class="final">
         <h2>Mulai rapikan keuangan keluarga hari ini</h2>
         <p>Harga promo mulai <span data-harga-min>Rp50.000</span> untuk seluruh keluarga.</p>
-        <div class="hero-cta"><a class="btn btn-gold" href="#harga">Pilih paket</a><a class="btn btn-ghost" href="../?demo" target="_blank" rel="noopener"><svg><use href="#i-play"/></svg>Coba demo</a></div>
+        <div class="hero-cta"><a class="btn btn-gold" href="#harga">Pilih paket</a><a class="btn btn-ghost" href="/?demo" target="_blank" rel="noopener"><svg><use href="#i-play"/></svg>Coba demo</a></div>
       </div>
     </div>
   </section>
@@ -402,7 +412,7 @@
 <footer>
   <div class="wrap foot">
     <span>© <span id="th"></span> SatuAtap · JuniorLabs</span>
-    <span><a href="../">Masuk aplikasi</a> · <a href="#" data-paket="">Tanya lewat WhatsApp</a></span>
+    <span><a href="/">Masuk aplikasi</a> · <a href="#" data-paket="">Tanya lewat WhatsApp</a></span>
   </div>
 </footer>
 <a class="wa-float" href="#" data-paket="" aria-label="Tanya lewat WhatsApp"><svg><use href="#i-wa"/></svg></a>
@@ -412,7 +422,7 @@
   <div class="sheet" id="sheet"></div>
 </div>
 <div class="resume" id="resume"><span id="resume-t"></span><button type="button" id="resume-b">Lihat</button></div>
-<script src="../js/config.js"></script>
+<script src="/js/config.js"></script>
 <script>
   /* Harga & rekening diambil dari relay (Konsol › Toko). Nilai di bawah hanya cadangan bila relay tak terjangkau. */
   const RELAY = (window.APP_CONFIG && APP_CONFIG.RELAY_URL) || '';
@@ -571,7 +581,7 @@
     const vs=[...document.querySelectorAll('video[data-v]')];
     vs.forEach(v=>{
       v.muted=true; v.setAttribute('muted',''); v.setAttribute('webkit-playsinline','');
-      v.src='vid/'+v.dataset.v+'.mp4';
+      v.src='/beli/vid/'+v.dataset.v+'.mp4';
       const f=v.parentNode; const b=document.createElement('button');
       b.type='button'; b.className='vplay'; b.setAttribute('aria-label','Putar video'); b.innerHTML='▶'; b.hidden=true; f.appendChild(b);
       const coba=()=>{ const p=v.play(); if(p&&p.catch) p.catch(()=>{ b.hidden=false; }); };
@@ -582,6 +592,25 @@
     if(!('IntersectionObserver' in window)){ vs.forEach(v=>v._coba()); return; }
     const io=new IntersectionObserver(es=>es.forEach(e=>{ const v=e.target; if(e.isIntersecting) v._coba(); else v.pause(); }),{threshold:.25});
     vs.forEach(v=>io.observe(v));
+  })();
+
+  /* Carousel hero: geser otomatis, bisa digeser manual */
+  (function(){
+    const tr=document.getElementById('hcar'); if(!tr) return;
+    const ds=[...document.querySelectorAll('#hdots i')], n=ds.length;
+    let cur=0, jeda=false, tmr;
+    const lebar=()=>tr.clientWidth;
+    const tampil=i=>{ cur=(i+n)%n; tr.scrollTo({left:cur*lebar(),behavior:'smooth'}); };
+    const tandai=()=>{ cur=Math.round(tr.scrollLeft/lebar()); ds.forEach((d,k)=>d.classList.toggle('on',k===cur)); };
+    tr.addEventListener('scroll',()=>{ clearTimeout(tmr); tmr=setTimeout(tandai,60); },{passive:true});
+    ds.forEach((d,k)=>d.onclick=()=>{ tampil(k); tahan(); });
+    const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let idle; const tahan=()=>{ jeda=true; clearTimeout(idle); idle=setTimeout(()=>{jeda=false;},6000); };
+    ['touchstart','pointerdown','wheel','keydown'].forEach(e=>tr.addEventListener(e,tahan,{passive:true}));
+    tr.addEventListener('mouseenter',()=>{jeda=true;}); tr.addEventListener('mouseleave',()=>{jeda=false;});
+    let tampak=true; if('IntersectionObserver' in window) new IntersectionObserver(es=>{tampak=es[0].isIntersecting;},{threshold:.3}).observe(tr);
+    if(!reduce) setInterval(()=>{ if(!jeda&&tampak&&!document.hidden) tampil(cur+1); },3200);
+    tandai();
   })();
 </script>
 </body>
