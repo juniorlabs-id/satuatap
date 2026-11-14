@@ -30,7 +30,7 @@ const PENGINGAT = [7, 3, 1, 0];  // H-7, H-3, H-1, hari H
 const PROPS = PropertiesService.getScriptProperties();
 
 function setupPendamping() {
-  if (/TEMPEL/.test(FILE_ID)) throw new Error('Isi dulu FILE_ID di baris atas (salin dari aplikasi: Lainnya › Notifikasi › Skrip Pendamping).');
+  if (/TEMPEL/.test(FILE_ID)) throw new Error('FILE_ID belum diisi. Salin ulang kode dari aplikasi: Lainnya › Pengaturan › Notifikasi › Panduan pasang (kodenya sudah terisi).');
   const st = bacaData_();
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'tugasHarian') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('tugasHarian').timeBased().everyDays(1).atHour(JAM_KIRIM).nearMinute(5).create();
@@ -47,12 +47,28 @@ function hentikanPendamping() {
   Logger.log('Pendamping dihentikan. Kalender "Keuangan …" tetap ada; hapus manual bila tidak diperlukan.');
 }
 
+/**
+ * Baca isi sheet _log lewat Google Sheets API. Cukup dengan izin baca-saja (spreadsheets.readonly);
+ * SpreadsheetApp.openById justru meminta izin ubah SEMUA spreadsheet, jadi sengaja tidak dipakai.
+ */
+function bacaLog_() {
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(FILE_ID) + '/values/' + encodeURIComponent('_log!A2:F') + '?valueRenderOption=UNFORMATTED_VALUE';
+  const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
+  const kode = r.getResponseCode(); let j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+  if (kode === 200) return j.values || [];
+  const pesan = (j.error && j.error.message) || ('HTTP ' + kode);
+  if (kode === 404) throw new Error('File data tidak ditemukan. Pastikan FILE_ID benar dan Anda masuk dengan akun Admin keluarga (pemilik file).');
+  if (/has not been used|is disabled|SERVICE_DISABLED|accessNotConfigured/i.test(pesan)) {
+    const link = (/(https:\/\/console\.developers\.google\.com\/apis\/api\/sheets\.googleapis\.com\/overview\?project=\d+)/.exec(pesan) || [])[1] || 'https://console.cloud.google.com/apis/library/sheets.googleapis.com';
+    throw new Error('Google Sheets API belum aktif untuk skrip ini (sekali saja). Buka tautan ini › klik AKTIFKAN / ENABLE › tunggu 1–2 menit › jalankan lagi: ' + link);
+  }
+  if (kode === 403) throw new Error('Akun ini tidak punya akses ke file data keluarga (' + pesan + '). Jalankan dengan akun Admin keluarga (pemilik file).');
+  if (kode === 400 && /parse range/i.test(pesan)) throw new Error('Sheet _log tidak ditemukan. Pastikan FILE_ID adalah file "SatuAtap – Data …".');
+  throw new Error('Gagal membaca file data: ' + pesan);
+}
 /** Baca & susun ulang data dari sheet tersembunyi _log (sama seperti aplikasi). */
 function bacaData_() {
-  const sh = SpreadsheetApp.openById(FILE_ID).getSheetByName('_log');
-  if (!sh) throw new Error('Sheet _log tidak ditemukan. Pastikan FILE_ID adalah file "SatuAtap – Data …".');
-  const last = sh.getLastRow();
-  const v = last > 1 ? sh.getRange(2, 1, last - 1, 6).getValues() : [];
+  const v = bacaLog_();
   const st = { Anggota: {}, Pengaturan: {}, Rutin: {}, Pinjaman: {}, Acara: {}, Transaksi: {}, Rapat: {}, setting: {} };
   v.forEach(function (r) {
     const t = String(r[2]), id = String(r[3]), op = String(r[4]);
@@ -148,11 +164,18 @@ function cekWA() {
       const r = UrlFetchApp.fetch('https://api.fonnte.com/device', { method: 'post', muteHttpExceptions: true, headers: { Authorization: tok } });
       const j = JSON.parse(r.getContentText());
       if (j.status === false) L(false, 'Fonnte menolak token: ' + (j.reason || '') + ' — salin ulang token dari fonnte.com › Device');
-      else L(/connect/i.test(String(j.device_status || '')), 'Perangkat Fonnte ' + (j.device || '') + ': ' + (j.device_status || '?') + (/connect/i.test(String(j.device_status || '')) ? '' : ' — buka fonnte.com › Device › Connect lalu scan QR dari WhatsApp'));
+      else {
+        L(/connect/i.test(String(j.device_status || '')), 'Perangkat Fonnte ' + (j.device || '') + ': ' + (j.device_status || '?') + (/connect/i.test(String(j.device_status || '')) ? '' : ' — buka fonnte.com › Device › Connect lalu scan QR dari WhatsApp'));
+        if (j.autoread !== undefined) L(/on|true|1|personal|all/i.test(String(j.autoread)), 'Autoread: ' + j.autoread + (/on|true|1|personal|all/i.test(String(j.autoread)) ? '' : ' — nyalakan di fonnte.com › Device › Edit, kalau tidak pesan masuk tidak diteruskan'));
+        if (j.webhook !== undefined) L(/\/exec\?k=/.test(String(j.webhook)), 'Webhook di Fonnte: ' + (j.webhook || '(kosong)'));
+      }
     } catch (e) { L(null, 'Status perangkat Fonnte tidak bisa dicek (' + e.message + ').'); }
   }
   if (!PROPS.getProperty('WA_KUNCI')) PROPS.setProperty('WA_KUNCI', Utilities.getUuid().replace(/-/g, ''));
   let url = ''; try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  const jj = JSON.parse(PROPS.getProperty('WA_JEJAK') || '[]');
+  if (!jj.length) L(false, 'Belum ada satu pun kiriman dari Fonnte ke skrip ini. Periksa di fonnte.com › Device › Edit: (1) AUTOREAD harus ON — tanpa ini Fonnte tidak meneruskan pesan masuk; (2) Webhook = alamat /exec + ?k=… (bukan /dev); (3) klik Update; (4) perangkat berstatus connect. Uji alamatnya dengan membukanya di browser.');
+  else { L(true, 'Kiriman webhook terakhir dari Fonnte:'); jj.forEach(function (x) { Logger.log('   ' + x.t + ' · ' + (x.dari || '-') + ' · "' + (x.teks || '') + '" → ' + x.hasil); }); }
   const k = PROPS.getProperty('WA_KUNCI');
   if (/\/exec$/.test(url)) { L(true, 'Alamat webhook — salin SELURUH baris berikut ke fonnte.com › Device › Edit › Webhook:'); Logger.log(url + '?k=' + k); }
   else {
@@ -163,24 +186,38 @@ function cekWA() {
   }
 }
 /** Webhook Fonnte: pesan WA masuk → Kotak aplikasi pengirim (dikonfirmasi di aplikasi). */
+/** Catat 10 kiriman webhook terakhir (tanpa isi pesan lengkap) agar cekWA bisa menunjukkan di mana macetnya. */
+function jejak_(o) {
+  try { const a = JSON.parse(PROPS.getProperty('WA_JEJAK') || '[]'); a.unshift(Object.assign({ t: new Date().toISOString().slice(0, 19).replace('T', ' ') }, o)); PROPS.setProperty('WA_JEJAK', JSON.stringify(a.slice(0, 10))); } catch (e) {}
+}
 function doPost(e) {
   const k = e && e.parameter && e.parameter.k;
-  if (!k || k !== PROPS.getProperty('WA_KUNCI')) return ContentService.createTextOutput('forbidden');
+  if (!k || k !== PROPS.getProperty('WA_KUNCI')) { jejak_({ hasil: 'DITOLAK: kunci ?k= ' + (k ? 'salah' : 'tidak ada') + ' di alamat webhook' }); return ContentService.createTextOutput('forbidden'); }
   let d = {};
   try { d = e.postData && /json/.test(e.postData.type || '') ? JSON.parse(e.postData.contents) : (e.parameter || {}); } catch (x) { d = e.parameter || {}; }
-  const no = nomor_(d.sender || d.from || ''), teks = String(d.message || d.text || '').trim(), email = waAnggota_()[no];
-  if (!no || !teks || !email || d.isgroup === true || d.isgroup === 'true') return ContentService.createTextOutput('ok');
+  const no = nomor_(d.sender || d.from || ''), teks = String(d.message || d.text || d.pesan || '').trim(), email = waAnggota_()[no];
+  const J = function (hasil) { jejak_({ dari: no || '?', teks: teks.slice(0, 24), hasil: hasil }); };
+  if (d.isgroup === true || d.isgroup === 'true') { J('diabaikan: pesan grup'); return ContentService.createTextOutput('ok'); }
+  if (!no || !teks) { J('diabaikan: bukan pesan teks (status/pemberitahuan Fonnte)'); return ContentService.createTextOutput('ok'); }
+  if (!email) { J('DITOLAK: nomor ' + no + ' tidak ada di WA_ANGGOTA'); return ContentService.createTextOutput('ok'); }
   const c = CacheService.getScriptCache(), dup = 'wa_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, no + teks + String(d.timestamp || '')));
   if (c.get(dup)) return ContentService.createTextOutput('ok');
   c.put(dup, '1', 3600);
-  if (/^(bantuan|help|\?)$/i.test(teks)) { kirimWA_('Kirim catatan seperti: makan siang 45rb gopay · bensin 50.000 · gaji 7,5 jt bca. Catatan masuk ke aplikasi SatuAtap Anda untuk dikonfirmasi.', no); return ContentService.createTextOutput('ok'); }
+  if (/^(bantuan|help|\?)$/i.test(teks)) { kirimWA_('Kirim catatan seperti: makan siang 45rb gopay · bensin 50.000 · gaji 7,5 jt bca. Catatan masuk ke aplikasi SatuAtap Anda untuk dikonfirmasi.', no); J('bantuan dibalas'); return ContentService.createTextOutput('ok'); }
   const v = nominalTeks_(teks);
-  if (!v) { kirimWA_('Nominalnya belum terbaca 🤔 Contoh: makan siang 45rb gopay', no); return ContentService.createTextOutput('ok'); }
-  try { relay_('kotak.tambah', { email: email, teks: teks.slice(0, 300), sumber: 'wa' }); kirimWA_('📝 Diterima: ' + rp_(v) + ' — ' + teks.slice(0, 80) + '\nMasuk sebagai draf — konfirmasi di aplikasi SatuAtap › Mutasi › Menunggu konfirmasi.', no); }
-  catch (x) { kirimWA_('Maaf, catatan belum tersimpan (' + x.message + '). Coba lagi nanti.', no); }
+  if (!v) { kirimWA_('Nominalnya belum terbaca 🤔 Contoh: makan siang 45rb gopay', no); J('nominal tidak terbaca'); return ContentService.createTextOutput('ok'); }
+  try { relay_('kotak.tambah', { email: email, teks: teks.slice(0, 300), sumber: 'wa' }); J('OK → draf untuk ' + email); kirimWA_('📝 Diterima: ' + rp_(v) + ' — ' + teks.slice(0, 80) + '\nMasuk sebagai draf — konfirmasi di aplikasi SatuAtap › Mutasi › Menunggu konfirmasi.', no); }
+  catch (x) { J('GAGAL ke relay: ' + x.message); try { kirimWA_('Maaf, catatan belum tersimpan (' + x.message + '). Coba lagi nanti.', no); } catch (y) {} }
   return ContentService.createTextOutput('ok');
 }
-function doGet() { return ContentService.createTextOutput('SatuAtap Pendamping aktif'); }
+/** Buka alamat webhook di browser untuk mengecek: kunci benar & skrip versi terbaru sudah diterapkan. */
+function doGet(e) {
+  const k = e && e.parameter && e.parameter.k;
+  if (!k) return ContentService.createTextOutput('SatuAtap Pendamping aktif. Tambahkan ?k=… (dari cekWA) di ujung alamat untuk menguji.');
+  return ContentService.createTextOutput(k === PROPS.getProperty('WA_KUNCI')
+    ? '✅ Alamat webhook BENAR. Pendamping siap menerima WA untuk ' + Object.keys(waAnggota_()).length + ' nomor anggota. Tempel alamat ini persis di fonnte.com › Device › Edit › Webhook.'
+    : '❌ Kunci ?k= SALAH. Jalankan cekWA di editor dan salin ulang alamat webhook.');
+}
 function nominalTeks_(t) {
   t = String(t || '').toLowerCase().replace(/rp\.?\s*/g, '');
   const m = /(\d+(?:[.,]\d+)*)\s*(rb|ribu|k|jt|juta)?\b/.exec(t);

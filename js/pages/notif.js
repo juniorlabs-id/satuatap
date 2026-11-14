@@ -109,7 +109,8 @@
         ${Store.mode !== 'live' ? '<div class="note warn small">Mode demo: ID file belum terisi. Lakukan dari akun keluarga sungguhan.</div>' : ''}<div class="row-btns">${btn('kode', 'copy', 'Salin kode Pendamping', '')}</div>`),
       T('Jalankan & beri izin', `<ol class="steps"><li>Di toolbar atas, pada kotak pilihan fungsi pilih <b>setupPendamping</b> › klik <b>▶ Jalankan</b>.</li><li>Muncul <b>"Otorisasi diperlukan"</b> › <b>Tinjau izin</b> › pilih akun ${U.esc(admin())}.</li>
           <li>Muncul <b>"Google belum memverifikasi aplikasi ini"</b> › klik <b>Lanjutan</b> (kecil, kiri bawah) › <b>Buka SatuAtap Pendamping (tidak aman)</b> › <b>Izinkan</b>.</li></ol>
-        <div class="note small">${I('shield-check')} <span>Peringatan itu wajar: skrip ini Anda pasang sendiri di akun Anda, jadi Google tidak memeriksanya. Skrip hanya <b>membaca</b> file data SatuAtap dan menulis ke kalender Anda.</span></div>`),
+        <div class="note small">${I('shield-check')} <span>Peringatan itu wajar: skrip ini Anda pasang sendiri di akun Anda, jadi Google tidak memeriksanya. Skrip hanya <b>membaca</b> file data SatuAtap dan menulis ke kalender Anda.</span></div>
+        <div class="note warn small">${I('triangle-alert')} <span>Log menulis <b>"Google Sheets API belum aktif"</b>? Buka tautan di log itu › klik <b>AKTIFKAN</b> (Enable) › tunggu 1–2 menit › <b>▶ Jalankan</b> lagi. Hanya sekali.</span></div>`),
       T('Selesai — cek hasilnya', `<p>Di bawah editor muncul <b>Log eksekusi</b>. Berhasil bila ada baris <b>"✅ Pendamping aktif untuk …"</b>.</p>
         <ul class="ul"><li>Buka Google Calendar — ada kalender <b>Keuangan …</b> berisi jadwal tagihan.</li><li>Pengingat Telegram terkirim tiap pagi ke anggota yang sudah <b>Hubungkan Telegram</b>.</li><li>Agar pasangan melihat kalender yang sama: Google Calendar › kalender <b>Keuangan …</b> › ⋮ › <b>Setelan & berbagi</b> › › tambahkan email pasangan.</li></ul>
         <div class="note small">${I('triangle-alert')} <span>Ada tulisan merah? Foto layar log-nya dan kirim ke JuniorLabs. Untuk berhenti: pilih fungsi <b>hentikanPendamping</b> › Jalankan.</span></div>
@@ -133,13 +134,20 @@
         <div class="note small">${I('lock')} <span>Ketik nama properti persis huruf besar seperti di atas. Token disimpan di sini — bukan di kode — agar aman.</span></div>`),
       T('Jalankan setupWA', `<ol class="steps"><li>Klik <b>&lt;&gt; Editor</b> › kotak pilihan fungsi pilih <b>setupWA</b> › <b>▶ Jalankan</b>.</li><li>Bila diminta izin, ulangi seperti sebelumnya (Tinjau izin › Lanjutan › Izinkan).</li><li>Setiap anggota menerima WA: <b>"✅ SatuAtap tersambung ke WhatsApp keluarga ini."</b></li></ol>
         <p class="muted small">Sampai di sini <b>pengingat WA sudah aktif</b>. Langkah berikutnya hanya untuk <b>mencatat lewat chat WA</b>.</p>`),
-      T('Terapkan sebagai Aplikasi web', `<ol class="steps"><li>Kanan atas klik <b>Terapkan</b> › <b>Deployment baru</b>.</li><li>Klik ikon ⚙️ di samping "Pilih jenis" › <b>Aplikasi web</b>.</li><li>Jalankan sebagai: <b>Saya</b> · Yang memiliki akses: <b>Siapa saja</b> › <b>Terapkan</b> (izinkan bila diminta).</li><li>Klik <b>Selesai</b>.</li></ol>
+      T('Terapkan sebagai Aplikasi web', `<ol class="steps"><li>Kanan atas klik <b>Terapkan</b> › <b>Deployment baru</b>.</li><li>Klik ikon ⚙️ di samping "Pilih jenis" › <b>Aplikasi web</b>.</li><li>Jalankan sebagai: <b>Saya</b> · Yang memiliki akses: <b>Siapa saja</b> — <u>bukan</u> "Siapa saja yang memiliki Akun Google" › <b>Terapkan</b> (izinkan bila diminta).</li><li>Klik <b>Selesai</b>.</li></ol>
         <div class="note small">${I('info')} <span>"Siapa saja" diperlukan agar Fonnte bisa meneruskan pesan WA. Skrip menolak pesan yang tidak membawa kunci rahasia Anda.</span></div>`),
       T('Pasang webhook di Fonnte', `<ol class="steps"><li>Di editor pilih fungsi <b>cekWA</b> › <b>▶ Jalankan</b>.</li><li>Log menampilkan status token & perangkat, lalu <b>alamat webhook</b> (berakhiran <code>?k=…</code>). Salin seluruh baris alamat itu.</li>
-          <li>Di fonnte.com › <b>Device</b> › <b>Edit</b> pada device › kolom <b>Webhook</b> › tempel › <b>Update</b>.</li></ol>
+          <li>Tempel alamat itu di kotak di bawah — aplikasi mengubahnya menjadi <b>alamat jembatan</b> yang diterima Fonnte. Salin hasilnya.</li>
+          <li>Di fonnte.com › <b>Device</b> › <b>Edit</b> pada device › kolom <b>Webhook</b> › tempel alamat jembatan.</li>
+          <li>Masih di Edit: nyalakan <b>Autoread</b> (pilih <b>personal</b>; "silent autoread" boleh agar centang biru tidak muncul) › <b>Update</b>. <b>Tanpa Autoread, Fonnte tidak meneruskan pesan masuk.</b></li>
+          <li>Cek: buka alamat jembatan di browser — harus muncul <b>"✅ Jembatan WhatsApp aktif & tersambung ke Pendamping"</b>.</li></ol>
+        <label class="field"><span>Alamat dari cekWA <small class="muted">(script.google.com/…/exec?k=…)</small></span><input data-wh-in placeholder="https://script.google.com/macros/s/…/exec?k=…" autocomplete="off"></label>
+        <div class="kv-list"><div class="kv"><span>Alamat jembatan</span><b><code class="wrap" data-wh-out>—</code></b></div></div>
+        <div class="row-btns">${btn('wh-salin', 'copy', 'Salin alamat jembatan', '')}</div>
+        <p class="muted small">"Response Source" tidak perlu diubah — biarkan Autoreply. Setelah kode Pendamping diganti, selalu <b>Terapkan › Kelola deployment › ✏️ › Versi baru</b>; webhook menjalankan versi yang diterapkan, bukan isi editor.</p>
         <div class="note small">${I('triangle-alert')} <span>Bila kolom Webhook tidak tersedia di paket Fonnte Anda, catat lewat WA belum bisa — pengingat WA tetap berjalan.</span></div>`),
       T('Uji coba', `<ol class="steps"><li>Dari nomor salah satu anggota, kirim WA ke <b>nomor pengirim</b>: <code>makan siang 45rb gopay</code>.</li><li>Balasan: <b>"📝 Diterima: Rp 45.000 …"</b>.</li><li>Buka aplikasi › <b>Mutasi</b> › <b>Menunggu konfirmasi</b> › geser kanan untuk menyimpan.</li></ol>
-        <div class="note small">${I('circle-help')} <span>Tidak ada balasan? Jalankan <b>cekWA</b> lagi dan pastikan semua baris ✅, nomor pengirim berstatus <b>connect</b> di Fonnte, dan nomor anggota di WA_ANGGOTA benar.</span></div>`)
+        <div class="note small">${I('circle-help')} <span>Tidak ada balasan? Jalankan <b>cekWA</b> lagi — bagian <b>"Kiriman webhook terakhir"</b> menunjukkan apakah pesan sampai ke skrip dan mengapa ditolak. "Belum ada satu pun kiriman" berarti masalahnya di Fonnte (Autoread mati, alamat webhook salah/belum di-Update, atau perangkat tidak connect).</span></div>`)
     ] }
   };
   UI.act('panduan', el => UI.panduan(el.dataset.k));
@@ -163,9 +171,12 @@
       if (act === 'kode') salin(kodeTerisi(), 'Kode Pendamping');
       else if (act === 'json') salin(PEND.json, 'appsscript.json');
       else if (act === 'wa-anggota') { const v = waAnggota(); if (!v) return UI.toast('Isi minimal satu nomor yang benar.', 'warn'); salin(v, 'WA_ANGGOTA'); }
+      else if (act === 'wh-salin') { const o = s.el.querySelector('[data-wh-out]'), v = o && o.textContent; if (!v || v === '—' || /^Alamat/.test(v)) return UI.toast('Tempel dulu alamat dari cekWA.', 'warn'); salin(v, 'Alamat jembatan'); }
       else if (act === 'ke-wa' || act === 'ke-pend') { s.close(); setTimeout(() => UI.panduan(act === 'ke-wa' ? 'wa' : 'pend'), 250); }
     });
-    s.el.addEventListener('input', e => { const w = e.target.dataset && e.target.dataset.wa; if (!w) return; const o = bacaNo(); o[w] = e.target.value; simpanNo(o); const out = s.el.querySelector('[data-wa-out]'); if (out) out.textContent = waAnggota() || '—'; e.target.classList.toggle('bad', !!e.target.value && !noWA(e.target.value)); });
+    s.el.addEventListener('input', e => {
+      if (e.target.dataset && e.target.dataset.whIn !== undefined) { const m = /script\.google\.com\/macros\/s\/([A-Za-z0-9_-]{20,})\/exec\?k=([A-Za-z0-9]+)/.exec(e.target.value.trim()), o = s.el.querySelector('[data-wh-out]'); if (o) o.textContent = m ? location.origin + '/api/wa?id=' + m[1] + '&k=' + m[2] : (e.target.value ? 'Alamat belum lengkap — harus berakhiran /exec?k=…' : '—'); return; }
+      const w = e.target.dataset && e.target.dataset.wa; if (!w) return; const o = bacaNo(); o[w] = e.target.value; simpanNo(o); const out = s.el.querySelector('[data-wa-out]'); if (out) out.textContent = waAnggota() || '—'; e.target.classList.toggle('bad', !!e.target.value && !noWA(e.target.value)); });
     gambar();
   };
 
