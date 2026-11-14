@@ -98,6 +98,12 @@
   const onSearch = U.debounce(v => { F.q = v.trim(); n = 0; renderList(); }, 250);
   UI.act('mut-q', el => onSearch(el.value));
 
+  // Pengguna baru: tagihan yang jatuh tempo sebelum mulai mencatat tidak perlu dikonfirmasi satu per satu
+  UI.act('draf-bersih', async () => {
+    const n = UI.drafts().filter(o => o.tanggal < U.today()).length; if (!n) return;
+    if (!(await UI.confirm('Lewati ' + n + ' tagihan yang sudah lewat?', 'Tagihan & pemasukan rutin yang jatuh tempo sebelum hari ini dianggap sudah beres dan tidak ditagihkan lagi. Saldo dompet tidak berubah. Jadwal berikutnya tetap muncul seperti biasa.', 'Lewati'))) return;
+    Store.setSetting('mulaiTagih', U.today()); UI.toast(n + ' tagihan dilewati.');
+  });
   UI.page('mutasi', {
     render() {
       const p = Calc.periodShift(Calc.period(), F.off);
@@ -118,7 +124,7 @@
           <div class="sumline" id="mut-sum"></div>
         </div>
         ${F.off === 0 && !F.all && UI.kotakAlert ? UI.kotakAlert() : ''}
-        ${drafts.length || kotak.length ? `<div class="day-h"><b>Menunggu konfirmasi</b><span>geser kanan untuk konfirmasi</span></div><div class="card list">${kotak.map(UI.kotakRow).join('')}${drafts.map(UI.draftRow).join('')}</div>` : ''}
+        ${drafts.length || kotak.length ? `<div class="day-h"><b>Menunggu konfirmasi</b><span>geser kanan untuk konfirmasi</span>${drafts.filter(o => o.tanggal < U.today()).length >= 3 ? `<button class="link small" data-act="draf-bersih">Lewati yang lewat</button>` : ''}</div><div class="card list">${kotak.map(UI.kotakRow).join('')}${drafts.map(UI.draftRow).join('')}</div>` : ''}
         <div id="mut-list"></div><div class="spacer"></div>`;
     },
     after() { renderList(); }

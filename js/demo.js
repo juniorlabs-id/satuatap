@@ -157,6 +157,8 @@
     IV('i7', 'kendaraan', 'Toyota Avanza 2021', 'B 1234 XYZ', 0, 210000000, 165000000, U.addMonths(today, -40));
     T.Pengaturan.push({ id: 'targetAlokasi', nilai: JSON.stringify({ kas: 25, emas: 25, saham: 15, reksadana: 20, tetap: 15, lain: 0 }) });
     T.Pengaturan.push({ id: 'zakatHaul', nilai: U.addDays(today, -300) });
+    T.Pengaturan.push({ id: 'mulaiTagih', nilai: U.addMonths(today, -24) });
+    T.Pengaturan.push({ id: 'zakatAset', nilai: 'emas,kas,saham,reksadana,sbn,deposito' });
     T.Pengaturan.push({ id: 'zakatJiwa', nilai: '4' });
     T.Pengaturan.push({ id: 'hargaAlert', nilai: JSON.stringify({ jual: 2400000, beli: 2400000 }) });
     // Fase 3: rapat, tugas, skenario

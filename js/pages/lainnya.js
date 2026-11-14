@@ -221,11 +221,7 @@
       ${UI.notifKartu ? UI.notifKartu() : ''}
       ${needAdmin()}<div class="card" id="f-not">
       <label class="check"><input type="checkbox" name="notifEmail" ${on ? 'checked' : ''} ${Store.isAdminLike() ? '' : 'disabled'}><span><b>Email ringkasan bulanan</b><br><small class="muted">Laporan (bukan pengingat): pemasukan, pengeluaran, kategori terbesar & tujuan periode lalu untuk Admin & Pasangan — terkirim saat aplikasi pertama kali dibuka di periode baru.</small></span></label>
-      ${Store.isAdminLike() ? `<button class="btn" data-act="save-not">Simpan</button>` : ''}</div>
-      <div class="card"><h4 class="mini-h">${I('calendar-plus')} Skrip Pendamping <span class="pill">opsional</span></h4>
-        <p class="small">Agar pengingat tetap jalan walau aplikasi tidak dibuka: jadwal tagihan di <b>Google Calendar</b>, pengingat <b>Telegram</b> setiap pagi, dan (bila memakai Fonnte) <b>WhatsApp</b>. Dipasang sekali di akun Google Admin — sekitar 5 menit, ikuti Panduan Instalasi Bagian C.</p>
-        <p class="muted small">Saat memasang, Google menampilkan layar "aplikasi belum diverifikasi" satu kali karena skrip berjalan di akun Anda sendiri.</p>
-        ${UI.pendampingKartu ? UI.pendampingKartu() : ''}</div>`;
+      ${Store.isAdminLike() ? `<button class="btn" data-act="save-not">Simpan</button>` : ''}</div>`;
   }
   UI.act('save-not', () => { const f = UI.formData(document.getElementById('f-not')); Store.commit(Object.keys(f).map(k => ({ op: 'upsert', t: 'Pengaturan', row: { id: k, nilai: f[k] ? 'true' : 'false' } }))); UI.toast('Disimpan.'); });
   UI.act('copy-fileid', async () => { try { await navigator.clipboard.writeText(Store.fileId); UI.toast('ID file disalin.'); } catch (e) { prompt('Salin ID file:', Store.fileId); } });

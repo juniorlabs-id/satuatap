@@ -4,13 +4,13 @@
   const katZakat = () => (Store.t.Kategori.find(k => k.jenis === 'keluar' && /zakat|sedekah/i.test(k.nama) && !k.arsip) || Store.kategori('keluar')[0] || {}).id || '';
   UI.bayarZakat = (tag, jumlah, catatan) => UI.catat({ preset: { jenis: 'keluar', jumlah: Math.round(jumlah || 0), kategoriId: katZakat(), catatan, tag } });
   UI.act('zk-bayar', el => UI.bayarZakat(el.dataset.tag, Number(el.dataset.v), el.dataset.cat));
+  UI.act('zk-aset', el => { const o = Calc.zakatAset(), k = el.dataset.k; if (o[k]) delete o[k]; else o[k] = true; Store.setSetting('zakatAset', Object.keys(o).join(',') || '-'); });
   UI.act('zk-set', () => {
     const v = k => Store.setting(k, '');
     const s = UI.sheet({ title: 'Pengaturan zakat', body: `
       ${UI.field('Awal haul zakat mal', `<input type="date" name="zakatHaul" value="${v('zakatHaul')}">`, 'Tanggal harta pertama kali mencapai nisab, atau tanggal yang biasa dipakai keluarga (mis. 1 Ramadan). Haul = 1 tahun Hijriah (354 hari).')}
       <div class="grid2">${UI.field('Nisab (gram emas)', `<input type="number" name="nisabGram" value="${v('nisabGram') || 85}">`)}${UI.field('Harga emas untuk nisab', `<select name="nisabHarga"><option value="beli" ${v('nisabHarga') !== 'buyback' ? 'selected' : ''}>Harga beli</option><option value="buyback" ${v('nisabHarga') === 'buyback' ? 'selected' : ''}>Harga buyback</option></select>`)}</div>
       ${UI.field('Utang yang mengurangi harta', `<select name="zakatUtang"><option value="jatuhTempo" ${v('zakatUtang') !== 'semua' && v('zakatUtang') !== 'tidak' ? 'selected' : ''}>Yang jatuh tempo 30 hari ke depan</option><option value="semua" ${v('zakatUtang') === 'semua' ? 'selected' : ''}>Seluruh sisa utang</option><option value="tidak" ${v('zakatUtang') === 'tidak' ? 'selected' : ''}>Tidak dikurangi</option></select>`, 'Pendapat ulama berbeda — pilih yang diyakini keluarga.')}
-      <label class="check"><input type="checkbox" name="zakatPiutang" ${v('zakatPiutang') !== 'false' ? 'checked' : ''}><span>Piutang yang lancar dihitung sebagai harta</span></label>
       <div class="grid2">${UI.field('Jumlah jiwa (fitrah)', `<input type="number" min="1" name="zakatJiwa" value="${v('zakatJiwa') || Store.members().length}">`)}${UI.field('Tarif fitrah / jiwa', UI.rpInput('zakatFitrahTarif', Number(v('zakatFitrahTarif')) || 50000), 'Ikuti ketetapan BAZNAS/daerah')}</div>
       ${UI.field('Target sedekah (% pemasukan / bulan)', `<input type="number" step="0.5" min="0" name="sedekahTarget" value="${v('sedekahTarget') || 2.5}">`)}`, foot: `<button class="btn" data-ok>Simpan</button>` });
     UI.bindRp(s.el);
@@ -82,7 +82,9 @@
         ${z.wajib && z.kurang > 0 ? `<button class="btn block gold" data-act="zk-bayar" data-tag="zakat-mal" data-v="${z.kurang}" data-cat="Zakat mal${z.haul ? ' haul ' + U.tgl(z.haul.next, 'mys') : ''}">${I('hand-heart')} Bayar zakat ${U.rp(z.kurang)}</button>` : ''}
         ${z.dibayar ? `<div class="note">${I('circle-check')} Sudah dibayar ${U.rp(z.dibayar)} pada haul ini.</div>` : ''}
         ${!z.wajib && z.nisab ? `<div class="note">${I('info')} Harta bersih masih ${U.pct(z.bersih / z.nisab)} dari nisab — belum wajib zakat mal. Tetap bisa bersedekah.</div>` : ''}
-        ${UI.sec('Rincian harta')}<div class="card list">${Object.keys(grp).map(k => `<div class="day-h in-card"><b>${U.esc(k)}</b><span></span><em>${UI.ms(U.sum(grp[k], x => x.v))}</em></div>${grp[k].map(x => `<div class="row"><div class="tx-txt"><b>${U.esc(x.nama)}</b></div><span>${UI.ms(x.v)}</span></div>`).join('')}`).join('') || '<div class="row muted">Belum ada harta tercatat.</div>'}
+        ${UI.sec('Harta yang dihitung')}<div class="card"><div class="chips wrap">${Calc.ZAKAT_GRUP.map(g => `<button class="chip ${z.pil[g[0]] ? 'on' : ''}" data-act="zk-aset" data-k="${g[0]}">${z.pil[g[0]] ? I('check') + ' ' : ''}${g[1]}</button>`).join('')}</div>
+          <p class="muted small" style="margin:10px 0 0">Bawaan hanya <b>emas</b>. Ketuk untuk menambah/mengeluarkan kelompok harta lain dari perhitungan.</p></div>
+        ${UI.sec('Rincian harta')}<div class="card list">${z.items.length ? '' : '<div class="row"><div class="tx-txt muted">Belum ada harta pada kelompok yang dipilih.</div></div>'}${Object.keys(grp).map(k => `<div class="day-h in-card"><b>${U.esc(k)}</b><span></span><em>${UI.ms(U.sum(grp[k], x => x.v))}</em></div>${grp[k].map(x => `<div class="row"><div class="tx-txt"><b>${U.esc(x.nama)}</b></div><span>${UI.ms(x.v)}</span></div>`).join('')}`).join('') || '<div class="row muted">Belum ada harta tercatat.</div>'}
           <div class="row"><div class="tx-txt"><b>Dikurangi utang</b><small>${{ jatuhTempo: 'jatuh tempo 30 hari', semua: 'seluruh sisa utang', tidak: 'tidak dikurangi' }[z.modeUtang]}</small></div><b class="bad">−${UI.ms(z.utang)}</b></div></div>
         <p class="muted small">Emas/aset yang tidak dicentang "dihitung zakat" (mis. perhiasan dipakai, rumah tinggal) tidak masuk. Perhitungan ini panduan umum; untuk kasus khusus konsultasikan ke BAZNAS/LAZ atau ustaz tepercaya.</p><div class="spacer"></div>`;
     }

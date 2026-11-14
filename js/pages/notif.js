@@ -65,12 +65,11 @@
     return `<div class="card"><h4 class="mini-h">${I('send')} Telegram @${U.esc((inf && inf.bot) || 'SatuAtapBot')} <span class="pill ok">gratis</span></h4>
         <p class="small">Pengingat tagihan, alert emas, dan <b>catat lewat chat</b> — kirim "makan siang 45rb gopay", lalu konfirmasi kategorinya di aplikasi. Setiap anggota menghubungkan akunnya sendiri.</p>${tg}</div>
       <div class="card"><h4 class="mini-h">${I('message-circle')} WhatsApp <span class="pill">opsional</span></h4>
-        <p class="small">Pakai akun <b>Fonnte milik keluarga</b> (paket gratis tersedia di fonnte.com) lewat Skrip Pendamping: pengingat yang sama ke WA dan catat lewat chat WA. Token Fonnte disimpan di Script Properties Pendamping Anda — tidak di aplikasi, tidak di JuniorLabs.</p>
-        <p class="muted small">Butuh Skrip Pendamping terpasang dulu (± 10 menit, sekali saja).</p>
-        <div class="row-btns"><button class="btn sm" data-act="panduan" data-k="pend">${I('book-open')} Pasang Pendamping</button><button class="btn ghost sm" data-act="panduan" data-k="wa">${I('message-circle')} Pasang WhatsApp</button></div></div>`;
+        <p class="small">Lewat akun <b>Fonnte milik keluarga</b> dan sebuah script di akun Google Anda: <b>pengingat tagihan tiap pagi</b>, <b>catat lewat chat WA</b>, dan <b>ringkasan catatan pukul 20.00</b>. Script yang sama juga mengirim pengingat Telegram walau aplikasi tidak dibuka.</p>
+        <p class="muted small">Dipasang sekali (± 10–20 menit) dengan panduan langkah demi langkah — semua tinggal salin–tempel. Token Fonnte hanya disimpan di script Anda.</p>
+        <div class="row-btns"><button class="btn sm" data-act="panduan" data-k="pend">${I('book-open')} Pasang script</button><button class="btn ghost sm" data-act="panduan" data-k="wa">${I('message-circle')} Pasang WhatsApp</button></div></div>`;
   };
-  UI.pendampingKartu = () => `<div class="row-btns"><button class="btn sm" data-act="panduan" data-k="pend">${I('book-open')} Panduan pasang langkah demi langkah</button></div>
-    ${Store.mode === 'live' ? `<div class="kv-list"><div class="kv"><span>ID file keluarga</span><b><code class="wrap">${U.esc(Store.fileId)}</code></b></div></div>` : ''}`;
+  UI.pendampingKartu = () => '';
 
   // ---------- Panduan pasang Skrip Pendamping & WhatsApp (wizard langkah demi langkah) ----------
   const PEND = { teks: '', json: '' };
@@ -94,70 +93,88 @@
   const T = (judul, isi) => ({ judul, isi });
   const btn = (act, ikon, label, cls) => `<button type="button" class="btn ${cls || 'ghost'} sm" data-pa="${act}">${I(ikon)} ${label}</button>`;
   const link = (url, label) => `<a class="btn ghost sm" href="${url}" target="_blank" rel="noopener">${I('external-link')} ${label}</a>`;
+  // Ilustrasi skematis (bukan tangkapan layar asli) — menunjukkan letak tombol yang harus diklik.
+  const hl = (isi, n) => `<span class="mk-hl">${isi}${n ? `<i>${n}</i>` : ''}</span>`;
+  const mock = (judul, isi) => `<figure class="mk"><figcaption>${I('image')} Ilustrasi · ${judul}</figcaption><div class="mk-body">${isi}</div></figure>`;
+  const ILUS = {
+    nama: () => mock('script.google.com', `<div class="mk-bar"><b class="mk-logo">Apps Script</b>${hl('Proyek tanpa judul', 1)}<span class="mk-sp"></span><span class="mk-btn biru">Terapkan ▾</span></div><div class="mk-note">Klik judul › ketik <b>SatuAtap Pendamping</b> › Ganti nama</div>`),
+    manifes: () => mock('Setelan Proyek', `<div class="mk-cols"><div class="mk-side"><span>ⓘ</span><span>&lt;&gt;</span><span>⏱</span>${hl('⚙️', 1)}</div><div class="mk-main"><b>Setelan Proyek</b><div class="mk-row">☑ Aktifkan runtime Chrome V8</div><div class="mk-row">${hl('☑ Tampilkan file manifes "appsscript.json" di editor', 2)}</div></div></div>`),
+    file: (f) => mock('Editor', `<div class="mk-cols"><div class="mk-files"><small>File</small><div class="${f === 'json' ? 'on' : ''}">${f === 'json' ? hl('appsscript.json', 1) : 'appsscript.json'}</div><div class="${f === 'kode' ? 'on' : ''}">${f === 'kode' ? hl('Kode.gs', 1) : 'Kode.gs'}</div></div><div class="mk-main mk-code">${hl('Ctrl+A › hapus › tempel (Ctrl+V)', 2)}<br><span class="mk-dim">…isi lama diganti seluruhnya…</span><div class="mk-row">Lalu simpan: 💾 atau Ctrl+S</div></div></div>`),
+    jalankan: (fn) => mock('Toolbar editor', `<div class="mk-bar">↶ ↷ 💾 ${hl('▶ Jalankan', 2)}<span class="mk-btn">Debug</span>${hl(fn + ' ▾', 1)}<span class="mk-btn">Log eksekusi</span></div><div class="mk-note">1 pilih fungsi <b>${fn}</b> · 2 klik <b>Jalankan</b> · hasil muncul di <b>Log eksekusi</b> (bawah)</div>`),
+    izin: () => mock('Izin Google', `<div class="mk-dialog"><b>Google belum memverifikasi aplikasi ini</b><p class="mk-dim">Aplikasi meminta akses ke info sensitif di Akun Google Anda…</p><div class="mk-row">${hl('Lanjutan', 1)}<span class="mk-sp"></span><span class="mk-btn biru">Kembali ke keamanan</span></div><div class="mk-row">${hl('Buka SatuAtap Pendamping (tidak aman)', 2)}</div><div class="mk-row"><span class="mk-sp"></span>${hl('Izinkan', 3)}</div></div>`),
+    api: () => mock('Google Cloud · Google Sheets API', `<div class="mk-dialog"><b>Google Sheets API</b><p class="mk-dim">Reads and writes Google Sheets.</p><div class="mk-row">${hl('<span class="mk-btn biru">AKTIFKAN</span>', 1)}<span class="mk-btn">Coba API ini</span></div></div><div class="mk-note">Tunggu 1–2 menit, lalu kembali ke editor dan Jalankan lagi.</div>`),
+    prop: (rows) => mock('Setelan Proyek › Properti skrip', `<div class="mk-main"><b>Properti skrip</b><div class="mk-tbl"><div><small>Properti</small><small>Nilai</small></div>${rows.map(r => `<div><code>${r[0]}</code><span class="mk-dim">${r[1]}</span></div>`).join('')}</div><div class="mk-row">${hl('+ Tambahkan properti skrip', 1)}<span class="mk-sp"></span>${hl('<span class="mk-btn biru">Simpan properti skrip</span>', 2)}</div></div>`),
+    deploy: () => mock('Terapkan › Deployment baru', `<div class="mk-dialog"><b>Deployment baru</b><div class="mk-row">Pilih jenis ${hl('⚙️', 1)} → <b>Aplikasi web</b></div><div class="mk-row">Jalankan sebagai: <b>Saya</b></div><div class="mk-row">Yang memiliki akses: ${hl('Siapa saja', 2)}</div><div class="mk-row"><span class="mk-sp"></span>${hl('<span class="mk-btn biru">Terapkan</span>', 3)}</div></div><div class="mk-dialog"><small>Aplikasi web · URL</small><div class="mk-row"><code>https://script.google.com/macros/s/AKfy…/exec</code>${hl('Salin', 4)}</div></div>`),
+    fonnte: () => mock('fonnte.com › Device › Edit', `<div class="mk-main"><small>Webhook</small><div class="mk-row">${hl('<code>https://…/api/wa?id=…&amp;k=…</code>', 1)}</div><small>autoread</small><div class="mk-row">${hl('● On', 2)}</div><small>Response Source</small><div class="mk-row mk-dim">Autoreply (biarkan)</div><div class="mk-row">${hl('<span class="mk-btn gelap">Update</span>', 3)}</div></div>`),
+    token: () => mock('fonnte.com › Device', `<div class="mk-tbl tiga"><div><small>Device</small><small>Status</small><small>Aksi</small></div><div><span>SatuAtap<br><span class="mk-dim">62812…</span></span><span class="mk-ok">connect</span><span>${hl('Token', 1)} · Edit</span></div></div>`)
+  };
+  const kunciWA = () => { const id = 'sa:waKunci:' + Store.fileId; try { let k = localStorage.getItem(id); if (!k) { const a = new Uint8Array(16); crypto.getRandomValues(a); k = Array.from(a).map(x => x.toString(16).padStart(2, '0')).join(''); localStorage.setItem(id, k); } return k; } catch (e) { return 'buatkuncisendiri1234'; } };
+  const salinBaris = (nama, nilai, ket) => `<div class="pv-row"><div><code>${nama}</code><small class="muted">${ket}</small></div><div class="row-btns"><button type="button" class="btn ghost xs" data-salin="${U.esc(nama)}" data-nm="Nama properti">${I('copy')} Nama</button>${nilai ? `<button type="button" class="btn xs" data-salin="${U.esc(nilai)}" data-nm="Nilai ${U.esc(nama)}">${I('copy')} Nilai</button>` : ''}</div></div>`;
   const PANDUAN = {
-    pend: { judul: 'Pasang Skrip Pendamping', langkah: () => [
-      T('Apa ini & siapkan', `<p>Skrip Pendamping berjalan di akun Google <b>Anda sendiri</b>, setiap pagi ± pukul 08.00, walau aplikasi tidak dibuka:</p>
-        <ul class="ul"><li>mengisi Google Calendar <b>"Keuangan …"</b> dengan jadwal tagihan & cicilan,</li><li>mengirim pengingat H-7, H-3, H-1, hari H ke Telegram (dan WhatsApp bila dipasang).</li></ul>
-        <div class="note small">${I('monitor')} <span>Paling mudah di <b>laptop/komputer</b>. Di HP bisa, buka Chrome › ⋮ › centang <b>Situs desktop</b>.</span></div>
-        <div class="note small">${I('user')} <span>Masuk Google dengan akun <b>${U.esc(admin())}</b> (Admin keluarga / pemilik file data).</span></div>`),
-      T('Buat proyek baru', `<ol class="steps"><li>Ketuk tombol di bawah — terbuka <b>script.google.com</b> dengan proyek kosong.</li><li>Klik judul <b>"Proyek tanpa judul"</b> di kiri atas › ganti menjadi <code>SatuAtap Pendamping</code> › <b>Ganti nama</b>.</li></ol>
-        <div class="row-btns">${link('https://script.google.com/home/projects/create', 'Buka script.google.com')}</div>`),
-      T('Tampilkan file manifes', `<ol class="steps"><li>Di kiri, klik ikon <b>⚙️ Setelan Proyek</b> (gerigi, paling bawah).</li><li>Centang <b>"Tampilkan file manifes 'appsscript.json' di editor"</b>.</li><li>Klik ikon <b>&lt;&gt; Editor</b> di kiri untuk kembali. Sekarang ada dua file: <code>appsscript.json</code> dan <code>Kode.gs</code>.</li></ol>`),
-      T('Tempel appsscript.json', `<ol class="steps"><li>Ketuk <b>Salin appsscript.json</b> di bawah.</li><li>Di editor, klik file <b>appsscript.json</b> › tekan <kbd>Ctrl</kbd>+<kbd>A</kbd> (pilih semua) › hapus › <b>tempel</b> (<kbd>Ctrl</kbd>+<kbd>V</kbd>).</li><li>Simpan: ikon 💾 atau <kbd>Ctrl</kbd>+<kbd>S</kbd>.</li></ol>
-        <p class="muted small">File ini berisi daftar izin yang dibutuhkan skrip (baca file data, kalender, kirim pengingat).</p><div class="row-btns">${btn('json', 'copy', 'Salin appsscript.json', '')}</div>`),
-      T('Tempel kode Pendamping', `<ol class="steps"><li>Ketuk <b>Salin kode Pendamping</b>. Kode ini <b>sudah berisi</b> ID file keluarga & alamat relay Anda — tidak perlu diubah apa pun.</li><li>Klik file <b>Kode.gs</b> › <kbd>Ctrl</kbd>+<kbd>A</kbd> › hapus › tempel › simpan 💾.</li></ol>
-        ${Store.mode !== 'live' ? '<div class="note warn small">Mode demo: ID file belum terisi. Lakukan dari akun keluarga sungguhan.</div>' : ''}<div class="row-btns">${btn('kode', 'copy', 'Salin kode Pendamping', '')}</div>`),
-      T('Jalankan & beri izin', `<ol class="steps"><li>Di toolbar atas, pada kotak pilihan fungsi pilih <b>setupPendamping</b> › klik <b>▶ Jalankan</b>.</li><li>Muncul <b>"Otorisasi diperlukan"</b> › <b>Tinjau izin</b> › pilih akun ${U.esc(admin())}.</li>
-          <li>Muncul <b>"Google belum memverifikasi aplikasi ini"</b> › klik <b>Lanjutan</b> (kecil, kiri bawah) › <b>Buka SatuAtap Pendamping (tidak aman)</b> › <b>Izinkan</b>.</li></ol>
-        <div class="note small">${I('shield-check')} <span>Peringatan itu wajar: skrip ini Anda pasang sendiri di akun Anda, jadi Google tidak memeriksanya. Skrip hanya <b>membaca</b> file data SatuAtap dan menulis ke kalender Anda.</span></div>
-        <div class="note warn small">${I('triangle-alert')} <span>Log menulis <b>"Google Sheets API belum aktif"</b>? Buka tautan di log itu › klik <b>AKTIFKAN</b> (Enable) › tunggu 1–2 menit › <b>▶ Jalankan</b> lagi. Hanya sekali.</span></div>`),
-      T('Selesai — cek hasilnya', `<p>Di bawah editor muncul <b>Log eksekusi</b>. Berhasil bila ada baris <b>"✅ Pendamping aktif untuk …"</b>.</p>
-        <ul class="ul"><li>Buka Google Calendar — ada kalender <b>Keuangan …</b> berisi jadwal tagihan.</li><li>Pengingat Telegram terkirim tiap pagi ke anggota yang sudah <b>Hubungkan Telegram</b>.</li><li>Agar pasangan melihat kalender yang sama: Google Calendar › kalender <b>Keuangan …</b> › ⋮ › <b>Setelan & berbagi</b> › › tambahkan email pasangan.</li></ul>
-        <div class="note small">${I('triangle-alert')} <span>Ada tulisan merah? Foto layar log-nya dan kirim ke JuniorLabs. Untuk berhenti: pilih fungsi <b>hentikanPendamping</b> › Jalankan.</span></div>
+    pend: { judul: 'Pasang script', langkah: () => [
+      T('Apa ini & siapkan', `<p>Script ini berjalan di akun Google <b>Anda sendiri</b> setiap pagi ± pukul 08.00, walau aplikasi tidak dibuka. Tugasnya:</p>
+        <ul class="ul"><li>mengirim pengingat tagihan & cicilan (H-7, H-3, H-1, hari H) ke <b>Telegram</b>,</li><li>dan ke <b>WhatsApp</b> bila Anda memasangnya di panduan berikutnya.</li></ul>
+        <div class="note small">${I('clock')} <span>± 10 menit, sekali saja. Semua kode tinggal <b>salin–tempel</b> dari panduan ini.</span></div>
+        <div class="note small">${I('monitor')} <span>Paling mudah di <b>laptop/komputer</b>. Di HP: Chrome › ⋮ › centang <b>Situs desktop</b>.</span></div>
+        <div class="note small">${I('user')} <span>Masuk Google dengan akun <b>${U.esc(admin())}</b> (Admin keluarga).</span></div>`),
+      T('Buat proyek baru', `<ol class="steps"><li>Ketuk tombol di bawah — terbuka <b>script.google.com</b> dengan proyek kosong.</li><li>Klik judul <b>"Proyek tanpa judul"</b> di kiri atas.</li><li>Ketik <code>SatuAtap Pendamping</code> › <b>Ganti nama</b>.</li></ol>
+        <div class="row-btns">${link('https://script.google.com/home/projects/create', 'Buka script.google.com')}<button type="button" class="btn ghost sm" data-salin="SatuAtap Pendamping" data-nm="Nama proyek">${I('copy')} Salin nama</button></div>${ILUS.nama()}`),
+      T('Tampilkan file manifes', `<ol class="steps"><li>Di sisi kiri, klik ikon <b>⚙️ Setelan Proyek</b> (gerigi).</li><li>Centang <b>"Tampilkan file manifes 'appsscript.json' di editor"</b>.</li><li>Klik ikon <b>&lt;&gt; Editor</b> untuk kembali. Sekarang ada dua file: <code>appsscript.json</code> dan <code>Kode.gs</code>.</li></ol>${ILUS.manifes()}`),
+      T('Tempel appsscript.json', `<ol class="steps"><li>Ketuk <b>Salin appsscript.json</b>.</li><li>Di editor klik file <b>appsscript.json</b>.</li><li>Tekan <kbd>Ctrl</kbd>+<kbd>A</kbd> › hapus › tempel <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li><li>Simpan: ikon 💾 atau <kbd>Ctrl</kbd>+<kbd>S</kbd>.</li></ol>
+        <div class="row-btns">${btn('json', 'copy', 'Salin appsscript.json', '')}</div>${ILUS.file('json')}<p class="muted small">Isinya daftar izin script: membaca file data (baca-saja) dan mengirim pengingat.</p>`),
+      T('Tempel kode script', `<ol class="steps"><li>Ketuk <b>Salin kode script</b>. Kode <b>sudah berisi</b> ID file keluarga & alamat server — tidak perlu diubah.</li><li>Klik file <b>Kode.gs</b>.</li><li><kbd>Ctrl</kbd>+<kbd>A</kbd> › hapus › tempel › simpan 💾.</li></ol>
+        ${Store.mode !== 'live' ? '<div class="note warn small">Mode demo: ID file belum terisi. Lakukan dari akun keluarga sungguhan.</div>' : ''}<div class="row-btns">${btn('kode', 'copy', 'Salin kode script', '')}</div>${ILUS.file('kode')}`),
+      T('Jalankan setupPendamping', `<ol class="steps"><li>Di toolbar atas, pada kotak pilihan fungsi pilih <b>setupPendamping</b>.</li><li>Klik <b>▶ Jalankan</b>.</li><li>Muncul <b>"Otorisasi diperlukan"</b> › klik <b>Tinjau izin</b> › pilih akun ${U.esc(admin())}.</li></ol>${ILUS.jalankan('setupPendamping')}`),
+      T('Beri izin', `<ol class="steps"><li>Muncul <b>"Google belum memverifikasi aplikasi ini"</b> › klik <b>Lanjutan</b> (tulisan kecil di kiri bawah).</li><li>Klik <b>Buka SatuAtap Pendamping (tidak aman)</b>.</li><li>Klik <b>Izinkan</b>.</li></ol>${ILUS.izin()}
+        <div class="note small">${I('shield-check')} <span>Peringatan ini wajar: script Anda pasang sendiri di akun Anda, jadi Google tidak memeriksanya. Script hanya <b>membaca</b> file data SatuAtap.</span></div>
+        <div class="note warn small">${I('triangle-alert')} <span>Log menulis <b>"Google Sheets API belum aktif"</b>? Klik tautan di log itu › <b>AKTIFKAN</b> › tunggu 1–2 menit › <b>▶ Jalankan</b> lagi. Hanya sekali.</span></div>${ILUS.api()}`),
+      T('Selesai', `<p>Lihat <b>Log eksekusi</b> di bawah editor. Berhasil bila ada baris:</p><div class="kode-mini">✅ Pendamping aktif untuk "…" — … transaksi terbaca.</div>
+        <ul class="ul"><li>Pengingat Telegram terkirim tiap pagi ke anggota yang sudah <b>Hubungkan Telegram</b>.</li><li>Tidak ada yang perlu dijalankan lagi — script bekerja sendiri.</li><li>Berhenti kapan saja: pilih fungsi <b>hentikanPendamping</b> › Jalankan.</li></ul>
+        <div class="note small">${I('triangle-alert')} <span>Ada tulisan merah? Foto layar log-nya dan kirim ke JuniorLabs.</span></div>
         <div class="row-btns"><button type="button" class="btn sm" data-pa="ke-wa">${I('message-circle')} Lanjut pasang WhatsApp</button></div>`)
     ] },
     wa: { judul: 'Pasang WhatsApp (Fonnte)', langkah: () => [
-      T('Sebelum mulai', `<p>Dengan WhatsApp, pengingat tagihan juga masuk WA, dan anggota bisa <b>mencatat lewat chat WA</b> ("makan siang 45rb gopay").</p>
-        <ul class="ul"><li><b>Skrip Pendamping sudah terpasang</b> (panduan sebelumnya).</li><li><b>Satu nomor WhatsApp pengirim</b> — nomor inilah yang mengirim pengingat & menerima catatan. Sebaiknya nomor kedua/khusus (WA Business boleh), bukan nomor yang dipakai mencatat.</li><li>Akun <b>Fonnte</b> (gratis) — layanan pengirim WA. Token Fonnte hanya disimpan di skrip Anda, tidak di aplikasi & tidak di JuniorLabs.</li></ul>
-        <div class="row-btns"><button type="button" class="btn ghost sm" data-pa="ke-pend">${I('book-open')} Belum pasang Pendamping</button></div>`),
-      T('Daftar & sambungkan Fonnte', `<ol class="steps"><li>Buka <b>fonnte.com</b> › <b>Register</b> › isi data & verifikasi › <b>Login</b>.</li><li>Menu <b>Device</b> › <b>Add device</b>: nama <code>SatuAtap</code>, nomor = <b>nomor WA pengirim</b> › Save.</li>
-          <li>Di baris device itu klik <b>Connect</b> › muncul QR. Di HP pemilik nomor pengirim: WhatsApp › ⋮ › <b>Perangkat tertaut</b> › › <b>Tautkan perangkat</b> › › scan QR.</li><li>Status device berubah menjadi <b>connect</b>.</li></ol>
+      T('Sebelum mulai', `<p>Dengan WhatsApp, keluarga mendapat <b>2 pesan sehari</b> dari nomor pengirim:</p>
+        <ul class="ul"><li><b>Pagi ± 08.00</b> — pengingat tagihan & cicilan.</li><li><b>Malam 20.00</b> — ringkasan catatan yang dikirim lewat WA hari itu.</li></ul>
+        <p>Anggota mencatat dengan mengirim chat, mis. <code>makan siang 45rb gopay</code>. Chat <b>tidak dibalas satu per satu</b> (hemat kuota); catatannya langsung muncul sebagai draf di aplikasi.</p>
+        <p><b>Siapkan:</b></p><ul class="ul"><li><b>Script sudah terpasang</b> (panduan "Pasang script").</li><li><b>Satu nomor WhatsApp pengirim</b> — sebaiknya nomor kedua/khusus, bukan nomor anggota yang mencatat.</li><li>Akun <b>Fonnte</b> (ada paket gratis).</li></ul>
+        <div class="row-btns"><button type="button" class="btn ghost sm" data-pa="ke-pend">${I('book-open')} Belum pasang script</button></div>`),
+      T('Daftar & sambungkan Fonnte', `<ol class="steps"><li>Buka <b>fonnte.com</b> › <b>Register</b> › verifikasi › <b>Login</b>.</li><li>Menu <b>Device</b> › <b>Add device</b>: nama <code>SatuAtap</code>, nomor = <b>nomor WA pengirim</b> › Save.</li>
+          <li>Pada baris device klik <b>Connect</b> › muncul QR.</li><li>Di HP nomor pengirim: WhatsApp › ⋮ › <b>Perangkat tertaut</b> › <b>Tautkan perangkat</b> › scan QR.</li><li>Status device menjadi <b>connect</b>.</li></ol>
         <div class="row-btns">${link('https://md.fonnte.com/new/register.php', 'Buka fonnte.com')}</div>`),
-      T('Salin token Fonnte', `<ol class="steps"><li>Di fonnte.com › menu <b>Device</b> › pada baris device klik <b>Token</b> (atau ikon kunci).</li><li>Salin token itu, simpan sebentar (mis. di catatan HP). <b>Jangan bagikan ke siapa pun</b> — siapa pun yang punya token bisa mengirim WA atas nomor Anda.</li></ol>`),
-      T('Nomor WA anggota', `<p>Isi nomor WhatsApp <b>tiap anggota</b> (nomor yang akan menerima pengingat & mengirim catatan). Boleh diawali 08…</p>
+      T('Salin token Fonnte', `<ol class="steps"><li>fonnte.com › menu <b>Device</b>.</li><li>Pada baris device klik <b>Token</b> › token tersalin / tampil.</li><li>Simpan sebentar (dipakai di langkah 5).</li></ol>${ILUS.token()}
+        <div class="note small">${I('lock')} <span><b>Jangan bagikan token</b> — siapa pun yang memilikinya bisa mengirim WA atas nomor Anda. Token hanya disimpan di script Anda, tidak di aplikasi & tidak di JuniorLabs.</span></div>`),
+      T('Nomor WA anggota', `<p>Isi nomor WhatsApp <b>tiap anggota</b> — nomor yang menerima pengingat & mengirim catatan. Boleh diawali 08…</p>
         <div class="wa-no">${Store.members().map(m => `<label class="field"><span>${U.esc(m.nama)} <small class="muted">${U.esc(m.email)}</small></span><input inputmode="tel" data-wa="${U.esc(m.email)}" value="${U.esc(bacaNo()[m.email] || '')}" placeholder="08xxxxxxxxxx"></label>`).join('')}</div>
-        <div class="kv-list"><div class="kv"><span>Nilai WA_ANGGOTA</span><b><code class="wrap" data-wa-out>${U.esc(waAnggota() || '—')}</code></b></div></div>
-        <div class="row-btns">${btn('wa-anggota', 'copy', 'Salin nilai WA_ANGGOTA', '')}</div>`),
-      T('Isi Properti skrip', `<p>Kembali ke editor <b>SatuAtap Pendamping</b> di script.google.com.</p>
-        <ol class="steps"><li>Klik <b>⚙️ Setelan Proyek</b> › gulir ke bawah ke <b>Properti skrip</b> › <b>Tambahkan properti skrip</b>.</li>
-          <li>Baris 1 — Properti: <code>FONNTE_TOKEN</code> · Nilai: <b>token Fonnte</b> (langkah 3).</li><li>Klik <b>Tambahkan properti skrip</b> lagi. Baris 2 — Properti: <code>WA_ANGGOTA</code> · Nilai: <b>tempel</b> nilai dari langkah 4.</li><li>Klik <b>Simpan properti skrip</b>.</li></ol>
-        <div class="note small">${I('lock')} <span>Ketik nama properti persis huruf besar seperti di atas. Token disimpan di sini — bukan di kode — agar aman.</span></div>`),
-      T('Jalankan setupWA', `<ol class="steps"><li>Klik <b>&lt;&gt; Editor</b> › kotak pilihan fungsi pilih <b>setupWA</b> › <b>▶ Jalankan</b>.</li><li>Bila diminta izin, ulangi seperti sebelumnya (Tinjau izin › Lanjutan › Izinkan).</li><li>Setiap anggota menerima WA: <b>"✅ SatuAtap tersambung ke WhatsApp keluarga ini."</b></li></ol>
-        <p class="muted small">Sampai di sini <b>pengingat WA sudah aktif</b>. Langkah berikutnya hanya untuk <b>mencatat lewat chat WA</b>.</p>`),
-      T('Terapkan sebagai Aplikasi web', `<ol class="steps"><li>Kanan atas klik <b>Terapkan</b> › <b>Deployment baru</b>.</li><li>Klik ikon ⚙️ di samping "Pilih jenis" › <b>Aplikasi web</b>.</li><li>Jalankan sebagai: <b>Saya</b> · Yang memiliki akses: <b>Siapa saja</b> — <u>bukan</u> "Siapa saja yang memiliki Akun Google" › <b>Terapkan</b> (izinkan bila diminta).</li><li>Klik <b>Selesai</b>.</li></ol>
-        <div class="note small">${I('info')} <span>"Siapa saja" diperlukan agar Fonnte bisa meneruskan pesan WA. Skrip menolak pesan yang tidak membawa kunci rahasia Anda.</span></div>`),
-      T('Pasang webhook di Fonnte', `<ol class="steps"><li>Di editor pilih fungsi <b>cekWA</b> › <b>▶ Jalankan</b>.</li><li>Log menampilkan status token & perangkat, lalu <b>alamat webhook</b> (berakhiran <code>?k=…</code>). Salin seluruh baris alamat itu.</li>
-          <li>Tempel alamat itu di kotak di bawah — aplikasi mengubahnya menjadi <b>alamat jembatan</b> yang diterima Fonnte. Salin hasilnya.</li>
-          <li>Di fonnte.com › <b>Device</b> › <b>Edit</b> pada device › kolom <b>Webhook</b> › tempel alamat jembatan.</li>
-          <li>Masih di Edit: nyalakan <b>Autoread</b> (pilih <b>personal</b>; "silent autoread" boleh agar centang biru tidak muncul) › <b>Update</b>. <b>Tanpa Autoread, Fonnte tidak meneruskan pesan masuk.</b></li>
-          <li>Cek: buka alamat jembatan di browser — harus muncul <b>"✅ Jembatan WhatsApp aktif & tersambung ke Pendamping"</b>.</li></ol>
-        <label class="field"><span>Alamat dari cekWA <small class="muted">(script.google.com/…/exec?k=…)</small></span><input data-wh-in placeholder="https://script.google.com/macros/s/…/exec?k=…" autocomplete="off"></label>
-        <div class="kv-list"><div class="kv"><span>Alamat jembatan</span><b><code class="wrap" data-wh-out>—</code></b></div></div>
-        <div class="row-btns">${btn('wh-salin', 'copy', 'Salin alamat jembatan', '')}</div>
-        <p class="muted small">"Response Source" tidak perlu diubah — biarkan Autoreply. Setelah kode Pendamping diganti, selalu <b>Terapkan › Kelola deployment › ✏️ › Versi baru</b>; webhook menjalankan versi yang diterapkan, bukan isi editor.</p>
-        <div class="note small">${I('triangle-alert')} <span>Bila kolom Webhook tidak tersedia di paket Fonnte Anda, catat lewat WA belum bisa — pengingat WA tetap berjalan.</span></div>`),
-      T('Uji coba', `<ol class="steps"><li>Dari nomor salah satu anggota, kirim WA ke <b>nomor pengirim</b>: <code>makan siang 45rb gopay</code>.</li><li>Balasan: <b>"📝 Diterima: Rp 45.000 …"</b>.</li><li>Buka aplikasi › <b>Mutasi</b> › <b>Menunggu konfirmasi</b> › geser kanan untuk menyimpan.</li></ol>
-        <div class="note small">${I('circle-help')} <span>Tidak ada balasan? Jalankan <b>cekWA</b> lagi — bagian <b>"Kiriman webhook terakhir"</b> menunjukkan apakah pesan sampai ke skrip dan mengapa ditolak. "Belum ada satu pun kiriman" berarti masalahnya di Fonnte (Autoread mati, alamat webhook salah/belum di-Update, atau perangkat tidak connect).</span></div>`)
+        <p class="muted small">Nomor hanya disimpan di HP ini untuk menyusun nilai di langkah berikutnya.</p>`),
+      T('Isi 3 Properti skrip', `<p>Di editor <b>SatuAtap Pendamping</b>: klik <b>⚙️ Setelan Proyek</b> › gulir ke <b>Properti skrip</b> › <b>Tambahkan properti skrip</b>. Buat 3 baris — salin nama & nilainya dari sini:</p>
+        <div class="pv">${salinBaris('FONNTE_TOKEN', '', 'Nilai: tempel token Fonnte dari langkah 3')}
+          <div data-pv-anggota>${salinBaris('WA_ANGGOTA', waAnggota(), waAnggota() ? 'Nomor anggota dari langkah 4' : 'Isi nomor di langkah 4 dulu')}</div>
+          ${salinBaris('WA_KUNCI', kunciWA(), 'Kunci rahasia webhook (dibuat otomatis)')}</div>
+        <p>Terakhir klik <b>Simpan properti skrip</b>.</p>${ILUS.prop([['FONNTE_TOKEN', 'token Fonnte…'], ['WA_ANGGOTA', '62812…=email,…'], ['WA_KUNCI', kunciWA().slice(0, 8) + '…']])}`),
+      T('Jalankan setupWA', `<ol class="steps"><li>Klik <b>&lt;&gt; Editor</b>.</li><li>Pilih fungsi <b>setupWA</b> › <b>▶ Jalankan</b> (izinkan bila diminta).</li><li>Setiap anggota menerima WA: <b>"✅ SatuAtap tersambung ke WhatsApp keluarga ini."</b></li></ol>${ILUS.jalankan('setupWA')}
+        <p class="muted small">Sampai di sini <b>pengingat pagi sudah aktif</b>. Tiga langkah berikutnya untuk <b>mencatat lewat chat WA</b>.</p>`),
+      T('Terapkan sebagai Aplikasi web', `<ol class="steps"><li>Kanan atas klik <b>Terapkan</b> › <b>Deployment baru</b>.</li><li>Klik ⚙️ di samping "Pilih jenis" › <b>Aplikasi web</b>.</li><li>Jalankan sebagai: <b>Saya</b>. Yang memiliki akses: <b>Siapa saja</b> — <u>bukan</u> "Siapa saja yang memiliki Akun Google".</li><li>Klik <b>Terapkan</b> (izinkan bila diminta).</li><li>Pada <b>URL Aplikasi web</b> klik <b>Salin</b>, lalu <b>Selesai</b>.</li></ol>${ILUS.deploy()}
+        <div class="note small">${I('info')} <span>Setiap kali kode script diganti: <b>Terapkan › Kelola deployment › ✏️ › Versi baru › Terapkan</b>. Jangan "Deployment baru" lagi, agar alamat tidak berubah.</span></div>`),
+      T('Pasang webhook di Fonnte', `<ol class="steps"><li>Tempel <b>URL Aplikasi web</b> (dari langkah 7) di kotak ini:</li></ol>
+        <label class="field"><span>URL Aplikasi web <small class="muted">(berakhiran /exec)</small></span><input data-wh-in placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" value="${U.esc((() => { try { return localStorage.getItem('sa:waUrl:' + Store.fileId) || ''; } catch (e) { return ''; } })())}"></label>
+        <div class="kv-list"><div class="kv"><span>Alamat webhook</span><b><code class="wrap" data-wh-out>—</code></b></div></div>
+        <div class="row-btns">${btn('wh-salin', 'copy', 'Salin alamat webhook', '')}${btn('wh-buka', 'external-link', 'Cek di browser')}</div>
+        <ol class="steps" start="2"><li>Ketuk <b>Cek di browser</b> — harus muncul <b>"✅ Jembatan WhatsApp aktif & tersambung ke Pendamping"</b>.</li><li>Di fonnte.com › <b>Device</b> › <b>Edit</b>: tempel alamat webhook di kolom <b>Webhook</b>.</li><li>Nyalakan <b>autoread</b> (On). <b>Response Source</b> biarkan apa adanya.</li><li>Klik <b>Update</b>.</li></ol>${ILUS.fonnte()}`),
+      T('Uji & cara pakai', `<ol class="steps"><li>Dari WA salah satu anggota, kirim ke <b>nomor pengirim</b>: <code>makan siang 45rb gopay</code>.</li><li>Tidak ada balasan langsung — itu normal.</li><li>Buka aplikasi › <b>Mutasi › Menunggu konfirmasi</b>: catatan muncul sebagai draf. Geser kanan untuk menyimpan.</li><li>Pukul <b>20.00</b> nomor pengirim mengirim ringkasan catatan hari itu.</li></ol>
+        <div class="note small">${I('info')} <span>Pesan yang sama persis dalam 30 menit hanya dicatat sekali. Memang dua transaksi? Awali dengan <b>lagi</b>: <code>lagi parkir 5rb tunai</code>.</span></div>
+        <div class="note small">${I('circle-help')} <span>Draf tidak muncul setelah beberapa menit? Di editor jalankan fungsi <b>cekWA</b> — bagian "Kiriman webhook terakhir" menunjukkan apakah pesan sampai dan mengapa ditolak. Fonnte kadang meneruskan pesan terlambat; untuk catat cepat, Telegram lebih bisa diandalkan.</span></div>`)
     ] }
   };
   UI.act('panduan', el => UI.panduan(el.dataset.k));
   UI.panduan = (k) => {
     const P = PANDUAN[k]; if (!P) return; muatPend();
-    const L = P.langkah(), kunci = 'sa:pand:' + k; let i = Math.min(L.length - 1, Number(localStorage.getItem(kunci) || 0) || 0);
+    let L = P.langkah(); const kunci = 'sa:pand:' + k; let i = Math.min(L.length - 1, Number(localStorage.getItem(kunci) || 0) || 0);
     const s = UI.sheet({ title: P.judul, body: '<div class="pand"></div>', foot: `<button class="btn ghost" data-n="-1">${I('chevron-left')} Kembali</button><button class="btn" data-n="1">Lanjut ${I('chevron-right')}</button>` });
     const box = s.el.querySelector('.pand'), bK = s.el.querySelector('[data-n="-1"]'), bL = s.el.querySelector('[data-n="1"]');
-    const gambar = () => {
+    let gambar = () => {
       try { localStorage.setItem(kunci, String(i)); } catch (e) {}
+      L = P.langkah();      // isi langkah mengikuti data terbaru (nomor WA, kunci)
       box.innerHTML = `<div class="pand-dots">${L.map((_, j) => `<button type="button" class="${j === i ? 'on' : j < i ? 'ok' : ''}" data-ke="${j}" aria-label="Langkah ${j + 1}">${j < i ? I('check') : j + 1}</button>`).join('')}</div>
         <div class="pand-step"><small class="muted">Langkah ${i + 1} dari ${L.length}</small><h3>${L[i].judul}</h3>${L[i].isi}</div>`;
       bK.disabled = i === 0; bL.innerHTML = i === L.length - 1 ? I('check') + ' Selesai' : 'Lanjut ' + I('chevron-right');
@@ -166,17 +183,22 @@
     s.el.addEventListener('click', e => {
       const d = e.target.closest('[data-ke]'); if (d) { i = +d.dataset.ke; return gambar(); }
       const n = e.target.closest('[data-n]'); if (n) { if (+n.dataset.n > 0 && i === L.length - 1) { try { localStorage.removeItem(kunci); } catch (x) {} s.close(); return UI.toast('Mantap! Panduan bisa dibuka lagi kapan saja.'); } i = Math.max(0, Math.min(L.length - 1, i + +n.dataset.n)); return gambar(); }
+      const sl = e.target.closest('[data-salin]'); if (sl) return salin(sl.dataset.salin, sl.dataset.nm || 'Teks');
       const a = e.target.closest('[data-pa]'); if (!a) return;
       const act = a.dataset.pa;
       if (act === 'kode') salin(kodeTerisi(), 'Kode Pendamping');
       else if (act === 'json') salin(PEND.json, 'appsscript.json');
       else if (act === 'wa-anggota') { const v = waAnggota(); if (!v) return UI.toast('Isi minimal satu nomor yang benar.', 'warn'); salin(v, 'WA_ANGGOTA'); }
-      else if (act === 'wh-salin') { const o = s.el.querySelector('[data-wh-out]'), v = o && o.textContent; if (!v || v === '—' || /^Alamat/.test(v)) return UI.toast('Tempel dulu alamat dari cekWA.', 'warn'); salin(v, 'Alamat jembatan'); }
+      else if (act === 'wh-salin' || act === 'wh-buka') { const o = s.el.querySelector('[data-wh-out]'), v = o && o.textContent; if (!v || !/^https/.test(v)) return UI.toast('Tempel dulu URL Aplikasi web (berakhiran /exec).', 'warn'); if (act === 'wh-buka') window.open(v, '_blank', 'noopener'); else salin(v, 'Alamat webhook'); }
       else if (act === 'ke-wa' || act === 'ke-pend') { s.close(); setTimeout(() => UI.panduan(act === 'ke-wa' ? 'wa' : 'pend'), 250); }
     });
     s.el.addEventListener('input', e => {
-      if (e.target.dataset && e.target.dataset.whIn !== undefined) { const m = /script\.google\.com\/macros\/s\/([A-Za-z0-9_-]{20,})\/exec\?k=([A-Za-z0-9]+)/.exec(e.target.value.trim()), o = s.el.querySelector('[data-wh-out]'); if (o) o.textContent = m ? location.origin + '/api/wa?id=' + m[1] + '&k=' + m[2] : (e.target.value ? 'Alamat belum lengkap — harus berakhiran /exec?k=…' : '—'); return; }
+      if (e.target.dataset && e.target.dataset.whIn !== undefined) { whHitung(e.target.value); return; }
       const w = e.target.dataset && e.target.dataset.wa; if (!w) return; const o = bacaNo(); o[w] = e.target.value; simpanNo(o); const out = s.el.querySelector('[data-wa-out]'); if (out) out.textContent = waAnggota() || '—'; e.target.classList.toggle('bad', !!e.target.value && !noWA(e.target.value)); });
+    const whHitung = (v) => { v = String(v || '').trim(); const m = /script\.google\.com\/macros\/s\/([A-Za-z0-9_-]{20,})\/exec(?:\?k=([A-Za-z0-9]+))?/.exec(v), o = s.el.querySelector('[data-wh-out]'); if (!o) return;
+      if (m) try { localStorage.setItem('sa:waUrl:' + Store.fileId, v); } catch (e) {}
+      o.textContent = m ? location.origin + '/api/wa?id=' + m[1] + '&k=' + (m[2] || kunciWA()) : (v ? 'URL belum lengkap — harus berakhiran /exec' : '—'); };
+    const asli = gambar; gambar = () => { asli(); const inp = s.el.querySelector('[data-wh-in]'); if (inp && inp.value) whHitung(inp.value); };
     gambar();
   };
 

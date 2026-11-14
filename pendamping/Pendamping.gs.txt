@@ -1,15 +1,15 @@
 /**
  * ============================================================
- *  SatuAtap — SKRIP PENDAMPING (opsional, v1.6.8)
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.7.0)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
- *   1. Jadwal tagihan, cicilan & acara di Google Calendar (kalender "Keuangan <nama>").
- *   2. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (lewat @SatuAtapBot, bila anggota sudah
+ *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (lewat @SatuAtapBot, bila anggota sudah
  *      menghubungkan Telegram di aplikasi) + pengingat Rapat Keuangan.
- *   3. (Opsional) WhatsApp lewat akun Fonnte MILIK KELUARGA: pengingat yang sama ke nomor WA,
- *      dan catat lewat chat WA ("makan 45rb gopay") yang masuk ke aplikasi untuk dikonfirmasi.
+ *   2. (Opsional) WhatsApp lewat akun Fonnte MILIK KELUARGA: pengingat yang sama ke nomor WA setiap pagi,
+ *      dan catat lewat chat WA ("makan 45rb gopay") yang masuk ke aplikasi sebagai draf.
+ *      WA hanya mengirim 2 pesan sehari: pengingat pagi & ringkasan catatan pukul 20.00 (hemat kuota).
  *
- *  Skrip MEMBACA file "SatuAtap – Data …" milik Anda, menulis ke kalender Anda, dan mengirim teks
+ *  Skrip hanya MEMBACA file "SatuAtap – Data …" milik Anda dan mengirim teks
  *  pengingat (nama tagihan & nominal) ke relay JuniorLabs → Telegram. Tidak mengirim email.
  *
  *  Cara pasang: ikuti panduan langkah demi langkah di aplikasi (Lainnya › Notifikasi ›
@@ -22,9 +22,8 @@
  */
 const FILE_ID = 'TEMPEL_ID_FILE_DI_SINI';
 const RELAY_URL = 'TEMPEL_ALAMAT_RELAY_DI_SINI';   // alamat /exec relay JuniorLabs (disalin dari aplikasi)
-const JAM_KIRIM = 8;          // jam pengingat & pembaruan kalender setiap pagi (Asia/Jakarta)
-const HARI_KALENDER = 60;     // berapa hari ke depan disalin ke Google Calendar
-const KALENDER = true;        // false = tidak membuat/mengisi Google Calendar
+const JAM_KIRIM = 8;          // jam pengingat setiap pagi (Asia/Jakarta)
+const JAM_RINGKAS = 20;       // jam ringkasan catatan WA malam hari
 const PENGINGAT = [7, 3, 1, 0];  // H-7, H-3, H-1, hari H
 
 const PROPS = PropertiesService.getScriptProperties();
@@ -32,19 +31,23 @@ const PROPS = PropertiesService.getScriptProperties();
 function setupPendamping() {
   if (/TEMPEL/.test(FILE_ID)) throw new Error('FILE_ID belum diisi. Salin ulang kode dari aplikasi: Lainnya › Pengaturan › Notifikasi › Panduan pasang (kodenya sudah terisi).');
   const st = bacaData_();
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'tugasHarian') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('tugasHarian').timeBased().everyDays(1).atHour(JAM_KIRIM).nearMinute(5).create();
+  pasangPemicu_();
   Logger.log('✅ Pendamping aktif untuk "' + (st.setting.namaKeluarga || 'Keluarga') + '" — ' + Object.keys(st.Transaksi).length + ' transaksi terbaca.');
-  Logger.log('   Setiap hari sekitar pukul ' + JAM_KIRIM + '.00: ' + [KALENDER ? 'kalender' : '', relayOk_() ? 'pengingat Telegram' : '', waOk_() ? 'pengingat WA' : ''].filter(String).join(', ') + '.');
+  Logger.log('   Setiap hari sekitar pukul ' + JAM_KIRIM + '.00: ' + [relayOk_() ? 'pengingat Telegram' : '', waOk_() ? 'pengingat WA (+ ringkasan catatan pukul ' + JAM_RINGKAS + '.00)' : ''].filter(String).join(', ') + '.');
   if (!relayOk_()) Logger.log('   ⚠️ RELAY_URL belum diisi — pengingat Telegram nonaktif.');
   Logger.log('   Menjalankan sekali sekarang…');
   Logger.log(JSON.stringify(tugasHarian_(st)));
+}
+function pasangPemicu_() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (['tugasHarian', 'ringkasanMalam'].indexOf(t.getHandlerFunction()) > -1) ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('tugasHarian').timeBased().everyDays(1).atHour(JAM_KIRIM).nearMinute(5).create();
+  ScriptApp.newTrigger('ringkasanMalam').timeBased().everyDays(1).atHour(JAM_RINGKAS).nearMinute(0).create();
 }
 function jalankanSekarang() { Logger.log(JSON.stringify(tugasHarian_(bacaData_()))); }
 function tugasHarian() { tugasHarian_(bacaData_()); }
 function hentikanPendamping() {
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  Logger.log('Pendamping dihentikan. Kalender "Keuangan …" tetap ada; hapus manual bila tidak diperlukan.');
+  Logger.log('Pendamping dihentikan — pengingat tidak dikirim lagi.');
 }
 
 /**
@@ -84,7 +87,6 @@ function bacaData_() {
 function tugasHarian_(st) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const out = {};
-  if (KALENDER) { try { out.kalender = kalender_(st, today); } catch (e) { out.kalender = 'gagal: ' + e.message; } }
   const pesan = pengingat_(st, today);
   out.pengingat = pesan.length;
   if (pesan.length && relayOk_()) { try { out.telegram = kirimTelegram_(pesan); } catch (e) { out.telegram = 'gagal: ' + e.message; } }
@@ -151,7 +153,8 @@ function setupWA() {
   if (!PROPS.getProperty('WA_KUNCI')) PROPS.setProperty('WA_KUNCI', Utilities.getUuid().replace(/-/g, ''));
   const n = kirimWA_('✅ SatuAtap tersambung ke WhatsApp keluarga ini.\nPengingat tagihan dikirim setiap pagi. Untuk mencatat, balas misalnya: makan siang 45rb gopay');
   Logger.log('✅ Pesan uji dikirim ke ' + n + ' nomor: ' + Object.keys(waAnggota_()).join(', ') + '. Cek WhatsApp masing-masing.');
-  Logger.log('   Langkah berikut (agar bisa CATAT lewat WA): Terapkan › Deployment baru › Aplikasi web › Terapkan, lalu jalankan cekWA.');
+  pasangPemicu_();
+  Logger.log('   Langkah berikut (agar bisa CATAT lewat WA): Terapkan › Deployment baru › Aplikasi web › Terapkan — lanjutkan panduan di aplikasi.');
 }
 /** Periksa WhatsApp: token Fonnte, nomor anggota, dan ALAMAT WEBHOOK yang harus ditempel di fonnte.com. */
 function cekWA() {
@@ -202,13 +205,48 @@ function doPost(e) {
   if (!email) { J('DITOLAK: nomor ' + no + ' tidak ada di WA_ANGGOTA'); return ContentService.createTextOutput('ok'); }
   const c = CacheService.getScriptCache(), dup = 'wa_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, no + teks + String(d.timestamp || '')));
   if (c.get(dup)) return ContentService.createTextOutput('ok');
-  c.put(dup, '1', 3600);
-  if (/^(bantuan|help|\?)$/i.test(teks)) { kirimWA_('Kirim catatan seperti: makan siang 45rb gopay · bensin 50.000 · gaji 7,5 jt bca. Catatan masuk ke aplikasi SatuAtap Anda untuk dikonfirmasi.', no); J('bantuan dibalas'); return ContentService.createTextOutput('ok'); }
-  const v = nominalTeks_(teks);
-  if (!v) { kirimWA_('Nominalnya belum terbaca 🤔 Contoh: makan siang 45rb gopay', no); J('nominal tidak terbaca'); return ContentService.createTextOutput('ok'); }
-  try { relay_('kotak.tambah', { email: email, teks: teks.slice(0, 300), sumber: 'wa' }); J('OK → draf untuk ' + email); kirimWA_('📝 Diterima: ' + rp_(v) + ' — ' + teks.slice(0, 80) + '\nMasuk sebagai draf — konfirmasi di aplikasi SatuAtap › Mutasi › Menunggu konfirmasi.', no); }
-  catch (x) { J('GAGAL ke relay: ' + x.message); try { kirimWA_('Maaf, catatan belum tersimpan (' + x.message + '). Coba lagi nanti.', no); } catch (y) {} }
+  c.put(dup, '1', 21600);
+  // Jam pesan asli (Fonnte kadang mengirim terlambat/beruntun) → disebut di balasan agar jelas pesan yang mana
+  let ts = Number(d.timestamp) || 0; if (ts > 1e12) ts = Math.round(ts / 1000);
+  const tgl = ts > 1e9 ? new Date(ts * 1000) : new Date(), telat = (Date.now() - tgl.getTime()) / 60000;
+  const jam = Utilities.formatDate(tgl, 'Asia/Jakarta', 'HH.mm'), ket = ' (pesan pukul ' + jam + (telat > 5 ? ', baru diteruskan WhatsApp sekarang' : '') + ')';
+  // Tidak membalas per pesan (hemat kuota Fonnte): semua dirangkum pukul 20.00 oleh ringkasanMalam().
+  const catat = function (o) { catatHari_(no, Object.assign({ j: jam, teks: teks.slice(0, 60) }, o)); };
+  // Pesan sama persis dari nomor yang sama dalam 30 menit = kiriman ulang → satu draf saja (awalan "lagi" = sengaja)
+  const kembar = 'wak_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, no + teks.toLowerCase()));
+  const lalu = Number(c.get(kembar) || 0);
+  if (lalu && Math.abs(tgl.getTime() - lalu) < 30 * 60000 && !/^(lagi|ulang)\b/i.test(teks)) { c.put(kembar, String(tgl.getTime()), 3600); J('dilewati: sama dengan pesan < 30 menit sebelumnya'); catat({ s: 'dobel' }); return ContentService.createTextOutput('ok'); }
+  c.put(kembar, String(tgl.getTime()), 3600);
+  const isi = teks.replace(/^(lagi|ulang)\s+/i, '');
+  if (/^(bantuan|help|\?)$/i.test(teks)) { kirimWA_('Kirim catatan seperti: makan siang 45rb gopay · bensin 50.000 · gaji 7,5 jt bca. Catatan masuk ke aplikasi SatuAtap sebagai draf; ringkasannya dikirim pukul ' + JAM_RINGKAS + '.00.', no); J('bantuan dibalas'); return ContentService.createTextOutput('ok'); }
+  const v = nominalTeks_(isi);
+  if (!v) { J('nominal tidak terbaca'); catat({ s: 'nominal' }); return ContentService.createTextOutput('ok'); }
+  try { relay_('kotak.tambah', { email: email, teks: isi.slice(0, 300), sumber: 'wa', waktu: tgl.toISOString() }); J('OK → draf untuk ' + email); catat({ s: 'ok', v: v, teks: isi.slice(0, 60) }); }
+  catch (x) { J('GAGAL ke relay: ' + x.message); catat({ s: 'gagal' }); }
   return ContentService.createTextOutput('ok');
+}
+/** Simpan catatan WA hari ini per nomor (untuk ringkasan malam). */
+function catatHari_(no, o) {
+  const lock = LockService.getScriptLock(); try { lock.waitLock(5000); } catch (e) {}
+  try { const a = JSON.parse(PROPS.getProperty('WA_HARI') || '{}'); (a[no] = a[no] || []).push(o); if (a[no].length > 60) a[no] = a[no].slice(-60); PROPS.setProperty('WA_HARI', JSON.stringify(a)); }
+  catch (e) {} finally { try { lock.releaseLock(); } catch (e) {} }
+}
+/** Pemicu pukul 20.00: satu pesan ringkasan per anggota yang mencatat lewat WA hari itu. */
+function ringkasanMalam() {
+  if (!waOk_()) return 0;
+  const lock = LockService.getScriptLock(); try { lock.waitLock(5000); } catch (e) {}
+  let a = {}; try { a = JSON.parse(PROPS.getProperty('WA_HARI') || '{}'); PROPS.deleteProperty('WA_HARI'); } catch (e) {} finally { try { lock.releaseLock(); } catch (e) {} }
+  let n = 0;
+  Object.keys(a).forEach(function (no) {
+    const it = a[no] || [], ok = it.filter(function (x) { return x.s === 'ok'; }), lain = it.filter(function (x) { return x.s !== 'ok'; }); if (!it.length) return;
+    const ket = { dobel: 'sama dengan pesan sebelumnya, tidak dicatat dua kali (awali "lagi" bila memang dua transaksi)', nominal: 'nominal tidak terbaca — kirim ulang, mis. "makan siang 45rb gopay"', gagal: 'belum tersimpan — kirim ulang' };
+    let t = '🧾 Catatan WhatsApp hari ini: ' + ok.length + ' masuk sebagai draf' + (ok.length ? ' · total ' + rp_(ok.reduce(function (s, x) { return s + (x.v || 0); }, 0)) : '') + '\n';
+    t += ok.map(function (x) { return '• ' + x.j + '  ' + x.teks + ' — ' + rp_(x.v); }).join('\n');
+    if (lain.length) t += (ok.length ? '\n\n' : '') + '⚠️ Tidak dicatat:\n' + lain.map(function (x) { return '• ' + x.j + '  ' + x.teks + ' — ' + (ket[x.s] || x.s); }).join('\n');
+    if (ok.length) t += '\n\nKonfirmasi di aplikasi SatuAtap › Mutasi › Menunggu konfirmasi (geser kanan ✓).';
+    try { kirimWA_(t, no); n++; } catch (e) {}
+  });
+  return n;
 }
 /** Buka alamat webhook di browser untuk mengecek: kunci benar & skrip versi terbaru sudah diterapkan. */
 function doGet(e) {
@@ -259,22 +297,6 @@ function jadwal_(st, today, hari) {
     if (h >= 0 && h <= hari) out.push({ occ: 'a|' + a.id, nama: a.nama, jumlah: Number(a.estimasi) || 0, h: h, arah: 'keluar', lunas: false, tanggal: a.tanggal, jenis: 'acara' });
   });
   return out;
-}
-
-/** Sinkron satu arah ke kalender "Keuangan <nama>". Acara buatan skrip ditandai [SatuAtap]. */
-function kalender_(st, today) {
-  const nama = 'Keuangan ' + (st.setting.namaKeluarga || 'Keluarga');
-  let cal = null, id = PROPS.getProperty('CALENDAR_ID');
-  if (id) { try { cal = CalendarApp.getCalendarById(id); } catch (e) { cal = null; } }
-  if (!cal) { cal = CalendarApp.createCalendar(nama, { color: CalendarApp.Color.TEAL }); PROPS.setProperty('CALENDAR_ID', cal.getId()); }
-  const end = new Date(today.getTime() + HARI_KALENDER * 864e5);
-  cal.getEvents(today, end).forEach(function (ev) { if (/\[SatuAtap\]/.test(ev.getDescription())) ev.deleteEvent(); });
-  const items = jadwal_(st, today, HARI_KALENDER);
-  items.forEach(function (x) {
-    const ev = cal.createAllDayEvent((x.lunas ? '✓ ' : '') + x.nama + ' · ' + rp_(x.jumlah), new Date(x.tanggal + 'T00:00:00'), { description: '[SatuAtap] ' + x.jenis });
-    if (!x.lunas && x.arah === 'keluar') { try { ev.addPopupReminder(9 * 60); } catch (e) {} }   // pop-up pukul 15.00 sehari sebelumnya
-  });
-  return items.length;
 }
 
 function esc_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }

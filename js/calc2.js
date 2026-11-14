@@ -168,17 +168,22 @@
     let start = mulai; while (U.diffDays(start, U.today()) >= HAUL_HARI) start = U.addDays(start, HAUL_HARI);
     return { start, next: U.addDays(start, HAUL_HARI), sisa: U.diffDays(U.today(), U.addDays(start, HAUL_HARI)) };
   };
+  /** Harta yang dihitung zakat mal. Bawaan: emas saja; kelompok lain dipilih di halaman Zakat (setelan 'zakatAset'). */
+  C.ZAKAT_GRUP = [['emas', 'Emas'], ['kas', 'Kas & tabungan'], ['saham', 'Saham'], ['reksadana', 'Reksa dana'], ['sbn', 'SBN / obligasi'], ['deposito', 'Deposito'], ['kripto', 'Kripto'], ['piutang', 'Piutang lancar']];
+  C.zakatAset = () => { const o = {}; String(Store.setting('zakatAset', 'emas')).split(',').forEach(k => { if (k) o[k.trim()] = true; }); return o; };
   C.zakatMal = () => M('zakatMal', () => {
     const h = C.hargaEmas(), nisabGram = Number(Store.setting('nisabGram', 85)) || 85;
     const hargaNisab = h ? (Store.setting('nisabHarga', 'beli') === 'buyback' ? h.buyback : h.beli) : 0;
     const nisab = Math.round(nisabGram * hargaNisab);
-    const b = C.balances(), items = [];
-    Store.wallets().forEach(w => { const v = Math.max(0, b[w.id] || 0); if (v) items.push({ grup: 'Kas & tabungan', nama: w.nama, v }); });
-    C.goals().filter(g => !g.t.walletId && g.dana > 0).forEach(g => items.push({ grup: 'Kas & tabungan', nama: 'Dana tujuan: ' + g.t.nama, v: g.dana }));
+    const b = C.balances(), items = [], pil = C.zakatAset();
+    if (pil.kas) {
+      Store.wallets().forEach(w => { const v = Math.max(0, b[w.id] || 0); if (v) items.push({ grup: 'Kas & tabungan', nama: w.nama, v }); });
+      C.goals().filter(g => !g.t.walletId && g.dana > 0).forEach(g => items.push({ grup: 'Kas & tabungan', nama: 'Dana tujuan: ' + g.t.nama, v: g.dana }));
+    }
     const hb = h ? h.buyback : 0;
-    C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.gram(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
-    C.investasi().filter(i => i.x.zakat).forEach(i => items.push({ grup: (C.KELAS[i.x.kelas] || C.KELAS.lain).label, nama: i.x.nama, v: i.nilai }));
-    if (Store.setting('zakatPiutang', 'true') !== 'false') C.loans().filter(l => !l.lunas && l.p.arah === 'piutang').forEach(l => items.push({ grup: 'Piutang', nama: l.p.pihak, v: l.sisa }));
+    if (pil.emas) C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.gram(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
+    C.investasi().filter(i => i.x.zakat && pil[i.x.kelas]).forEach(i => items.push({ grup: (C.KELAS[i.x.kelas] || C.KELAS.lain).label, nama: i.x.nama, v: i.nilai }));
+    if (pil.piutang) C.loans().filter(l => !l.lunas && l.p.arah === 'piutang').forEach(l => items.push({ grup: 'Piutang', nama: l.p.pihak, v: l.sisa }));
     const modeUtang = Store.setting('zakatUtang', 'jatuhTempo');
     let utang = 0;
     if (modeUtang === 'semua') utang = U.sum(C.loans().filter(l => !l.lunas && l.p.arah !== 'piutang'), l => l.sisa);
@@ -186,7 +191,7 @@
     const harta = U.sum(items, x => x.v), bersih = Math.max(0, harta - utang);
     const wajib = nisab > 0 && bersih >= nisab, zakat = wajib ? Math.round(bersih * 0.025) : 0;
     const haul = C.haul(), dibayar = tagSum(/^zakat-mal/, haul ? haul.start : U.addDays(U.today(), -HAUL_HARI));
-    return { nisab, nisabGram, hargaNisab, items, harta, utang, modeUtang, bersih, wajib, zakat, haul, dibayar, kurang: Math.max(0, zakat - dibayar) };
+    return { pil, nisab, nisabGram, hargaNisab, items, harta, utang, modeUtang, bersih, wajib, zakat, haul, dibayar, kurang: Math.max(0, zakat - dibayar) };
   });
   C.zakatPenghasilan = (p) => M('zakatPeng:' + (p || C.period()).key, () => {
     p = p || C.period();

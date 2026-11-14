@@ -39,6 +39,7 @@
     if (!location.hash || location.hash === '#') location.replace('#/beranda');
     UI.route();
     App.loop();
+    setTimeout(() => { try { UI.catatNw && UI.catatNw(); } catch (e) {} }, 8000);   // titik harian tren kekayaan bersih
     // Pintasan ikon aplikasi "Catat suara" (manifest) → buka perekam suara
     if (/[?&]aksi=suara\b/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {} setTimeout(() => UI.voiceCatat && UI.voiceCatat(), 600); }
     Priv.decryptAll();

@@ -78,6 +78,38 @@
   ];
   UI.asetTiles = TILES;
 
+  // ---------- Tren kekayaan bersih (dicatat otomatis sekali sehari) ----------
+  let RNG = '6b';
+  /** Simpan nilai hari ini. Harian untuk 90 hari terakhir; lebih lama dari itu cukup satu titik per bulan. */
+  UI.catatNw = () => {
+    try {
+      if (Store.mode !== 'live' || !Store.t.Wallet.length) return;
+      const today = U.today(), a = Calc.nwRiwayat().slice(), nw = Calc.netWorth(), baris = [today, Math.round(nw.bersih), Math.round(nw.aset), Math.round(nw.utang)];
+      const akhir = a[a.length - 1];
+      if (akhir && akhir[0] === today) { if (Math.abs(akhir[1] - baris[1]) < Math.max(1000, Math.abs(akhir[1]) * 0.002)) return; a[a.length - 1] = baris; } else a.push(baris);
+      const batas = U.addDays(today, -90), bln = {};
+      const rapi = a.filter(x => { if (x[0] >= batas) return true; const k = x[0].slice(0, 7); return true && (bln[k] = x) && false; });
+      const lama = Object.keys(bln).sort().map(k => bln[k]);
+      Store.setSetting('nwRiwayat', JSON.stringify(lama.concat(rapi).slice(-400)));
+    } catch (e) {}
+  };
+  const contoh = nw => { const out = [], n = 13; for (let i = n - 1; i >= 0; i--) { const f = 1 - i * 0.028 + Math.sin(i * 1.7) * 0.012; out.push([U.addMonths(U.today(), -i), Math.round(nw.bersih * f), Math.round(nw.aset * f), nw.utang]); } return out; };
+  const nwTren = nw => {
+    let a = Calc.nwRiwayat(); if (Store.mode === 'demo' && a.length < 2) a = contoh(nw);
+    if (a.length && a[a.length - 1][0] !== U.today()) a = a.concat([[U.today(), nw.bersih, nw.aset, nw.utang]]);
+    const dari = { '1b': U.addMonths(U.today(), -1), '6b': U.addMonths(U.today(), -6), '1t': U.addMonths(U.today(), -12), semua: '' }[RNG] || '';
+    const pts = a.filter(x => x[0] >= dari);
+    const chips = `<div class="chips">${[['1b', '1 bln'], ['6b', '6 bln'], ['1t', '1 thn'], ['semua', 'Semua']].map(r => `<button class="chip sm ${RNG === r[0] ? 'on' : ''}" data-act="nw-rng" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>`;
+    if (pts.length < 2) return `<div class="card nw-tren"><h4 class="mini-h">${I('trending-up')} Tren kekayaan bersih</h4>
+      <p class="muted small">${a.length < 2 ? 'Grafik mulai terbentuk besok. Nilai kekayaan bersih dicatat otomatis setiap hari aplikasi dibuka — tidak perlu melakukan apa pun.' : 'Belum ada cukup titik pada rentang ini.'}</p>${a.length >= 2 ? chips : ''}</div>`;
+    const awal = pts[0], naik = nw.bersih - awal[1], pct = awal[1] ? naik / Math.abs(awal[1]) : 0;
+    return `<div class="card nw-tren"><div class="nw-head"><div><h4 class="mini-h">${I('trending-up')} Tren kekayaan bersih</h4>
+        <b class="${naik >= 0 ? 'ok' : 'bad'}">${naik >= 0 ? '+' : '−'}${UI.ms(Math.abs(naik))}${awal[1] ? ' (' + (naik >= 0 ? '+' : '−') + U.pct(Math.abs(pct), 1) + ')' : ''}</b><small class="muted"> sejak ${U.tgl(awal[0])}</small></div></div>
+      ${UI.hide() ? '<p class="muted small">Nominal disembunyikan.</p>' : Charts.line(pts.map(x => ({ d: x[0], bal: x[1] })), { fit: true, h: 150, fmt: RNG === '1b' ? 'dm' : 'mys', aria: 'Tren kekayaan bersih' })}
+      ${chips}</div>`;
+  };
+  UI.act('nw-rng', el => { RNG = el.dataset.r; UI.render(); });
+
   UI.page('aset', {
     head: p => p === 'kas' ? { title: 'Kas & Bank', crumb: 'Aset', back: 'aset', right: `<button class="icon-btn" data-act="wallet-add" aria-label="Tambah">${I('plus')}</button>` } : null,
     nav: () => 'aset',
@@ -99,6 +131,7 @@
         ${UI.tiles(TILES())}
         <div class="card donut-card">${Charts.donut(parts.length ? parts : [{ v: 1, color: 'var(--outline-variant)' }], ['Aset', UI.ms(nw.aset)])}
           <ul class="legend">${parts.map(x => `<li data-act="go" data-to="${x.to}"><i style="background:${x.color}"></i>${U.esc(x.label)}<b>${UI.ms(x.v)}</b></li>`).join('')}${nw.investasi ? '' : '<li class="muted small">Tambahkan emas, saham, reksa dana atau properti lewat ubin di atas.</li>'}</ul></div>
+        ${nwTren(nw)}
         ${UI.sec('Dompet & rekening', '<a class="link" href="#/aset/kas">Kelola</a>')}
         <div class="card list">${ws.map(w => `<div class="row" data-act="wallet-open" data-id="${w.id}"><span class="cat-ic">${I(wIcon(w))}</span><div class="tx-txt"><b>${U.esc(w.nama)}</b><small>${U.esc(ownerLabel(w))}${w.likuid === false ? ' · tidak likuid' : ''}</small></div><b class="${(b[w.id] || 0) < 0 ? 'bad' : ''}">${UI.m(b[w.id] || 0)}</b></div>`).join('') || `<div class="row muted">Belum ada dompet. <button class="link" data-act="wallet-add">Tambah</button></div>`}</div>
         <div class="spacer"></div>`;

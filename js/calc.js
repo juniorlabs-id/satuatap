@@ -163,9 +163,16 @@
     return m;
   });
   C.loanCicilan = p => p.cicilan || C.loanCalc(p).cicilan;
+  /** Tanggal mulai menagih: tagihan/cicilan yang jatuh tempo SEBELUM keluarga mulai memakai aplikasi tidak dianggap
+   *  terlambat/draf (saldo awal sudah mencerminkannya). Bisa diatur (setelan 'mulaiTagih'); bawaan = hari catatan pertama dibuat. */
+  C.mulaiTagih = () => M('mulaiTagih', () => {
+    const v = Store.setting('mulaiTagih', ''); if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    let min = ''; Store.t.Transaksi.forEach(t => { const d = String(t.dibuat || '').slice(0, 10); if (d && (!min || d < min)) min = d; });
+    return min || U.today();
+  });
   /** Semua kejadian jatuh tempo pada rentang [from, to]. */
   C.occurrences = (from, to) => M('occ:' + from + ':' + to, () => {
-    const out = [], paid = C.paidIndex();
+    const out = [], paid = C.paidIndex(), awal = C.mulaiTagih();
     const rutin = Store.t.Rutin.filter(r => r.aktif !== false);
     const loans = Store.t.Pinjaman.filter(p => !p.lunas && p.tanggalBayar && C.loanCicilan(p) > 0);
     let d = from;
@@ -177,6 +184,7 @@
         if (r.mulai && d < r.mulai) return; if (r.selesai && d > r.selesai) return;
         const key = r.frekuensi === 'tahunan' ? d.slice(0, 4) : d.slice(0, 7);
         const pd = paid[r.id + '|' + key] || { total: 0 };
+        if (d < awal && !pd.total) return;       // sebelum mulai memakai aplikasi
         out.push({ id: r.id + '|' + key, ref: r, refId: r.id, periodeRef: key, kind: 'rutin', nama: r.nama, tanggal: d, jumlah: r.jumlah,
           arah: r.jenis === 'masuk' ? 'masuk' : 'keluar', dibayar: pd.total, sisa: Math.max(0, r.jumlah - pd.total), lunas: pd.total >= r.jumlah * 0.999 && pd.total > 0, tglBayar: pd.last,
           kategoriId: r.kategoriId, walletId: r.walletId, langganan: r.langganan, frekuensi: r.frekuensi });
@@ -186,6 +194,7 @@
         if (p.mulai && d < p.mulai) return;
         if (p.tenor && p.mulai) { const n = monthsBetween(p.mulai, d); if (n >= p.tenor + 1) return; }
         const key = d.slice(0, 7), c = C.loanCicilan(p), pd = paid[p.id + '|' + key] || { total: 0 };
+        if (d < awal && !pd.total) return;
         out.push({ id: p.id + '|' + key, ref: p, refId: p.id, periodeRef: key, kind: 'pinjaman', nama: p.arah === 'piutang' ? 'Piutang: ' + p.pihak : (/^cicilan/i.test(p.pihak) ? p.pihak : 'Cicilan ' + p.pihak), tanggal: d, jumlah: c,
           arah: p.arah === 'piutang' ? 'masuk' : 'keluar', dibayar: pd.total, sisa: Math.max(0, c - pd.total), lunas: pd.total >= c * 0.999 && pd.total > 0, tglBayar: pd.last, walletId: p.walletId });
       });
@@ -483,6 +492,9 @@
     const lain = U.sum(Object.keys(inv), k => inv[k]);
     return { kas, danaTujuan, utang, piutang, kelas: inv, investasi: lain, aset: kas + danaTujuan + piutang + lain, bersih: kas + danaTujuan + piutang + lain - utang };
   });
+
+  /** Riwayat kekayaan bersih: [[tgl, bersih, aset, utang], …] — dicatat otomatis sekali sehari (App.catatNw). */
+  C.nwRiwayat = () => M('nwRiw', () => { try { const a = JSON.parse(Store.setting('nwRiwayat', '[]')); return Array.isArray(a) ? a.filter(x => x && x[0]).sort((x, y) => x[0] < y[0] ? -1 : 1) : []; } catch (e) { return []; } });
 
   // ---------- Kategori pintar ----------
   C.smartCategories = (jenis) => M('smart:' + jenis + ':' + new Date().getHours(), () => {

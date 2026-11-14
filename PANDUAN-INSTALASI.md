@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.6.8 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.7.0 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -11,7 +11,7 @@
 | **Data keluarga** | 1 file Google Sheets "SatuAtap – Data …" | Dibuat otomatis oleh aplikasi | Per keluarga, di Drive Admin keluarga |
 | **Fungsi Vercel** | `api/emas.js` (harga emas), `api/saham.js` (harga saham IDX), `api/tg.js` (jembatan Telegram), `vercel.json` | JuniorLabs | Sekali (ikut repo) |
 | **Bot Telegram** @SatuAtapBot | Dibuat lewat @BotFather, token di Script Properties relay | JuniorLabs | Sekali (Bagian G) |
-| **Skrip Pendamping** (opsional) | `Pendamping.gs` — Google Calendar, pengingat Telegram/WA pukul 08.00, catat lewat WA | Admin keluarga yang menginginkannya | Opsional (Bagian C) |
+| **Skrip Pendamping** (opsional) | `Pendamping.gs` — pengingat Telegram/WA pukul 08.00, catat lewat WA, ringkasan WA pukul 20.00 | Admin keluarga yang menginginkannya | Opsional (Bagian C) |
 | **Kunci Gemini** (opsional) | Untuk Tanya AI, foto struk, insight mingguan | Tiap keluarga, disimpan hanya di HP | Opsional (Bagian H) |
 
 Pembeli **tidak perlu** membuka Apps Script, men-deploy, atau menyalin URL. Mereka cukup membuka aplikasi, menekan **Masuk dengan Google**, lalu memasukkan kode lisensi.
@@ -171,11 +171,10 @@ Catatan dan tag dienkripsi di HP Anda, sehingga anggota lain hanya melihat nomin
 
 ---
 
-## Bagian C — Skrip Pendamping (opsional): kalender, pengingat Telegram & WhatsApp
+## Bagian C — Script pendamping (opsional): pengingat Telegram & WhatsApp
 
 Skrip ini dipasang **Admin keluarga** di akun Google-nya sendiri, untuk hal yang harus berjalan walau aplikasi tidak dibuka. Setiap pagi sekitar pukul **08.00** skrip ini:
 
-- mengisi kalender **"Keuangan …"** di Google Calendar untuk 60 hari ke depan;
 - mengirim pengingat tagihan & cicilan **H-7, H-3, H-1, dan hari H** ke Telegram setiap anggota yang sudah menghubungkan @SatuAtapBot, plus pengingat Rapat Keuangan;
 - (opsional) mengirim pengingat yang sama ke **WhatsApp** lewat akun Fonnte milik keluarga.
 
@@ -188,14 +187,20 @@ Buka **Lainnya › Pengaturan › Notifikasi › Skrip Pendamping › Panduan pa
 
 Ringkasnya: buat proyek `SatuAtap Pendamping` → tampilkan & isi `appsscript.json` → tempel kode ke `Kode.gs` → jalankan `setupPendamping` → izinkan (layar "Google belum memverifikasi" itu normal untuk skrip milik sendiri: **Lanjutan › Buka … (tidak aman) › Izinkan**) → log menampilkan "✅ Pendamping aktif".
 
-Untuk berhenti, jalankan `hentikanPendamping`. Kalender bisa dimatikan dengan `const KALENDER = false`.
+Untuk berhenti, jalankan `hentikanPendamping`.
 
 > **Memperbarui Pendamping:** buka panduan yang sama, salin kode baru (langkah 4–5), tempel menimpa yang lama, lalu jalankan `setupPendamping` sekali lagi. Properti skrip (token Fonnte, nomor WA) tidak hilang.
 
 ### C2. WhatsApp lewat Fonnte (opsional)
-Buka **Notifikasi › WhatsApp › Pasang WhatsApp**. Panduan 9 langkah: daftar & sambungkan Fonnte → salin token → isi nomor WA anggota (aplikasi menyusun nilai `WA_ANGGOTA` untuk disalin) → isi **Properti skrip** `FONNTE_TOKEN` & `WA_ANGGOTA` → jalankan `setupWA` (pesan uji masuk) → **Terapkan › Deployment baru › Aplikasi web** → jalankan **`cekWA`** (memeriksa token, status perangkat Fonnte, dan menampilkan **alamat webhook** siap tempel) → tempel di fonnte.com › Device › Edit › Webhook → uji kirim "makan siang 45rb gopay".
+Buka **Notifikasi › WhatsApp › Pasang WhatsApp** dan ikuti 9 langkahnya (ada ilustrasi letak tombol, semua nilai tinggal salin–tempel):
+1. daftar Fonnte, sambungkan nomor pengirim, salin token;
+2. isi nomor WA anggota di aplikasi;
+3. buat 3 **Properti skrip** — `FONNTE_TOKEN`, `WA_ANGGOTA`, `WA_KUNCI` (dua terakhir disalin dari aplikasi);
+4. jalankan `setupWA` (pesan uji masuk; pengingat pagi aktif);
+5. **Terapkan › Deployment baru › Aplikasi web** (akses: Siapa saja) dan salin URL-nya;
+6. tempel URL itu di aplikasi → aplikasi memberi **alamat webhook** (lewat jembatan `/api/wa` di Vercel) → tempel di fonnte.com › Device › Edit › **Webhook**, nyalakan **autoread**, **Update**.
 
-Token Fonnte **hanya** disimpan di Properti skrip Pendamping keluarga — tidak di aplikasi, tidak di JuniorLabs.
+WhatsApp hanya mengirim **2 pesan sehari**: pengingat pagi dan ringkasan catatan pukul 20.00. Catatan lewat chat tidak dibalas satu per satu; langsung muncul sebagai draf di aplikasi. Bila bermasalah, jalankan `cekWA` di editor. Token Fonnte **hanya** disimpan di Properti skrip keluarga.
 
 ### C3. Agar Telegram tidak putus saat update
 - Sambungan Telegram setiap anggota tersimpan di relay; update aplikasi/relay **tidak** menghapusnya.
