@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.7.1 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.7.3 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -307,3 +307,26 @@ Yang dikirim ke Gemini hanya **ringkasan angka** (total per kategori, saldo, tag
 
 
 Butuh bantuan? WhatsApp dukungan JuniorLabs **0856-1254-689**, atau gunakan menu **Lainnya › Laporkan Masalah** di aplikasi.
+
+## Bagian I — Penjualan, langganan & masa berlaku (JuniorLabs)
+
+Sejak 1.7.3 lisensi punya **paket** dan **masa berlaku**. Lisensi lama (sebelum 1.7.3) otomatis dianggap **Lifetime**.
+
+**Sekali saja setelah memperbarui relay:**
+1. Tempel `Relay.gs` baru → **Deploy › Manage deployments › Edit › Version: New version › Deploy** (URL /exec tetap).
+2. Opsional: jalankan `setupRelay()` sekali agar sheet **Pesanan** dan kolom baru Lisensi (`paket, masa, berlakuSampai, nama, wa, maksAkun`) langsung muncul. Tanpa langkah ini pun kolom dibuat otomatis saat pertama dipakai.
+3. Buka aplikasi dengan akun superadmin › **Lainnya › Toko & Harga**: isi rekening/e-wallet tujuan transfer, nomor WhatsApp verifikasi, cek harga paket, lalu **Simpan**.
+
+**Alur penjualan:**
+1. Pembeli membuka `satuatap.vercel.app/beli/`, memilih paket, mengisi nama, email Google, dan nomor WhatsApp.
+2. Halaman menampilkan nomor pesanan, total, dan rekening tujuan. Pembeli transfer, lalu menekan **Verifikasi pembayaran via WhatsApp** dan melampirkan bukti.
+3. Di aplikasi: **Lainnya › Pesanan** › buka pesanan › cocokkan nominal › **Lunas & buat kode** (atau **Lunas & perpanjang** untuk pesanan perpanjangan).
+4. Tekan **Kirim ke WA pembeli** — pesan berisi kode & langkah aktivasi sudah disiapkan.
+
+**Masa berlaku:**
+- Paket 6 bulan / 1 tahun dihitung sejak kode **diaktifkan** (bukan sejak dibeli).
+- 14 hari sebelum berakhir, pengingat muncul di Beranda dan menu **Lainnya › Langganan**.
+- Setelah berakhir, aplikasi menjadi **baca-saja**: data tetap bisa dilihat dan diunduh, catatan baru tidak bisa ditambah, dan fitur relay (Telegram, ringkasan) berhenti.
+- Perpanjangan menambah masa dari tanggal berakhir (atau dari hari ini bila sudah lewat). Bisa lewat halaman beli (`/beli/?perpanjang=KODE`), kode perpanjangan yang dimasukkan di **Langganan**, atau langsung oleh superadmin (**Konsol › Lisensi › buka › +6 bln / +12 bln / Jadikan Lifetime**).
+
+**Semua pengaturan pelanggan di Konsol:** nama & WhatsApp pelanggan, paket, tanggal berlaku (kosong = selamanya), batas akun keluarga (1–20), nama keluarga, catatan, cabut/pulihkan, lepas ikatan, serta tombol **Ingatkan perpanjang** via WhatsApp.

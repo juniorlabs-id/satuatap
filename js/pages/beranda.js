@@ -39,6 +39,7 @@
         { id: 'k', icon: 'calendar-days', label: 'Tagihan', to: 'kalender/tagihan' }
       ], '', 'compact')}
 
+      ${UI.langgananAlert ? UI.langgananAlert() : ''}
       ${(() => { const due = Calc.occurrences(U.today(), U.addDays(U.today(), 3)).filter(o => !o.lunas && o.arah === 'keluar' && (o.kind === 'rutin' || o.kind === 'pinjaman' || o.kind === 'acara') && !UI.isTunda(o)); return due.length ? `<div class="alert warn" data-act="go" data-to="kalender">${I('bell-ring')}<div><b>${due.length} jadwal bayar ≤ 3 hari lagi</b><small>${due.slice(0, 3).map(o => U.esc(o.nama) + ' (' + U.relDay(o.tanggal).toLowerCase() + ')').join(' · ')}</small></div>${I('chevron-right')}</div>` : ''; })()}
       ${UI.emasAlert ? UI.emasAlert() : ''}
       ${UI.pasangKartu ? UI.pasangKartu('beranda') : ''}

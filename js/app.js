@@ -106,15 +106,28 @@
   };
 
   // ---------- Lisensi (relay) ----------
-  App.license = async () => {
+  App.lic = null;   // info langganan dari relay: { kode, paketNama, berlakuSampai, sisaHari, selamanya, kedaluwarsa }
+  App.licTerapkan = info => {
+    if (info) App.lic = info;
+    const L = App.lic, habis = !!(L && (L.kedaluwarsa || (!L.selamanya && L.berlakuSampai && U.today() > L.berlakuSampai)));
+    if (L && L.berlakuSampai) L.sisaHari = Math.round((new Date(L.berlakuSampai) - new Date(U.today())) / 864e5);
+    const ubah = Store.readOnly !== habis; Store.readOnly = habis;
+    if (ubah && UI.cur) UI.render();
+  };
+  App.license = async force => {
     if (!Relay.enabled() || Store.mode !== 'live' || !Auth.valid()) return;
     const k = 'sa:lic:' + Store.fileId, c = JSON.parse(localStorage.getItem(k) || 'null');
-    if (c && c.ok && Date.now() - c.at < 3 * 864e5) return;
+    if (c && c.info) App.licTerapkan(c.info);
+    const lewat = !!(c && c.info && c.info.berlakuSampai && !c.info.selamanya && U.today() > c.info.berlakuSampai);
+    if (!force && c && c.ok && !lewat && Date.now() - c.at < 864e5) return;
+    if (!force && c && c.exp && Date.now() - c.at < 6e5) return;
     const r = await Relay.call('lisensi.cek', { fileId: Store.fileId });
-    if (!r.success && (r.network || (r.data && r.data.code === 'AUTH'))) return;   // relay/sesi bermasalah sementara → tetap jalan
-    if (r.success && r.data.aktif) { localStorage.setItem(k, JSON.stringify({ ok: true, at: Date.now() })); return; }
+    if (!r.success && (r.network || (r.data && r.data.code === 'AUTH'))) return r;   // relay/sesi bermasalah sementara → tetap jalan
+    if (r.success && r.data.aktif) { localStorage.setItem(k, JSON.stringify({ ok: true, at: Date.now(), info: r.data })); App.licTerapkan(r.data); return r; }
+    if (r.success && r.data.kedaluwarsa) { localStorage.setItem(k, JSON.stringify({ exp: true, at: Date.now(), info: r.data })); App.licTerapkan(r.data); return r; }
     localStorage.setItem(k, JSON.stringify({ ok: false, at: Date.now() }));
     App.blocked((r.data && r.data.alasan) || r.message || 'Lisensi keluarga ini tidak aktif.', { backup: true });
+    return r;
   };
   App.syncMembers = async () => {
     if (!Relay.enabled() || !Auth.valid() || Store.setting('lisensiAdmin', '') !== Auth.email) return;
@@ -345,5 +358,7 @@
     App.login();
   };
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.init); else App.init();
+  // Splash (logo, nama, slogan) tampil minimal ± 1 detik agar tidak sekadar berkedip, lalu aplikasi dimulai.
+  const mulai = () => { const sisa = 1100 - (performance.now ? performance.now() : 0); if (sisa > 0 && document.querySelector('.splash')) setTimeout(App.init, sisa); else App.init(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai); else mulai();
 })();

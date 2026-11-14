@@ -15,6 +15,8 @@
           { id: 'konsol', icon: 'shield-check', label: 'Konsol Lisensi', to: 'konsol', gold: true },
           { id: 'kbuat', icon: 'key-round', label: 'Buat Kode', to: 'konsol/buat', gold: true },
           { id: 'klap', icon: 'inbox', label: 'Laporan Masuk', to: 'konsol/laporan', gold: true },
+          { id: 'kpes', icon: 'receipt', label: 'Pesanan', to: 'konsol/pesanan', gold: true },
+          { id: 'ktoko', icon: 'shopping-bag', label: 'Toko & Harga', to: 'konsol/toko', gold: true },
           { id: 'kstat', icon: 'chart-column', label: 'Statistik', to: 'konsol/statistik', gold: true }
         ])}` : ''}
         ${UI.sec('Keuangan')}${UI.tiles([
@@ -43,6 +45,7 @@
           { id: 'lap', icon: 'message-square-warning', label: 'Laporkan Masalah', to: 'laporan' },
           { id: 'ide', icon: 'lightbulb', label: 'Usul Fitur', to: 'laporan/ide' },
           { id: 'wa', icon: 'message-circle', label: 'Chat Dukungan', act: 'wa-support' },
+          { id: 'lgn', icon: 'badge-check', label: 'Langganan', to: 'langganan', badge: Store.readOnly ? '!' : (App.lic && !App.lic.selamanya && App.lic.sisaHari != null && App.lic.sisaHari <= 14 ? String(Math.max(0, App.lic.sisaHari)) : '') },
           { id: 'ttg', icon: 'info', label: 'Tentang', to: 'pengaturan/tentang' }
         ])}
         <button class="btn block ghost danger" data-act="logout">${I('log-out')} Keluar dari perangkat ini</button>

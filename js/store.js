@@ -175,8 +175,14 @@
 
   // ---- Mutasi lokal → antrean ----
   /** ops: [{op:'upsert', t, row:{id,...}} | {op:'delete', t, id}] */
+  S.readOnly = false;   // true saat masa langganan habis: data tetap bisa dilihat & diekspor
+  let _sentuh = 0; ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, () => { _sentuh = Date.now(); }, true));
   S.commit = (ops, opt) => {
     if (!ops || !ops.length) return;
+    if (S.readOnly && S.mode === 'live') {
+      if (Date.now() - _sentuh < 3000 && window.UI && UI.toast) UI.toast('Masa langganan berakhir — aplikasi sedang baca-saja. Perpanjang di Lainnya › Langganan.', 'warn');
+      return false;
+    }
     const wire = ops.map(o => o.op === 'delete' ? { op: 'delete', t: o.t, id: o.id }
       : { op: 'upsert', t: o.t, row: Object.fromEntries(Object.entries(o.row).map(([k, v]) => [k, toWire(v)])) });
     wire.forEach(applyOpLocal);
