@@ -210,11 +210,13 @@
   const txId = x => 't_k' + String(x.id).replace(/[^A-Za-z0-9]/g, '');
   const lengkap = r => !!(r.jumlah && r.kategoriId && r.walletId);
   const rowOf = (x, r) => ({ op: 'upsert', t: 'Transaksi', row: { id: txId(x), tanggal: String(x.waktu || '').slice(0, 10) || U.today(), jenis: r.jenis, jumlah: r.jumlah, kategoriId: r.kategoriId, walletId: r.walletId, walletTujuan: '', biaya: 0,
-    catatan: r.catatan || x.teks, dibayarOleh: Store.me.email, tag: '', sumber: x.sumber || 'telegram', refId: '', periodeRef: '', dicatatOleh: Store.me.email, dibuat: new Date().toISOString(), riwayat: [] } });
+    catatan: r.catatan || x.teks, dibayarOleh: x.email || Store.me.email, tag: '', sumber: x.sumber || 'telegram', refId: '', periodeRef: '', dicatatOleh: x.email || Store.me.email, dibuat: new Date().toISOString(), riwayat: [] } });
   const ringkas = r => [r.catatan, U.rp(r.jumlah), K(r.kategoriId), W(r.walletId)].filter(Boolean).join(' · ');
   const selesai = (ids, info) => { if (ids.length && relayOk()) Relay.call('tg.selesai', { fileId: Store.fileId, ids, info: info || {} }).catch(() => {}); };
   const hapus = ids => tulisKotak(bacaKotak().filter(x => ids.indexOf(x.id) < 0));
-  UI.kotakList = () => bacaKotak().filter(x => !Store.byId.Transaksi[txId(x)]);
+  /** Draf yang tampil: milik sendiri; Admin & Pasangan juga melihat draf satu sama lain (anak hanya miliknya). */
+  const terlihat = x => { if (!x.email || x.email === Store.me.email) return true; if (!Store.isAdminLike()) return false; const m = Store.members().find(z => z.email === x.email); return !!m && (m.peran === 'admin' || m.peran === 'pasangan'); };
+  UI.kotakList = () => bacaKotak().filter(x => terlihat(x) && !Store.byId.Transaksi[txId(x)]);
   App.ambilKotak = async (force) => {
     if (!relayOk() || N.kotakJalan || (!force && Date.now() - N.kotakAt < 60e3)) return;
     N.kotakAt = Date.now(); N.kotakJalan = true;
@@ -226,8 +228,9 @@
       const sudah = a.filter(x => Store.byId.Transaksi[txId(x)]).map(x => x.id);     // sudah dikonfirmasi di perangkat lain
       a = a.filter(x => sudah.indexOf(x.id) < 0);
       if (sudah.length) selesai(sudah);
-      const baru = a.filter(x => !lama.some(y => y.id === x.id));
+      let baru = a.filter(x => !lama.some(y => y.id === x.id));
       tulisKotak(a);
+      baru = baru.filter(terlihat);
       if (baru.length) UI.toast(baru.length === 1 ? 'Draf dari chat: ' + baru[0].teks.slice(0, 40) + ' — konfirmasi di Mutasi.' : baru.length + ' draf dari chat menunggu konfirmasi.', 'ok', { ms: 4500 });
       if (JSON.stringify(a.map(x => x.id)) !== JSON.stringify(lama.map(x => x.id)) && (UI.cur === 'beranda' || UI.cur === 'mutasi')) UI.render();
     } catch (e) {} finally { N.kotakJalan = false; }
@@ -241,7 +244,7 @@
       <div class="sw-l">${I('check')} Simpan</div><div class="sw-r"><button class="danger" data-act="kotak-buang" data-id="${U.esc(x.id)}">${I('trash-2')}<span>Buang</span></button></div>
       <div class="sw-main tx draft" data-act="kotak-ubah" data-id="${U.esc(x.id)}">
         <span class="cat-ic chat">${I(k ? k.ikon || 'tag' : (x.sumber === 'wa' ? 'message-circle' : 'send'))}</span>
-        <div class="tx-txt"><b>${U.esc(r.catatan || x.teks)}</b><small>${x.sumber === 'wa' ? 'WhatsApp' : 'Telegram'} · ${U.timeAgo(x.waktu)} · ${ok ? U.esc(K(r.kategoriId) + ' · ' + W(r.walletId)) : `<span class="vq-need">${!r.jumlah ? 'isi nominal' : !r.kategoriId ? 'pilih kategori' : 'pilih dompet'}</span>`}</small></div>
+        <div class="tx-txt"><b>${U.esc(r.catatan || x.teks)}</b><small>${x.email && x.email !== Store.me.email ? U.esc(Store.memberName(x.email)) + ' · ' : ''}${x.sumber === 'wa' ? 'WhatsApp' : 'Telegram'} · ${U.timeAgo(x.waktu)} · ${ok ? U.esc(K(r.kategoriId) + ' · ' + W(r.walletId)) : `<span class="vq-need">${!r.jumlah ? 'isi nominal' : !r.kategoriId ? 'pilih kategori' : 'pilih dompet'}</span>`}</small></div>
         <div class="tx-amt">${r.jumlah ? UI.amount(r.jumlah, r.jenis) : '<b class="muted">Rp ?</b>'}<small>draf</small></div>
         <button class="kebab" data-act="kotak-ubah" data-id="${U.esc(x.id)}" aria-label="Periksa">${I('ellipsis-vertical')}</button>
       </div></div>`; };

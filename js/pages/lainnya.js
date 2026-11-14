@@ -310,14 +310,14 @@
   UI.act('sync-full', async () => { await Store.flush(); const r = await Store.sync(true); UI.toast(r && r.ok ? 'Data dimuat ulang dari Google Drive.' : (r && r.message) || 'Gagal.', r && r.ok ? 'ok' : 'warn'); UI.render(); });
   UI.act('mirror-now', async el => { el.disabled = true; const r = await Cloud.mirror(Store.tablesWire()); el.disabled = false; UI.toast(r.ok ? 'Tab tabel di spreadsheet diperbarui.' : 'Gagal: ' + r.message, r.ok ? 'ok' : 'error'); if (r.ok) localStorage.setItem('sa:mir:' + Store.fileId, String(Date.now())); });
   UI.act('backup', () => {
-    const out = { app: 'SatuAtap', versi: APP_CONFIG.VERSION, dibuat: new Date().toISOString(), keluarga: Store.setting('namaKeluarga', ''), tables: {} };
+    const out = { app: 'SatuAtap', versi: (window.SA_VERSI || APP_CONFIG.VERSION), dibuat: new Date().toISOString(), keluarga: Store.setting('namaKeluarga', ''), tables: {} };
     Object.keys(Store.SCHEMA).forEach(t => out.tables[t] = Store.t[t]);
     U.download('cadangan-satuatap-' + U.today() + '.json', JSON.stringify(out), 'application/json');
   });
 
   function tentang() {
     return `<div class="about"><img src="img/logo-wide.png" alt="SatuAtap" width="220"><p><b>SatuAtap — Keuangan Keluarga</b><br><i>Keuangan keluarga, di bawah satu atap.</i></p>
-      <div class="card kv-list"><div class="kv"><span>Versi aplikasi</span><b>${APP_CONFIG.VERSION}</b></div><div class="kv"><span>Dibuat oleh</span><b>JuniorLabs</b></div><div class="kv"><span>Data</span><b>Google Drive keluarga Anda</b></div>${Store.setting('lisensiKode', '') ? `<div class="kv"><span>Lisensi</span><b>${U.esc(Store.setting('lisensiKode', ''))}</b></div>` : ''}</div>
+      <div class="card kv-list"><div class="kv"><span>Versi aplikasi</span><b>${(window.SA_VERSI || APP_CONFIG.VERSION)}</b></div><div class="kv"><span>Dibuat oleh</span><b>JuniorLabs</b></div><div class="kv"><span>Data</span><b>Google Drive keluarga Anda</b></div>${Store.setting('lisensiKode', '') ? `<div class="kv"><span>Lisensi</span><b>${U.esc(Store.setting('lisensiKode', ''))}</b></div>` : ''}</div>
       <p class="muted small">SatuAtap membantu mencatat & merencanakan keuangan. Angka simulasi bersifat perkiraan dan bukan nasihat keuangan, pajak, atau hukum.</p></div>`;
   }
 
@@ -340,7 +340,7 @@
   UI.act('lap-send', async el => {
     const f = UI.formData(document.getElementById('f-lap'));
     if (!f.judul || f.deskripsi.length < 10) return UI.toast('Isi judul & deskripsi (min. 10 karakter).', 'warn');
-    f.diagnostik = 'v' + APP_CONFIG.VERSION + ' · ' + navigator.userAgent + ' · ' + innerWidth + 'x' + innerHeight + ' · mode ' + Store.mode + ' · rev ' + Store.rev + ' · antrean ' + Store.outbox.length;
+    f.diagnostik = 'v' + (window.SA_VERSI || APP_CONFIG.VERSION) + ' · ' + navigator.userAgent + ' · ' + innerWidth + 'x' + innerHeight + ' · mode ' + Store.mode + ' · rev ' + Store.rev + ' · antrean ' + Store.outbox.length;
     el.disabled = true; const r = await API.call('laporan.kirim', f); el.disabled = false;
     if (r.success) { UI.toast(r.message || 'Terkirim. Terima kasih!'); UI.go('lainnya'); } else UI.toast(r.message || 'Gagal mengirim — coba lagi.', 'error');
   });

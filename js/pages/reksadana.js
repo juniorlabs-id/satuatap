@@ -121,11 +121,6 @@
         ${barHasil(bul)}
         <small class="muted">${adaBln ? `${naikBln} dari ${adaBln} bulan untung. ` : ''}Setoran tidak dihitung sebagai hasil.</small>
       </div>
-      ${(() => { const tj = {}; list.forEach(i => { const t = tujuan(i.x); if (t) (tj[t.id] = tj[t.id] || { t, v: 0 }).v += i.nilai; });
-        const rows = Object.values(tj).sort((a, b) => b.v - a.v); if (!rows.length) return '';
-        const gs = Calc.goals();
-        return UI.sec('Per tujuan') + `<div class="rd-goals">${rows.map(r => { const g = gs.find(z => z.t.id === r.t.id), pc = g && g.target ? Math.min(1, g.pct) : 0;
-          return `<div class="rd-goal" data-act="go" data-to="tujuan/${r.t.id}"><div class="rd-goal-ic">${I(r.t.ikon || 'target')}</div><div class="grow"><b>${U.esc(r.t.nama)}</b><small>${UI.ms(r.v)} di reksa dana${g && g.target ? ' · tujuan ' + U.pct(pc) + ' tercapai' : ''}</small>${g && g.target ? `<div class="bar"><i style="width:${(pc * 100).toFixed(1)}%"></i></div>` : ''}</div></div>`; }).join('')}</div>`; })()}
       ${UI.sec('Per aplikasi')}
       <div class="rd-apps">${grupApp(list).map(g => {
         const col = warna(g.nama), u = g.nilai - g.modal, pc = g.modal ? u / g.modal : 0;

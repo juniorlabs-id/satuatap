@@ -33,8 +33,8 @@
       </section>
 
       ${UI.tiles([
-        { id: 'a', icon: 'clipboard-list', label: 'Anggaran', to: 'anggaran' },
         { id: 't', icon: 'target', label: 'Tujuan', to: 'tujuan' },
+        { id: 'a', icon: 'clipboard-list', label: 'Anggaran', to: 'anggaran' },
         { id: 'u', icon: 'scale', label: 'Utang', to: 'utang' },
         { id: 'k', icon: 'calendar-days', label: 'Tagihan', to: 'kalender/tagihan' }
       ], '', 'compact')}

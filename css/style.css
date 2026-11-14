@@ -814,3 +814,11 @@ button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opac
 .pv-row code { display: inline-block; font-weight: 700; font-size: 13.5px; } .pv-row small { display: block; font-size: 11.5px; } .pv-row .row-btns { margin: 0; flex-wrap: nowrap; }
 .kode-mini { font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface-2); padding: 8px 10px; border-radius: 10px; margin: 6px 0 10px; }
 .pv-row .row-btns .btn { flex: 1; }
+/* Rapat Keuangan: teks & tombol terbaca di slide gelap (emas/hero) */
+.slide.gold-slide .kicker .ic, .slide.hero-slide .kicker .ic { color: #F3C969; }
+.slide.gold-slide .kv span, .slide.hero-slide .kv span, .slide.gold-slide .kv-list span, .slide.hero-slide .kv-list span { color: rgba(255,255,255,.75); }
+.slide.gold-slide .kv b, .slide.hero-slide .kv b { color: #fff; }
+.slide.gold-slide .kv, .slide.hero-slide .kv { border-color: rgba(255,255,255,.15); }
+.slide.gold-slide .acts .btn.ghost, .slide.hero-slide .acts .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.28); }
+.slide.gold-slide .acts .btn.ghost .ic, .slide.hero-slide .acts .btn.ghost .ic { color: #fff; }
+.slide.gold-slide .ok, .slide.hero-slide .ok { color: #8EE6B4; } .slide.gold-slide .bad, .slide.hero-slide .bad { color: #FFB4A8; }

@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.7.0 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.7.1 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 

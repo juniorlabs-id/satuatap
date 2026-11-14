@@ -119,10 +119,7 @@
           { id: 'arus', icon: 'trending-up', label: 'Arus Kas', to: 'kalender/arus' },
           { id: 'tagihan', icon: 'receipt', label: 'Tagihan & Langganan', to: 'kalender/tagihan' },
           { id: 'musim', icon: 'flame', label: 'Musim Mahal', to: 'kalender/musim' },
-          { id: 'acara', icon: 'party-popper', label: 'Acara & Rencana', to: 'kalender/acara' },
-          { id: 'kk', icon: 'credit-card', label: 'Kartu Kredit', soon: true, act: 'soon' },
-          { id: 'add', icon: 'calendar-plus', label: 'Tambah Rutin', act: 'rutin-add' },
-          { id: 'adda', icon: 'plus', label: 'Tambah Acara', act: 'acara-add' }
+          { id: 'acara', icon: 'party-popper', label: 'Acara & Rencana', to: 'kalender/acara' }
         ])}
         <div class="stat3">
           <div class="stat"><small>${I('banknote')} Gajian</small><b>${gaj ? U.diffDays(U.today(), gaj.tanggal) + ' hari' : '—'}</b><small>${gaj ? U.tgl(gaj.tanggal, 'dm') : 'atur di rutin'}</small></div>
