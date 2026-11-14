@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.7.3 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.7.4 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -330,3 +330,6 @@ Sejak 1.7.3 lisensi punya **paket** dan **masa berlaku**. Lisensi lama (sebelum 
 - Perpanjangan menambah masa dari tanggal berakhir (atau dari hari ini bila sudah lewat). Bisa lewat halaman beli (`/beli/?perpanjang=KODE`), kode perpanjangan yang dimasukkan di **Langganan**, atau langsung oleh superadmin (**Konsol › Lisensi › buka › +6 bln / +12 bln / Jadikan Lifetime**).
 
 **Semua pengaturan pelanggan di Konsol:** nama & WhatsApp pelanggan, paket, tanggal berlaku (kosong = selamanya), batas akun keluarga (1–20), nama keluarga, catatan, cabut/pulihkan, lepas ikatan, serta tombol **Ingatkan perpanjang** via WhatsApp.
+
+## Catatan 1.7.4 — landing page berbasis video demo
+Halaman beli (`/beli/`) sekarang memakai 6 klip rekaman asli aplikasi di folder `beli/vid/` (mp4 + poster jpg, total ±2 MB). Klip dimuat malas dan diputar otomatis saat terlihat. Folder ini ikut ter-upload ke GitHub bersama frontend; tidak perlu perubahan Relay. Jangan menimpa `js/config.js` saat memperbarui.

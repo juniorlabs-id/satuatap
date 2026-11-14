@@ -316,9 +316,16 @@
     Store.persist = () => {};
     DemoServer.init(big || /big/.test(location.search));
     Store.me = DemoServer.me(); Auth.email = Store.me.email;
+    if (/[?&]embed\b/.test(location.search)) document.documentElement.classList.add('embed');   // dipasang di landing page: tanpa banner & tombol keluar
     Store.sync(true).then(() => {
       if (!location.hash || location.hash === '#') location.hash = '#/beranda';
       App.start();
+      // Data contoh: pastikan tidak ada saldo dompet minus supaya demo selalu tampak rapi
+      try {
+        const bal = Calc.balances(), tgt = [4200000, 3600000, 6100000, 1400000, 900000], ops = [];
+        Store.wallets().forEach((w, i) => { const v = bal[w.id] || 0; if (v < 0) ops.push({ op: 'upsert', t: 'Wallet', row: { id: w.id, saldoAwal: (Number(w.saldoAwal) || 0) - v + (tgt[i] || 1500000) } }); });
+        if (ops.length) Store.commit(ops);
+      } catch (e) {}
     });
   };
   UI.act('exit-demo', () => { location.href = location.pathname; });
@@ -326,7 +333,7 @@
   // ---------- Inisialisasi ----------
   App.init = async () => {
     App.applyTheme();
-    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && location.protocol === 'https:' && !/[?&]embed\b/.test(location.search)) navigator.serviceWorker.register('sw.js').catch(() => {});
     const params = new URLSearchParams(location.search);
     if (params.has('demo')) return App.demo(params.get('demo') === 'big');
     if (!APP_CONFIG.GOOGLE_CLIENT_ID) return App.login('Konfigurasi belum lengkap: GOOGLE_CLIENT_ID di js/config.js masih kosong. Mode demo tetap bisa dicoba.');

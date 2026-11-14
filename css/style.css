@@ -843,3 +843,6 @@ button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opac
 .ks-pay { display: grid; gap: 8px; }
 .ks-pay .grid2 { gap: 8px; }
 .ks-paket { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+
+/* Dipasang di landing page (?demo&embed) */
+.embed #demo-banner { display: none !important; }
