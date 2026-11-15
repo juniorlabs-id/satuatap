@@ -212,12 +212,8 @@
       <p class="muted small center">Anda akan diminta mengizinkan SatuAtap menyimpan file di Google Drive. SatuAtap <b>hanya</b> bisa membuka file yang ia buat sendiri.</p>
       <div class="or"><span>atau</span></div>
       <button class="btn ghost block" id="btn-demo">${I('flask-conical')} Coba demo dengan data contoh</button>
-      <details class="darurat"><summary>${I('info')} Info teknis login (untuk Admin JuniorLabs)</summary>
-        <p class="small">Daftarkan nilai berikut di Google Cloud › Google Auth Platform › Clients › (client Web):</p>
-        <div class="kv-list small"><div class="kv"><span>Authorized JavaScript origins</span><b><code class="wrap">${U.esc(location.origin)}</code></b></div>
-        <div class="kv"><span>Authorized redirect URIs</span><b><code class="wrap">${U.esc(Auth.redirect())}</code></b></div>
-        <div class="kv"><span>Client ID terpakai</span><b><code class="wrap">${U.esc(APP_CONFIG.GOOGLE_CLIENT_ID || '(kosong)')}</code></b></div>
-        <div class="kv"><span>Mode</span><b>${Relay.enabled() ? 'Relay (sinkron otomatis)' : 'Tanpa relay — RELAY_URL kosong'}</b></div></div></details>`);
+      <a class="btn gold block" href="beli/" id="btn-beli">${I('shopping-bag')} Belum punya lisensi? Lihat paket & harga</a>
+      <ul class="lg-pts"><li>${I('mic')}<span>Catat lewat suara, Telegram & WhatsApp</span></li><li>${I('users')}<span>Suami & istri dalam satu akun keluarga</span></li><li>${I('gem')}<span>Brankas emas, zakat & harga otomatis</span></li><li>${I('lock')}<span>Data di Google Drive Anda sendiri</span></li></ul>`);
     if (!Relay.enabled()) Auth.loadGIS().catch(e => say(U.esc(e.message), true));
     document.getElementById('btn-demo').onclick = () => App.demo();
     document.getElementById('btn-g').onclick = async () => {
@@ -279,13 +275,14 @@
     shell(`<h2>Buat data keluarga</h2><p class="muted small">File "SatuAtap – Data …" akan dibuat di Google Drive Anda. Anda menjadi Admin dan bisa mengundang hingga 4 anggota.</p>
       <label class="field"><span>Nama keluarga</span><input id="c-fam" maxlength="40" placeholder="mis. Keluarga Dimas & Rini"></label>
       <label class="field"><span>Nama panggilan Anda</span><input id="c-nama" maxlength="30" value="${U.esc(user.nama)}"></label>
-      ${Relay.enabled() ? `<label class="field"><span>Kode lisensi${sup ? ' <span class="pill gold">Superadmin</span>' : ''}</span><input id="c-kode" maxlength="24" autocomplete="off" placeholder="${sup ? 'Kosongkan — lisensi internal dibuat otomatis' : 'SA-XXXX-XXXX-XXXX'}" style="text-transform:uppercase"><small>${sup ? 'Akun superadmin JuniorLabs tidak wajib memasukkan kode.' : 'Didapat saat pembelian dari JuniorLabs.'}</small></label>` : ''}
+      ${Relay.enabled() ? `<label class="field"><span>Kode lisensi${sup ? ' <span class="pill gold">Superadmin</span>' : ''}</span><input id="c-kode" maxlength="24" autocomplete="off" placeholder="${sup ? 'Kosongkan — lisensi internal dibuat otomatis' : 'SA-XXXX-XXXX-XXXX'}" style="text-transform:uppercase"><small>${sup ? 'Akun superadmin JuniorLabs tidak wajib memasukkan kode.' : 'Didapat saat pembelian dari JuniorLabs. <a href="beli/" target="_blank" rel="noopener" class="lg-link"><b>Belum punya? Beli di sini</b></a>'}</small></label>` : ''}
       <button class="btn block" id="c-go">${I('check')} Buat & mulai</button><button class="btn block ghost" id="c-back">Kembali</button>`);
     document.getElementById('c-back').onclick = () => App.afterLogin(user);
     document.getElementById('c-go').onclick = async (ev) => {
       const fam = document.getElementById('c-fam').value.trim(), nama = document.getElementById('c-nama').value.trim() || user.nama;
       const kodeEl = document.getElementById('c-kode'), kode = kodeEl ? kodeEl.value.trim().toUpperCase() : '';
       if (!fam) return say('Isi nama keluarga.', true);
+      if (kodeEl && !sup && !kode) return say('Anda perlu kode lisensi. <a href="beli/" target="_blank" rel="noopener" class="lg-link"><b>Beli di sini</b></a>, kode dikirim setelah pembayaran.', true);
       const internal = !!(kodeEl && sup && !kode);
       if (kodeEl && !internal && !/^SA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(kode)) return say('Format kode lisensi: SA-XXXX-XXXX-XXXX', true);
       ev.target.disabled = true;

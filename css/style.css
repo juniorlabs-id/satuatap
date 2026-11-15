@@ -846,3 +846,16 @@ button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opac
 
 /* Dipasang di landing page (?demo&embed) */
 .embed #demo-banner { display: none !important; }
+
+/* Layar masuk 1.7.5 */
+.login { background: radial-gradient(60% 40% at 15% 0%, rgba(42,181,154,.28), transparent 60%), radial-gradient(55% 40% at 100% 100%, rgba(232,168,56,.26), transparent 60%), linear-gradient(180deg, #E8F4F1, var(--bg)); }
+.login-card { box-shadow: 0 30px 70px rgba(7,63,59,.18), 0 2px 0 rgba(255,255,255,.6) inset; animation: lgIn .6s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes lgIn { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+.login-logo { background: #0E2B2C; padding: 22px 40px; }
+.login .slogan { font-size: 17px; color: var(--ink); margin: 16px 0 20px; }
+.login .btn.gold { background: linear-gradient(180deg, #F3C969, #E8A838); color: #0E2B2C; font-weight: 800; box-shadow: 0 8px 20px rgba(232,168,56,.35); border: 0; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.login #btn-g { min-height: 52px; font-size: 16px; }
+.lg-pts { list-style: none; margin: 18px 0 4px; padding: 16px 0 0; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.lg-pts li { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text); }
+.lg-pts li .ic { flex: none; width: 34px; height: 34px; padding: 8px; border-radius: 11px; background: var(--primary-c); color: var(--primary); }
+.lg-link { color: var(--primary); text-decoration: underline; }
