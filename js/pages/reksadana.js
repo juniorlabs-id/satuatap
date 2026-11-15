@@ -173,12 +173,16 @@
       <div class="rd-pick">${urut.map(i => { const t = tujuan(i.x);
         return `<label class="rd-pick-o"><input type="radio" name="porto" value="${i.x.id}" ${i.x.id === def ? 'checked' : ''}>${av(i.x, 'sm')}<span class="grow"><b>${U.esc(lbl(i.x))}</b><small>${pemilik(i.x) ? U.esc(Store.memberName(pemilik(i.x))) + ' · ' : ''}${UI.ms(i.nilai)}${t ? ' · ' + I('target') + ' ' + U.esc(t.nama) : g ? ' · akan ditautkan ke ' + U.esc(g.nama) : ''}</small></span></label>`; }).join('')}</div>
       ${UI.field('Jumlah beli', UI.rpInput('jumlah', opt.jumlah || 0))}
+      <div class="chips sm rd-cepat">${[[500000, 'Rp 500 rb'], [1000000, 'Rp 1 jt'], [1500000, 'Rp 1,5 jt']].map(([n, t]) => `<button type="button" class="chip ${Number(opt.jumlah) === n ? 'on' : ''}" data-amt="${n}">${t}</button>`).join('')}</div>
       <div class="grid2">${UI.field('Dibayar dari', `<select name="walletId">${Store.wallets().map(w => `<option value="${w.id}" ${w.id === lastW ? 'selected' : ''}>${U.esc(w.nama)} — ${U.rpShort(bal[w.id] || 0)}</option>`).join('')}<option value="">Sudah tercatat / tidak memotong saldo</option></select>`)}${UI.field('Tanggal', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>
       ${UI.biayaField(0, 'Opsional — biaya transfer/pembelian.')}
       ${Store.members().length > 1 ? UI.field('Dibeli oleh', `<select name="oleh">${UI.memberOpts(me())}</select>`) : ''}
       <div class="note small rd-beli-hint">${I('link')} <span></span></div>`,
       foot: `<button class="btn" data-ok>${I('plus')} Beli</button>` });
     UI.bindRp(s.el);
+    const jml = s.el.querySelector('[name=jumlah]'), cepat = [...s.el.querySelectorAll('[data-amt]')];
+    cepat.forEach(b => b.onclick = () => { jml.value = U.fmtNum(Number(b.dataset.amt)); cepat.forEach(c => c.classList.toggle('on', c === b)); jml.dispatchEvent(new Event('input', { bubbles: true })); jml.dispatchEvent(new Event('change', { bubbles: true })); });
+    jml.addEventListener('input', e => { if (e.isTrusted) cepat.forEach(c => c.classList.remove('on')); });
     const hint = s.el.querySelector('.rd-beli-hint span');
     const upd = () => { const f = UI.formData(s.el), i = semua.find(z => z.x.id === f.porto), t = (g && g.id) || (i && i.x.tujuanId), tt = t && Store.byId.Tujuan[t];
       hint.innerHTML = `${f.walletId ? 'Saldo <b>' + U.esc((Store.byId.Wallet[f.walletId] || {}).nama || '') + '</b> berkurang' : 'Saldo dompet tidak berubah'} · total setoran <b>${U.esc(i ? lbl(i.x) : '')}</b> naik${tt ? ` · checklist tujuan <b>${U.esc(tt.nama)}</b> tercentang` : ''}.`; };
@@ -263,7 +267,8 @@
       if (sumber && sumber.indexOf('g:') === 0 && !v.tujuanId) v.tujuanId = sumber.slice(2);
       v.nama = String(v.nama).trim(); const ada = appAda.find(a => a.toLowerCase() === v.nama.toLowerCase()); if (ada) v.nama = ada;   // satukan ejaan nama aplikasi
       v.kode = String(v.kode || '').trim();
-      if (isNew && apps().some(i => i.x.nama === v.nama && porto(i.x) === v.kode && (i.x.tujuanId || '') === (v.tujuanId || ''))) return UI.toast('Portofolio ini sudah ada. Beri nama portofolio yang berbeda.', 'warn');
+      const pmBaru = pemilik({ kepemilikan: kp });   // nama sama boleh bila pemiliknya beda (mis. suami & istri)
+      if (isNew && apps().some(i => i.x.nama === v.nama && porto(i.x) === v.kode && (i.x.tujuanId || '') === (v.tujuanId || '') && pemilik(i.x) === pmBaru)) return UI.toast('Portofolio dengan nama ini sudah ada untuk pemilik yang sama. Beri nama berbeda atau pilih pemilik lain.', 'warn');
       let row = Object.assign({}, x, v, { kepemilikan: kp, unit: 0 });
       if (isNew) row.riwayatNilai = [[row.tanggal, row.modal, row.modal]].concat(row.nilai !== row.modal || row.tanggal !== U.today() ? [[U.today(), row.nilai, row.modal]] : []);
       if (isNew) row.tglNilai = U.today();
