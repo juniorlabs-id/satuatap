@@ -181,7 +181,7 @@
       C.goals().filter(g => !g.t.walletId && g.dana > 0).forEach(g => items.push({ grup: 'Kas & tabungan', nama: 'Dana tujuan: ' + g.t.nama, v: g.dana }));
     }
     const hb = h ? h.buyback : 0;
-    if (pil.emas) C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? 'Perhiasan ' : (l.e.merek || 'Emas') + ' ') + U.gram(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
+    if (pil.emas) C.emasLots().filter(l => l.e.zakat && l.e.status !== 'hibah').forEach(l => items.push({ grup: 'Emas', nama: (l.e.bentuk === 'perhiasan' ? (l.e.jenis || 'Perhiasan') + ' ' : (l.e.merek || 'Emas') + ' ') + U.gram(l.gram) + ' g', v: Math.round(l.gramMurni * ((C.hargaLot(l.e) || {}).buyback || hb)) }));
     C.investasi().filter(i => i.x.zakat && pil[i.x.kelas]).forEach(i => items.push({ grup: (C.KELAS[i.x.kelas] || C.KELAS.lain).label, nama: i.x.nama, v: i.nilai }));
     if (pil.piutang) C.loans().filter(l => !l.lunas && l.p.arah === 'piutang').forEach(l => items.push({ grup: 'Piutang', nama: l.p.pihak, v: l.sisa }));
     const modeUtang = Store.setting('zakatUtang', 'jatuhTempo');

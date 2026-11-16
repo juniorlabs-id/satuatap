@@ -120,7 +120,7 @@
     E('e1', U.addMonths(today, -22), 'Antam', 'batangan', 5, 2, 24, 11300000, { kepemilikan: JSON.stringify({ [D]: 50, [N]: 50 }), sertifikat: 'CertiEye' });
     E('e2', U.addMonths(today, -14), 'Antam', 'batangan', 10, 1, 24, 15600000 * 1.07, { tujuanId: 'g_pdd', catatan: 'Untuk uang pangkal SD Aisha' });
     E('e3', U.addMonths(today, -9), 'Galeri24', 'batangan', 1, 6, 24, 6 * 1530000, { kepemilikan: JSON.stringify({ [N]: 100 }) });
-    E('e4', U.addMonths(today, -30), 'Perhiasan', 'perhiasan', 8, 1, 18, 7200000, { catatan: 'Cincin & gelang mahar', kepemilikan: JSON.stringify({ [N]: 100 }) });
+    E('e4', U.addMonths(today, -30), 'Perhiasan', 'perhiasan', 8, 1, 18, 7200000, { jenis: 'Gelang', catatan: 'Gelang mahar', kepemilikan: JSON.stringify({ [N]: 100 }) });
     E('e5', U.addMonths(today, -5), 'Antam', 'batangan', 2, 1, 24, 2 * 2380000, { tujuanId: 'g_qur' });
     E('e6', U.addMonths(today, -26), 'UBS', 'batangan', 2, 1, 24, 2 * 1050000, { status: 'terjual', tglJual: U.addMonths(today, -3), hargaJual: String(2 * 2300000), catatan: 'Dijual untuk biaya rumah sakit' });
     E('e7', U.addMonths(today, -2), 'Pegadaian (digital)', 'digital', 0.85, 1, 24, Math.round(0.85 * 2510000));

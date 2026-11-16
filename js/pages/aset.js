@@ -40,19 +40,38 @@
   };
   UI.cocokkan = (w) => {
     const bal = Calc.balances()[w.id] || 0;
+    const katDef = jenis => { const ks = Store.kategori(jenis); return (ks.find(k => /lain/i.test(k.nama)) || ks.find(k => !/pribadi/i.test(k.nama)) || ks[0] || {}).id || ''; };
     const s = UI.sheet({ title: 'Cocokkan saldo · ' + w.nama, cls: 'small', body: `
-      <p class="muted">Saldo di aplikasi: <b>${U.rp(bal)}</b>. Masukkan saldo sebenarnya di bank/e-wallet; selisihnya dicatat sebagai penyesuaian.</p>
-      ${UI.field('Saldo sebenarnya', UI.rpInput('aktual', bal))}<div class="diff muted"></div>`,
+      <p class="muted">Saldo di aplikasi: <b>${U.rp(bal)}</b>. Masukkan saldo sebenarnya di bank/e-wallet.</p>
+      ${UI.field('Saldo sebenarnya', UI.rpInput('aktual', bal))}<div class="diff muted"></div>
+      <div class="cc-opsi" hidden>
+        <div class="cc-pilih"></div>
+        <div class="cc-kat">${UI.field('Kategori', '<select name="kategoriId"></select>')}${UI.field('Keterangan', '<input name="ket" maxlength="80" placeholder="mis. belanja yang lupa dicatat">', 'Opsional')}</div>
+      </div>`,
       foot: `<button class="btn" data-ok>Sesuaikan</button>` });
     UI.bindRp(s.el);
-    const inp = s.el.querySelector('[name=aktual]'), diff = s.el.querySelector('.diff');
-    const upd = () => { const d = U.parseRp(inp.value) - bal; diff.textContent = d ? 'Selisih ' + (d > 0 ? '+' : '−') + U.rp(Math.abs(d)) : 'Sudah cocok ✓'; };
-    inp.addEventListener('input', upd); upd();
+    const inp = s.el.querySelector('[name=aktual]'), diff = s.el.querySelector('.diff'), opsi = s.el.querySelector('.cc-opsi'), pilih = s.el.querySelector('.cc-pilih'), katBox = s.el.querySelector('.cc-kat'), kat = s.el.querySelector('[name=kategoriId]');
+    let arah = 0;
+    const cara = () => (s.el.querySelector('[name=cara]:checked') || {}).value || 'catat';
+    const upd = () => {
+      const d = U.parseRp(inp.value) - bal, a = Math.sign(d);
+      diff.innerHTML = d ? (d < 0 ? 'Kurang <b>' : 'Lebih <b>') + U.rp(Math.abs(d)) + '</b> dari catatan aplikasi' : 'Sudah cocok ✓';
+      opsi.hidden = !d;
+      if (a && a !== arah) {   // ganti pilihan saat selisih berubah tanda
+        const j = a < 0 ? 'keluar' : 'masuk';
+        pilih.innerHTML = UI.field(a < 0 ? 'Kekurangan ini dicatat sebagai' : 'Kelebihan ini dicatat sebagai', UI.seg('cara', [['catat', a < 0 ? 'Pengeluaran tak tercatat' : 'Pemasukan tak tercatat'], ['sesuai', 'Penyesuaian saja']], 'catat'),
+          a < 0 ? 'Pengeluaran: masuk laporan & anggaran. Penyesuaian: hanya membetulkan saldo.' : 'Pemasukan: masuk laporan. Penyesuaian: hanya membetulkan saldo.');
+        kat.innerHTML = UI.katOpts(j, katDef(j));
+      }
+      arah = a; katBox.hidden = cara() !== 'catat';
+    };
+    inp.addEventListener('input', upd); s.el.addEventListener('change', upd); upd();
     s.el.querySelector('[data-ok]').onclick = () => {
       const d = U.parseRp(inp.value) - bal; if (!d) { s.close(); return; }
-      const me = Store.me.email;
-      Store.upsert('Transaksi', { id: U.uid('t'), tanggal: U.today(), jenis: 'penyesuaian', jumlah: d, kategoriId: '', walletId: w.id, walletTujuan: '', biaya: 0, catatan: 'Cocokkan saldo ' + w.nama, dibayarOleh: me, tag: '', sumber: 'app', refId: '', periodeRef: '', dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
-      s.close(); UI.toast('Saldo disesuaikan.');
+      const me = Store.me.email, f = UI.formData(s.el), catat = cara() === 'catat';
+      const ket = String(f.ket || '').trim() || (catat ? (d < 0 ? 'Pengeluaran tak tercatat' : 'Pemasukan tak tercatat') + ' (cocokkan saldo ' + w.nama + ')' : 'Cocokkan saldo ' + w.nama);
+      Store.upsert('Transaksi', { id: U.uid('t'), tanggal: U.today(), jenis: catat ? (d < 0 ? 'keluar' : 'masuk') : 'penyesuaian', jumlah: catat ? Math.abs(d) : d, kategoriId: catat ? (f.kategoriId || '') : '', walletId: w.id, walletTujuan: '', biaya: 0, catatan: ket, dibayarOleh: me, tag: '', sumber: 'app', refId: '', periodeRef: '', dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [] });
+      s.close(); UI.toast(catat ? (d < 0 ? 'Dicatat sebagai pengeluaran ' : 'Dicatat sebagai pemasukan ') + U.rp(Math.abs(d)) + '.' : 'Saldo disesuaikan.');
     };
   };
   UI.act('wallet-add', () => UI.walletForm());

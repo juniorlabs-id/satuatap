@@ -2,6 +2,8 @@
 (function () {
   const I = UI.icon;
   const BENTUK = [['batangan', 'Batangan'], ['perhiasan', 'Perhiasan'], ['digital', 'Tabungan/digital']];
+  const JENIS_PERHIASAN = ['Kalung', 'Liontin', 'Gelang', 'Gelang kaki', 'Cincin', 'Cincin kawin', 'Anting', 'Giwang', 'Bros', 'Jam tangan emas', 'Set perhiasan', 'Lainnya'];
+  const namaLot = e => e.bentuk === 'perhiasan' ? (e.jenis || 'Perhiasan') + ' ' + (e.kadar || 24) + 'K' : e.merek;
   const KADAR = [[24, '24K (99,9%)'], [23, '23K'], [22, '22K'], [20, '20K'], [18, '18K'], [17, '17K'], [16, '16K'], [10, '10K'], [8, '8K']];
   const S = { pilih: {} };
   const g = v => U.gram(v);
@@ -50,14 +52,20 @@
     const isNew = !e, h = Calc.hargaEmas(); pre = pre || {};
     e = e || { id: U.uid('e'), tanggal: U.today(), merek: 'Antam', bentuk: 'batangan', gramKeping: 1, jumlah: 1, kadar: 24, hargaBeli: 0, biaya: 0, walletId: '', tujuanId: '', kepemilikan: {}, status: 'simpan', zakat: true, tglJual: '', hargaJual: 0, pinjamanId: '', sertifikat: '', catatan: '', dibuat: new Date().toISOString(), tujuanId: pre.tujuanId || '' };
     // Baris keping: [{gram, n, harga (per keping)}]. Pembelian baru boleh beberapa gramasi sekaligus.
-    const awal = isNew ? [{ gram: 1, n: 1, harga: 0 }] : [{ gram: Number(e.gramKeping) || 1, n: Number(e.jumlah) || 1, harga: Math.round((Number(e.hargaBeli) || 0) / (Number(e.jumlah) || 1)) }];
+    const awal = isNew ? [{ gram: 1, n: 1, harga: 0, berat: '', jenis: 'Kalung', hargaTot: 0 }]
+      : [{ gram: Number(e.gramKeping) || 1, n: Number(e.jumlah) || 1, harga: Math.round((Number(e.hargaBeli) || 0) / (Number(e.jumlah) || 1)),
+           berat: (Number(e.gramKeping) || 0) * (Number(e.jumlah) || 1), jenis: e.jenis || 'Lainnya', hargaTot: Number(e.hargaBeli) || 0 }];
+    // Perhiasan: tiap baris = satu barang (jenis, berat ditimbang manual, harga beli total). Batangan/digital: gramasi × keping.
     const baris = (r, i) => {
       const std = Calc.GRAMASI.indexOf(Number(r.gram)) > -1;
       return `<div class="keping-row" data-i="${i}">
-        <label class="field"><span>Berat/keping</span><select data-k="gsel">${Calc.GRAMASI.map(x => `<option value="${x}" ${Number(r.gram) === x ? 'selected' : ''}>${String(x).replace('.', ',')} g</option>`).join('')}<option value="lain" ${std ? '' : 'selected'}>Lainnya…</option></select>
+        <label class="field k-per"><span>Jenis</span><select data-k="jenis">${JENIS_PERHIASAN.map(j => `<option ${j === r.jenis ? 'selected' : ''}>${j}</option>`).join('')}</select></label>
+        <label class="field kecil k-per"><span>Berat (g)</span><input type="number" step="0.01" min="0.01" data-k="berat" value="${r.berat || ''}" inputmode="decimal" placeholder="mis. 5,25"></label>
+        <label class="field k-per k-harga"><span>Harga beli</span><div class="rp-input"><b>Rp</b><input data-k="hargaTot" data-rp inputmode="numeric" autocomplete="off" value="${r.hargaTot ? U.fmtNum(r.hargaTot) : ''}" placeholder="0"></div></label>
+        <label class="field k-bat"><span>Berat/keping</span><select data-k="gsel">${Calc.GRAMASI.map(x => `<option value="${x}" ${Number(r.gram) === x ? 'selected' : ''}>${String(x).replace('.', ',')} g</option>`).join('')}<option value="lain" ${std ? '' : 'selected'}>Lainnya…</option></select>
           <input type="number" step="0.001" min="0.001" data-k="gram" value="${r.gram}" ${std ? 'hidden' : ''} placeholder="gram"></label>
-        <label class="field kecil"><span>Keping</span><input type="number" min="1" data-k="n" value="${r.n}" inputmode="numeric"></label>
-        <label class="field"><span>Harga/keping</span><div class="rp-input"><b>Rp</b><input data-k="harga" data-rp inputmode="numeric" autocomplete="off" value="${r.harga ? U.fmtNum(r.harga) : ''}" placeholder="0"></div></label>
+        <label class="field kecil k-bat"><span>Keping</span><input type="number" min="1" data-k="n" value="${r.n}" inputmode="numeric"></label>
+        <label class="field k-bat"><span>Harga/keping</span><div class="rp-input"><b>Rp</b><input data-k="harga" data-rp inputmode="numeric" autocomplete="off" value="${r.harga ? U.fmtNum(r.harga) : ''}" placeholder="0"></div></label>
         ${isNew ? `<button type="button" class="icon-btn sm keping-x" data-x aria-label="Hapus baris" ${i === 0 ? 'hidden' : ''}>${I('x')}</button>` : ''}
       </div>`;
     };
@@ -65,10 +73,10 @@
       ${UI.seg('bentuk', BENTUK, e.bentuk)}
       <div class="grid2">${UI.field('Merek', `<select name="merek">${Calc.MEREK_EMAS.map(m => `<option ${m === e.merek ? 'selected' : ''}>${m}</option>`).join('')}</select>`)}${UI.field('Tanggal beli', `<input type="date" name="tanggal" value="${e.tanggal}">`)}</div>
       <div class="keping-list">${awal.map(baris).join('')}</div>
-      ${isNew ? `<button type="button" class="btn ghost block sm" data-tambah>${I('plus')} Tambah gramasi lain</button>` : ''}
+      ${isNew ? `<button type="button" class="btn ghost block sm" data-tambah>${I('plus')} <span class="k-bat-t">Tambah gramasi lain</span><span class="k-per-t">Tambah perhiasan lain</span></button>` : ''}
       <div class="grid2"><label class="field" data-kadar><span>Kadar</span><select name="kadar">${KADAR.map(k => `<option value="${k[0]}" ${Number(e.kadar) === k[0] ? 'selected' : ''}>${k[1]}</option>`).join('')}</select></label>${UI.field('Ongkos / biaya lain', UI.rpInput('biaya', e.biaya), isNew ? 'Total untuk seluruh pembelian' : '')}</div>
       <label class="check"><input type="checkbox" name="hadiah" ${!isNew && (Number(e.hargaBeli) || 0) + (Number(e.biaya) || 0) <= 1 ? 'checked' : ''}><span>Hadiah / warisan — tidak ada harga beli <small class="muted">(boleh dikosongkan; untung/rugi tidak dihitung)</small></span></label>
-      ${h ? `<button type="button" class="link" data-hari>${I('wand-sparkles')} Isi harga/keping dengan harga hari ini</button>` : ''}
+      ${h ? `<button type="button" class="link" data-hari>${I('wand-sparkles')} <span class="k-bat-t">Isi harga/keping dengan harga hari ini</span><span class="k-per-t">Perkirakan harga beli dari harga emas hari ini</span></button>` : ''}
       <div class="keping-total"></div>
       ${isNew ? UI.field('Sumber dana', `<select name="sumber">${UI.sumberDanaOpts(pre.sumber || '')}</select>`, 'Pembelian dari dompet mengurangi saldo dompet itu, bukan dicatat sebagai pengeluaran.') : ''}
       ${UI.field('Untuk tujuan', `<select name="tujuanId">${UI.tujuanOpts(e.tujuanId)}</select>`, 'Nilai emas ini ikut dihitung sebagai dana tujuan tersebut.')}
@@ -78,38 +86,42 @@
       foot: `${isNew ? '' : `<button class="btn ghost danger" data-del>${I('trash-2')}</button>`}<button class="btn" data-ok>${I('check')} Simpan</button>` });
     UI.bindRp(s.el);
     const list = s.el.querySelector('.keping-list'), tot = s.el.querySelector('.keping-total');
-    const f = () => UI.formData(s.el);
+    const f = () => UI.formData(s.el), perh = () => (s.el.querySelector('[name=bentuk]:checked') || {}).value === 'perhiasan';
     const rows = () => Array.from(list.querySelectorAll('.keping-row')).map(r => {
       const sel = r.querySelector('[data-k=gsel]').value, gr = sel === 'lain' ? Number(r.querySelector('[data-k=gram]').value) || 0 : Number(sel);
-      return { el: r, gram: gr, n: Math.max(1, Math.round(Number(r.querySelector('[data-k=n]').value) || 1)), harga: Number(String(r.querySelector('[data-k=harga]').value).replace(/\D/g, '')) || 0 };
+      if (perh()) return { el: r, gram: Number(String(r.querySelector('[data-k=berat]').value).replace(',', '.')) || 0, n: 1, harga: Number(String(r.querySelector('[data-k=hargaTot]').value).replace(/\D/g, '')) || 0, jenis: r.querySelector('[data-k=jenis]').value };
+      return { el: r, gram: gr, n: Math.max(1, Math.round(Number(r.querySelector('[data-k=n]').value) || 1)), harga: Number(String(r.querySelector('[data-k=harga]').value).replace(/\D/g, '')) || 0, jenis: '' };
     });
     const sync = () => {
       const v = f(), rs = rows();
       s.el.querySelector('[data-kadar]').hidden = v.bentuk !== 'perhiasan';
+      s.el.classList.toggle('mode-perh', v.bentuk === 'perhiasan'); s.el.querySelector('[name=merek]').closest('.field').hidden = v.bentuk === 'perhiasan';
       list.querySelectorAll('[data-x]').forEach((x, i) => x.hidden = list.children.length < 2);
       const gram = U.sum(rs, r => r.gram * r.n), beli = U.sum(rs, r => r.harga * r.n), total = beli + (v.biaya || 0);
       const hl = Calc.hargaLot({ merek: v.merek, bentuk: v.bentuk });
       const nb = hl ? Math.round(gram * (v.bentuk === 'perhiasan' ? Number(v.kadar) / 24 : 1) * hl.buyback) : 0;
-      tot.innerHTML = gram ? `<div class="kv"><span>${rs.length > 1 ? rs.map(r => r.n + '×' + g(r.gram) + 'g').join(' + ') : 'Total berat'}</span><b>${g(gram)} gram</b></div>
+      tot.innerHTML = gram ? `<div class="kv"><span>${rs.length > 1 ? rs.map(r => v.bentuk === 'perhiasan' ? r.jenis + ' ' + g(r.gram) + 'g' : r.n + '×' + g(r.gram) + 'g').join(' + ') : 'Total berat'}</span><b>${g(gram)} gram</b></div>
         <div class="kv"><span>Total bayar${v.biaya ? ' (termasuk ongkos)' : ''}</span><b>${U.rp(total)}</b></div>
         ${total ? `<div class="kv muted"><span>Rata-rata</span><b>${U.rp(Math.round(total / gram))}/gram${nb ? ' · buyback hari ini ' + U.rp(nb) : ''}</b></div>` : ''}` : '';
     };
     list.addEventListener('change', ev => { if (ev.target.dataset.k === 'gsel') { const inp = ev.target.closest('.keping-row').querySelector('[data-k=gram]'); inp.hidden = ev.target.value !== 'lain'; if (ev.target.value !== 'lain') inp.value = ev.target.value; else inp.focus(); } });
     list.addEventListener('click', ev => { const x = ev.target.closest('[data-x]'); if (x && list.children.length > 1) { x.closest('.keping-row').remove(); sync(); } });
     const tb = s.el.querySelector('[data-tambah]');
-    if (tb) tb.onclick = () => { const last = rows().pop(); list.insertAdjacentHTML('beforeend', baris({ gram: last && last.gram === 1 ? 5 : 1, n: 1, harga: 0 }, list.children.length)); UI.bindRp(list.lastElementChild); sync(); };
+    if (tb) tb.onclick = () => { const last = rows().pop(); list.insertAdjacentHTML('beforeend', baris({ gram: last && last.gram === 1 ? 5 : 1, n: 1, harga: 0, berat: '', jenis: 'Cincin', hargaTot: 0 }, list.children.length)); UI.bindRp(list.lastElementChild); sync(); };
     s.el.addEventListener('input', sync); s.el.addEventListener('change', e2 => {
       if (e2.target.name === 'bentuk') { const z = s.el.querySelector('[name=zakat]'); z.checked = e2.target.value !== 'perhiasan'; if (e2.target.value === 'perhiasan') s.el.querySelector('[name=merek]').value = 'Perhiasan'; else s.el.querySelector('[name=kadar]').value = '24'; }
       sync();
     });
     const hb = s.el.querySelector('[data-hari]');
-    if (hb) hb.onclick = () => { const v = f(), hx = Calc.hargaLot(v) || h; rows().forEach(r => { r.el.querySelector('[data-k=harga]').value = U.fmtNum(Math.round(r.gram * hx.beli * (v.bentuk === 'perhiasan' ? Number(v.kadar) / 24 : 1))); }); sync(); };
+    if (hb) hb.onclick = () => { const v = f(), hx = Calc.hargaLot(v) || h; rows().forEach(r => { r.el.querySelector(v.bentuk === 'perhiasan' ? '[data-k=hargaTot]' : '[data-k=harga]').value = U.fmtNum(Math.round(r.gram * hx.beli * (v.bentuk === 'perhiasan' ? Number(v.kadar) / 24 : 1))); }); sync(); };
     sync();
     s.el.querySelector('[data-ok]').onclick = () => {
       const v = f(), kp = UI.readKepemilikan(s.el), rs = rows();
       if (kp === null) return;
-      if (rs.some(r => !r.gram)) return UI.toast('Isi berat per keping di setiap baris.', 'warn');
-      if (!v.hadiah && rs.some(r => !r.harga)) return UI.toast('Isi harga per keping, atau centang "Hadiah / warisan".', 'warn');
+      const ph = v.bentuk === 'perhiasan';
+      if (rs.some(r => !r.gram)) return UI.toast(ph ? 'Isi berat setiap perhiasan (gram, hasil timbang).' : 'Isi berat per keping di setiap baris.', 'warn');
+      if (!v.hadiah && rs.some(r => !r.harga)) return UI.toast((ph ? 'Isi harga beli setiap perhiasan' : 'Isi harga per keping') + ', atau centang "Hadiah / warisan".', 'warn');
+      if (ph) v.merek = 'Perhiasan';
       if (v.hadiah && rs.every(r => r.harga <= 1)) rs.forEach(r => { r.harga = 0; });
       const kadar = v.bentuk === 'perhiasan' ? Number(v.kadar) || 24 : 24, biaya = v.biaya || 0, beliTot = U.sum(rs, r => r.harga * r.n);
       const sumber = v.sumber; delete v.sumber; delete v.hadiah;
@@ -118,12 +130,12 @@
       let sisaB = biaya;
       const lots = rs.map((r, i) => {
         const bi = i === rs.length - 1 ? sisaB : Math.round(biaya * (r.harga * r.n) / (beliTot || 1)); sisaB -= bi;
-        return Object.assign({}, e, v, { id: i === 0 ? e.id : U.uid('e'), gramKeping: r.gram, jumlah: r.n, kadar, hargaBeli: r.harga * r.n, biaya: bi, kepemilikan: kp, dibuat: e.dibuat || new Date().toISOString() });
+        return Object.assign({}, e, v, { id: i === 0 ? e.id : U.uid('e'), gramKeping: r.gram, jumlah: r.n, jenis: r.jenis || '', kadar, hargaBeli: r.harga * r.n, biaya: bi, kepemilikan: kp, dibuat: e.dibuat || new Date().toISOString() });
       });
-      const ket = 'Beli emas ' + (v.bentuk === 'perhiasan' ? 'perhiasan ' : v.merek + ' ') + rs.map(r => (r.n > 1 ? r.n + '×' : '') + g(r.gram) + 'g').join(' + ');
+      const ket = ph ? 'Beli perhiasan ' + rs.map(r => r.jenis + ' ' + g(r.gram) + 'g').join(' + ') + ' (' + kadar + 'K)' : 'Beli emas ' + v.merek + ' ' + rs.map(r => (r.n > 1 ? r.n + '×' : '') + g(r.gram) + 'g').join(' + ');
       const ops = lots.map(row => ({ op: 'upsert', t: 'Emas', row })).concat(isNew ? UI.opsBeliAset(sumber, beliTot + biaya, v.tanggal, lots[0].id, ket) : []);
       Store.commit(ops); s.close();
-      UI.toast((lots.length > 1 ? lots.length + ' gramasi, ' : 'Emas ') + g(U.sum(rs, r => r.gram * r.n)) + ' g tersimpan.');
+      UI.toast((lots.length > 1 ? lots.length + (ph ? ' perhiasan, ' : ' gramasi, ') : ph ? (rs[0].jenis + ' ') : 'Emas ') + g(U.sum(rs, r => r.gram * r.n)) + ' g tersimpan.');
     };
     const d = s.el.querySelector('[data-del]');
     if (d) d.onclick = async () => { if (await UI.confirm('Hapus catatan emas?', 'Transaksi pembelian/penjualan yang terkait tetap ada di Mutasi.', 'Hapus', true)) { Store.remove('Emas', e.id); s.close(); } };
@@ -134,11 +146,11 @@
   UI.act('emas-open', el => {
     const l = Calc.emasLots(true).find(x => x.e.id === el.dataset.id); if (!l) return;
     const e = l.e, tj = Store.byId.Tujuan[e.tujuanId], aktif = e.status !== 'terjual';
-    const s = UI.sheet({ title: (e.bentuk === 'perhiasan' ? 'Perhiasan' : e.merek) + ' · ' + g(l.gram) + ' g', body: `
+    const s = UI.sheet({ title: (e.bentuk === 'perhiasan' ? (e.jenis || 'Perhiasan') : e.merek) + ' · ' + g(l.gram) + ' g', body: `
       <div class="detail-head"><span class="cat-ic lg gold">${I('gem')}</span><div><small class="muted">${e.status === 'terjual' ? 'Terjual ' + U.tgl(e.tglJual) : e.status === 'gadai' ? 'Sedang digadaikan' : 'Nilai buyback hari ini'}</small><div class="big-amt">${UI.m(l.nilai)}</div>
         ${l.hadiah ? `<small class="muted">${I('gift')} Hadiah / tanpa harga beli</small>` : `<small class="${l.untung >= 0 ? 'ok' : 'bad'}">${l.untung >= 0 ? '+' : '−'}${UI.m(Math.abs(l.untung))} (${U.pct(l.pct, 1)})</small>`}</div></div>
       <div class="kv-list">
-        <div class="kv"><span>Berat</span><b>${e.jumlah > 1 ? e.jumlah + ' × ' + g(e.gramKeping) + ' g = ' : ''}${g(l.gram)} g${e.bentuk === 'perhiasan' ? ' (' + e.kadar + 'K ≈ ' + g(l.gramMurni) + ' g murni)' : ''}</b></div>
+        ${e.bentuk === 'perhiasan' ? `<div class="kv"><span>Jenis</span><b>${U.esc(e.jenis || 'Perhiasan')} · ${e.kadar}K</b></div>` : ''}<div class="kv"><span>Berat</span><b>${e.jumlah > 1 ? e.jumlah + ' × ' + g(e.gramKeping) + ' g = ' : ''}${g(l.gram)} g${e.bentuk === 'perhiasan' ? ' (' + e.kadar + 'K ≈ ' + g(l.gramMurni) + ' g murni)' : ''}</b></div>
         <div class="kv"><span>Harga beli</span><b>${l.hadiah ? 'Hadiah / warisan — tanpa harga beli' : UI.m(l.modal) + ' · ' + U.rp(Math.round(l.perGram)) + '/g'}</b></div>
         ${aktif && l.hargaGram ? `<div class="kv"><span>Buyback dipakai</span><b>${U.rp(Math.round(l.hargaGram))}/g · ${U.esc(l.hargaSumber)}</b></div>` : ''}
         <div class="kv"><span>Dibeli</span><b>${U.tgl(e.tanggal)} · ${l.umur} hari</b></div>
@@ -185,7 +197,7 @@
         ops.push({ op: 'upsert', t: 'Emas', row: { id: e.id, jumlah: e.jumlah - r.n, hargaBeli: Math.round(e.hargaBeli * (1 - r.frac)), biaya: Math.round((e.biaya || 0) * (1 - r.frac)) } });
         ops.push({ op: 'upsert', t: 'Emas', row: Object.assign({}, e, { id: soldId, jumlah: r.n, hargaBeli: Math.round(e.hargaBeli * r.frac), biaya: Math.round((e.biaya || 0) * r.frac), status: 'terjual', tglJual: v.tanggal, hargaJual: r.net, dibuat: now }) });
       } else ops.push({ op: 'upsert', t: 'Emas', row: { id: e.id, status: 'terjual', tglJual: v.tanggal, hargaJual: r.net } });
-      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: r.net, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: 'Jual emas ' + g(e.gramKeping * r.n) + ' g', dibayarOleh: me(), tag: '', sumber: 'aset', refId: soldId, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
+      ops.push({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: v.tanggal, jenis: 'aset_jual', jumlah: r.net, kategoriId: '', walletId: v.walletId, walletTujuan: '', biaya: v.biayaLain || 0, catatan: (e.bentuk === 'perhiasan' ? 'Jual ' + (e.jenis || 'perhiasan').toLowerCase() + ' ' : 'Jual emas ') + g(e.gramKeping * r.n) + ' g', dibayarOleh: me(), tag: '', sumber: 'aset', refId: soldId, periodeRef: '', dicatatOleh: me(), dibuat: now, riwayat: [] } });
       Store.commit(ops); s.close(); UI.toast('Penjualan tercatat · ' + U.rp(r.net) + ' masuk ke dompet.');
     };
   }
@@ -279,7 +291,7 @@
   const priceChip = h => h ? `<div class="price-chip ${h.basi ? 'stale' : ''}">${I(h.mode === 'manual' ? 'pencil' : 'radio')}<span>Beli <b>${U.rpShort(h.beli)}</b> · Buyback <b>${U.rpShort(h.buyback)}</b> /g</span><small>${U.tgl(h.tanggal, 'dm')}${h.basi ? ' · perlu diperbarui' : ''}</small></div>`
     : `<div class="alert warn" data-act="emas-manual">${I('triangle-alert')}<div><b>Harga emas belum tersedia</b><small>Ketuk untuk mengisi harga manual sementara.</small></div></div>`;
   const lotRow = l => `<div class="row" data-act="emas-open" data-id="${l.e.id}"><span class="cat-ic gold">${I(l.e.bentuk === 'perhiasan' ? 'sparkles' : l.e.bentuk === 'digital' ? 'smartphone' : 'gem')}</span>
-    <div class="tx-txt"><b>${l.e.jumlah > 1 ? l.e.jumlah + ' × ' : ''}${g(l.e.gramKeping)} g ${U.esc(l.e.bentuk === 'perhiasan' ? 'Perhiasan ' + l.e.kadar + 'K' : l.e.merek)}${l.e.status === 'gadai' ? ' ' + UI.pill('Gadai', 'bad') : l.e.status === 'terjual' ? ' ' + UI.pill('Terjual', '') : ''}</b>
+    <div class="tx-txt"><b>${l.e.bentuk === 'perhiasan' ? U.esc(namaLot(l.e)) + ' · ' + g(l.gram) + ' g' : (l.e.jumlah > 1 ? l.e.jumlah + ' × ' : '') + g(l.e.gramKeping) + ' g ' + U.esc(l.e.merek)}${l.e.status === 'gadai' ? ' ' + UI.pill('Gadai', 'bad') : l.e.status === 'terjual' ? ' ' + UI.pill('Terjual', '') : ''}</b>
     <small>${U.tgl(l.e.tanggal)} · ${U.esc(UI.ownLabel(l.e.kepemilikan))}${l.e.tujuanId && Store.byId.Tujuan[l.e.tujuanId] ? ' · ' + U.esc(Store.byId.Tujuan[l.e.tujuanId].nama) : ''}</small></div>
     <div class="tx-amt"><b>${UI.ms(l.nilai)}</b>${l.hadiah ? '<small class="muted">hadiah</small>' : `<small class="${l.untung >= 0 ? 'ok' : 'bad'}">${l.e.status === 'terjual' ? 'realisasi ' : ''}${l.untung >= 0 ? '+' : '−'}${U.pct(Math.abs(l.pct), 1)}</small>`}</div></div>`;
 
@@ -320,7 +332,7 @@
             <small class="muted">Coba: "bagaimana bila harga naik 10%?"</small></div>
           <div id="sim-emas">${simOut()}</div>
           ${UI.sec('Pilih koleksi yang ingin dijual', '<small class="muted">kosong = semua</small>')}
-          <div class="card list">${sum.lots.filter(l => l.e.status === 'simpan').map(l => `<label class="row"><input type="checkbox" data-change="emas-pilih" data-id="${l.e.id}" ${S.pilih[l.e.id] ? 'checked' : ''}><div class="tx-txt"><b>${l.e.jumlah > 1 ? l.e.jumlah + ' × ' : ''}${g(l.e.gramKeping)} g ${U.esc(l.e.bentuk === 'perhiasan' ? 'Perhiasan' : l.e.merek)}</b><small>Modal ${U.rpShort(l.modal)}</small></div><b>${UI.ms(l.nilai)}</b></label>`).join('')}</div><div class="spacer"></div>`;
+          <div class="card list">${sum.lots.filter(l => l.e.status === 'simpan').map(l => `<label class="row"><input type="checkbox" data-change="emas-pilih" data-id="${l.e.id}" ${S.pilih[l.e.id] ? 'checked' : ''}><div class="tx-txt"><b>${l.e.bentuk === 'perhiasan' ? U.esc(namaLot(l.e)) + ' · ' + g(l.gram) + ' g' : (l.e.jumlah > 1 ? l.e.jumlah + ' × ' : '') + g(l.e.gramKeping) + ' g ' + U.esc(l.e.merek)}</b><small>Modal ${U.rpShort(l.modal)}</small></div><b>${UI.ms(l.nilai)}</b></label>`).join('')}</div><div class="spacer"></div>`;
       }
       if (!sum.lots.length && !Store.t.Emas.length) return TILES('') + priceChip(h) + UI.empty('gem', 'Brankas Emas masih kosong', 'Catat emas batangan, perhiasan, atau tabungan emas keluarga. Nilainya diperbarui otomatis mengikuti harga harian.', `<button class="btn" data-act="emas-beli">${I('plus')} Catat emas pertama</button>`);
       const akum = Calc.emasAkumulasi(), pem = Object.keys(sum.perPemilik), gr = Object.keys(sum.perGramasi).sort((a, b) => a - b);

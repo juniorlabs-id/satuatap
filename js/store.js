@@ -25,7 +25,7 @@
                 'cicilan', 'walletId', 'lunas', 'catatan', 'dibuat'],
     Laporan:   ['id', 'tanggal', 'jenis', 'modul', 'judul', 'deskripsi', 'prioritas', 'status'],
     Emas:      ['id', 'tanggal', 'merek', 'bentuk', 'gramKeping', 'jumlah', 'kadar', 'hargaBeli', 'biaya', 'walletId', 'tujuanId',
-                'kepemilikan', 'status', 'zakat', 'tglJual', 'hargaJual', 'pinjamanId', 'sertifikat', 'catatan', 'dibuat'],
+                'kepemilikan', 'status', 'zakat', 'tglJual', 'hargaJual', 'pinjamanId', 'sertifikat', 'catatan', 'dibuat', 'jenis'],
     Investasi: ['id', 'kelas', 'nama', 'kode', 'unit', 'modal', 'nilai', 'tglNilai', 'tanggal', 'walletId', 'tujuanId',
                 'kepemilikan', 'jatuhTempo', 'imbal', 'zakat', 'status', 'tglJual', 'hargaJual', 'catatan', 'dibuat', 'riwayatNilai'],
     Skenario:  ['id', 'nama', 'jenis', 'data', 'catatan', 'dibuat', 'oleh'],

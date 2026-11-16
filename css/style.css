@@ -859,3 +859,12 @@ button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opac
 .lg-pts li { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text); }
 .lg-pts li .ic { flex: none; width: 34px; height: 34px; padding: 8px; border-radius: 11px; background: var(--primary-c); color: var(--primary); }
 .lg-link { color: var(--primary); text-decoration: underline; }
+
+/* Perhiasan 1.7.7: jenis · berat · harga beli */
+.keping-list .k-per, .k-per-t { display: none; }
+.mode-perh .keping-list .k-bat, .mode-perh .k-bat-t { display: none; }
+.mode-perh .keping-list .k-per { display: block; }
+.mode-perh .k-per-t { display: inline; }
+.mode-perh .keping-row { grid-template-columns: 1.3fr 1fr auto; }
+.mode-perh .keping-row .k-harga { grid-column: 1 / 3; }
+.mode-perh .keping-row .keping-x { grid-column: 3; grid-row: 1 / 3; }
