@@ -83,7 +83,7 @@
     ['ai', 'sparkles', 'Tanya AI'], ['simulasi', 'git-fork', 'Simulasi Keputusan'], null, ['pengaturan', 'settings', 'Pengaturan'], ['laporan', 'message-square-warning', 'Laporkan Masalah']];
   UI.shell = () => {
     document.body.innerHTML = `
-      <div id="demo-banner" class="demo-banner" hidden>${I('flask-conical')} Mode demo — data contoh, perubahan tidak disimpan. <button class="link" data-act="exit-demo">Keluar demo</button></div>
+      <div id="demo-banner" class="demo-banner" hidden><span class="db-t">${I('flask-conical')} Mode demo — data contoh, tidak disimpan.</span><a class="db-beli" href="/beli/#harga" target="_blank" rel="noopener">${I('shopping-bag')} Beli SatuAtap</a><button class="link" data-act="exit-demo">Keluar</button></div>
       <div id="shell">
         <aside id="sidebar"><div class="side-brand"><img src="img/icon-192.png" alt="" width="36" height="36"><div><b>SatuAtap</b><small>Keuangan Keluarga</small></div></div>
           <div class="side-fam">${I('users')}<span>${U.esc(Store.setting('namaKeluarga', 'Keluarga'))}</span></div>

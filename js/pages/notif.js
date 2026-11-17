@@ -282,7 +282,11 @@
       const occ = x.kind === 'acara' ? 'a|' + x.ref.id : x.id;
       pesan.push({ ke: 'semua', kunci: 'occ|' + occ + '|H-' + h, teks: (h <= 1 ? '🔔 ' : '🗓️ ') + U.esc(x.nama) + ' · <b>' + U.rp(x.sisa) + '</b> jatuh tempo ' + (h === 0 ? '<b>hari ini</b>' : h === 1 ? '<b>besok</b>' : h + ' hari lagi (' + U.tgl(x.tanggal, 'dm') + ')') + '.' });
     });
-    if (o.rapat) { const st = Calc.rapatStatus(); if (!st.sudahBulanIni && (st.sisa === 0 || st.sisa === 1)) pesan.push({ ke: 'semua', kunci: 'rapat|' + st.next.slice(0, 7) + '|H-' + st.sisa, teks: '👥 Rapat keuangan keluarga ' + (st.sisa === 0 ? '<b>hari ini</b>' : '<b>besok</b>') + '. Agendanya sudah disusun otomatis di aplikasi.' }); }
+    // Rapat: hanya bila jadwal rutin sudah diatur, dan hanya pada H-1 & hari-H jadwalnya (bukan tiap hari setelah terlewat).
+    if (o.rapat && Store.setting('rapatTanggal', '') !== '') Calc.rapatJadwal(today, U.addDays(today, 1)).forEach(x => {
+      if (x.lunas) return; const h = U.diffDays(today, x.tanggal), tahunan = x.tanggal.slice(5, 7) === '12';
+      pesan.push({ ke: 'semua', kunci: 'rapat|' + x.tanggal.slice(0, 7) + '|H-' + h, teks: '👥 Rapat keuangan keluarga ' + (h === 0 ? '<b>hari ini</b>' : '<b>besok</b>') + (tahunan ? ' — rapat tahunan dengan Kilas Balik.' : '.') + '\nAgendanya sudah disusun otomatis di aplikasi.' });
+    });
     kirim(pesan.slice(0, 20));
   };
   /** Amplop melewati 80% / 100% setelah transaksi dicatat di perangkat ini. */
