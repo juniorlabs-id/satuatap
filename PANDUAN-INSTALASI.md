@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.7.8 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.7.9 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -183,13 +183,13 @@ Tanpa Pendamping, pengingat Telegram tetap terkirim **saat salah satu anggota me
 ### C1. Pasang — ikuti panduan di aplikasi
 Buka **Lainnya › Pengaturan › Notifikasi › Skrip Pendamping › Panduan pasang langkah demi langkah**. Panduan 7 langkah itu memandu dari membuat proyek di script.google.com sampai mengecek hasilnya, lengkap dengan tombol:
 - **Salin appsscript.json**, dan
-- **Salin kode Pendamping**: kodenya **sudah berisi** `FILE_ID` keluarga dan `RELAY_URL`, jadi tidak ada yang perlu diketik ulang.
+- **Salin kode Pendamping**: kodenya **sudah berisi** `FILE_ID` keluarga dan `RELAY_URL`, jadi tidak ada yang perlu diketik ulang (keduanya juga disimpan di Properti skrip saat `setupPendamping` jalan).
 
 Ringkasnya: buat proyek `SatuAtap Pendamping` → tampilkan & isi `appsscript.json` → tempel kode ke `Kode.gs` → jalankan `setupPendamping` → izinkan (layar "Google belum memverifikasi" itu normal untuk skrip milik sendiri: **Lanjutan › Buka … (tidak aman) › Izinkan**) → log menampilkan "✅ Pendamping aktif".
 
 Untuk berhenti, jalankan `hentikanPendamping`.
 
-> **Memperbarui Pendamping:** buka panduan yang sama, salin kode baru (langkah 4–5), tempel menimpa yang lama, lalu jalankan `setupPendamping` sekali lagi. Properti skrip (token Fonnte, nomor WA) tidak hilang.
+> **Memperbarui Pendamping (2 menit):** buka panduan yang sama › **Salin kode script** › di editor Pendamping pilih semua (Ctrl+A) › tempel › simpan 💾 › jalankan `setupPendamping` sekali lagi. Selesai. `FILE_ID` dan `RELAY_URL` otomatis tersimpan di **Properti skrip** saat `setupPendamping` dijalankan, jadi tidak ada yang perlu diketik ulang; token Fonnte, nomor WA, dan jadwal juga tidak hilang. Bila Anda memakai berkas `Pendamping.gs` mentah (bukan salinan dari aplikasi), kode itu berisi tulisan `TEMPEL_…` — itu aman asalkan `setupPendamping` pernah dijalankan dari salinan aplikasi (nilainya sudah tersimpan). Jika ragu, jalankan `cekWA`: baris pertamanya menyebut apakah `FILE_ID` dan `RELAY_URL` **terisi**. Pesan WA yang gagal dengan tulisan *"DNS error … TEMPEL_ALAMAT_RELAY…"* berarti keduanya kosong: salin kode dari aplikasi, tempel, jalankan `setupPendamping`.
 
 ### C2. WhatsApp lewat Fonnte (opsional)
 Buka **Notifikasi › WhatsApp › Pasang WhatsApp** dan ikuti 9 langkahnya (ada ilustrasi letak tombol, semua nilai tinggal salin–tempel):

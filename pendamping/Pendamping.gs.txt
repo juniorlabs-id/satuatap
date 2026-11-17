@@ -15,26 +15,37 @@
  *  Cara pasang: ikuti panduan langkah demi langkah di aplikasi (Lainnya › Notifikasi ›
  *  "Panduan pasang Skrip Pendamping" / "Panduan pasang WhatsApp"). Ringkasnya:
  *   1. Kode ini disalin dari aplikasi dengan FILE_ID & RELAY_URL sudah terisi.
- *   2. Jalankan setupPendamping() → izinkan akses.
+ *   2. Jalankan setupPendamping() → izinkan akses. FILE_ID & RELAY_URL otomatis disimpan ke Properti skrip,
+ *      jadi saat kode diperbarui (tempel menimpa), keduanya TIDAK perlu diisi ulang.
  *   3. WhatsApp (opsional): isi Script Properties FONNTE_TOKEN & WA_ANGGOTA, jalankan setupWA(),
  *      Terapkan sebagai Aplikasi web, lalu jalankan cekWA() untuk alamat webhook Fonnte.
  * ============================================================
  */
-const FILE_ID = 'TEMPEL_ID_FILE_DI_SINI';
-const RELAY_URL = 'TEMPEL_ALAMAT_RELAY_DI_SINI';   // alamat /exec relay JuniorLabs (disalin dari aplikasi)
+const FILE_ID = 'TEMPEL_ID_FILE_DI_SINI';           // diisi otomatis oleh aplikasi saat kode disalin
+const RELAY_URL = 'TEMPEL_ALAMAT_RELAY_DI_SINI';   // alamat /exec relay JuniorLabs (diisi otomatis oleh aplikasi)
 const JAM_KIRIM = 8;          // jam pengingat setiap pagi (Asia/Jakarta)
 const JAM_RINGKAS = 20;       // jam ringkasan catatan WA malam hari
 const PENGINGAT = [7, 3, 1, 0];  // H-7, H-3, H-1, hari H
 
 const PROPS = PropertiesService.getScriptProperties();
 
+/**
+ * Nilai koneksi: pakai isi kode bila sudah terisi (hasil salin dari aplikasi), kalau tidak ambil dari Properti skrip
+ * (FILE_ID / RELAY_URL — disimpan setupPendamping). Dengan begitu menempel kode versi baru tidak merusak koneksi.
+ */
+function isi_(konst, kunci) { const k = String(konst || ''); return k && !/TEMPEL|ID_FILE_KELUARGA/.test(k) ? k : (PROPS.getProperty(kunci) || ''); }
+function fileId_() { return isi_(FILE_ID, 'FILE_ID'); }
+function relayUrl_() { return isi_(RELAY_URL, 'RELAY_URL'); }
+function simpanKoneksi_() { [['FILE_ID', fileId_()], ['RELAY_URL', relayUrl_()]].forEach(function (p) { if (p[1] && PROPS.getProperty(p[0]) !== p[1]) PROPS.setProperty(p[0], p[1]); }); }
+
 function setupPendamping() {
-  if (/TEMPEL/.test(FILE_ID)) throw new Error('FILE_ID belum diisi. Salin ulang kode dari aplikasi: Lainnya › Pengaturan › Notifikasi › Panduan pasang (kodenya sudah terisi).');
+  if (!fileId_()) throw new Error('FILE_ID belum terisi. Salin ulang kode dari aplikasi (Lainnya › Notifikasi › Pasang script › Salin kode script) — kodenya sudah terisi — tempel, lalu jalankan setupPendamping lagi.');
+  simpanKoneksi_();
   const st = bacaData_();
   pasangPemicu_();
   Logger.log('✅ Pendamping aktif untuk "' + (st.setting.namaKeluarga || 'Keluarga') + '" — ' + Object.keys(st.Transaksi).length + ' transaksi terbaca.');
   Logger.log('   Setiap hari sekitar pukul ' + JAM_KIRIM + '.00: ' + [relayOk_() ? 'pengingat Telegram' : '', waOk_() ? 'pengingat WA (+ ringkasan catatan pukul ' + JAM_RINGKAS + '.00)' : ''].filter(String).join(', ') + '.');
-  if (!relayOk_()) Logger.log('   ⚠️ RELAY_URL belum diisi — pengingat Telegram nonaktif.');
+  if (!relayOk_()) Logger.log('   ⚠️ RELAY_URL belum terisi — salin ulang kode dari aplikasi, tempel, jalankan setupPendamping lagi. Pengingat Telegram & catat via WA belum jalan.');
   Logger.log('   Menjalankan sekali sekarang…');
   Logger.log(JSON.stringify(tugasHarian_(st)));
 }
@@ -55,12 +66,12 @@ function hentikanPendamping() {
  * SpreadsheetApp.openById justru meminta izin ubah SEMUA spreadsheet, jadi sengaja tidak dipakai.
  */
 function bacaLog_() {
-  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(FILE_ID) + '/values/' + encodeURIComponent('_log!A2:F') + '?valueRenderOption=UNFORMATTED_VALUE';
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(fileId_()) + '/values/' + encodeURIComponent('_log!A2:F') + '?valueRenderOption=UNFORMATTED_VALUE';
   const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
   const kode = r.getResponseCode(); let j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) {}
   if (kode === 200) return j.values || [];
   const pesan = (j.error && j.error.message) || ('HTTP ' + kode);
-  if (kode === 404) throw new Error('File data tidak ditemukan. Pastikan FILE_ID benar dan Anda masuk dengan akun Admin keluarga (pemilik file).');
+  if (kode === 404) throw new Error('File data tidak ditemukan. Pastikan FILE_ID (Properti skrip) benar dan Anda masuk dengan akun Admin keluarga (pemilik file).');
   if (/has not been used|is disabled|SERVICE_DISABLED|accessNotConfigured/i.test(pesan)) {
     const link = (/(https:\/\/console\.developers\.google\.com\/apis\/api\/sheets\.googleapis\.com\/overview\?project=\d+)/.exec(pesan) || [])[1] || 'https://console.cloud.google.com/apis/library/sheets.googleapis.com';
     throw new Error('Google Sheets API belum aktif untuk skrip ini (sekali saja). Buka tautan ini › klik AKTIFKAN / ENABLE › tunggu 1–2 menit › jalankan lagi: ' + link);
@@ -102,8 +113,9 @@ function pengingat_(st, today) {
     return { ke: 'semua', kunci: 'occ|' + x.occ + '|H-' + x.h, teks: (x.h <= 1 ? '🔔 ' : '🗓️ ') + esc_(x.nama) + ' · <b>' + rp_(x.jumlah) + '</b> jatuh tempo ' + kapan + '.' + (x.h === 0 ? '\nTandai lunas di aplikasi setelah dibayar.' : '') };
   });
   // Rapat keuangan rutin (tanggal dari Pengaturan, bawaan tgl 1)
-  const hariRapat = Math.min(28, Math.max(1, Number(st.setting.rapatTanggal) || 1));
-  [0, 1].forEach(function (h) {
+  // Hanya bila keluarga sudah mengatur jadwal rapat rutin di aplikasi (Rapat Keuangan › Jadwal).
+  const hariRapat = Math.min(28, Math.max(1, Number(st.setting.rapatTanggal) || 1)), adaJadwal = String(st.setting.rapatTanggal || '') !== '';
+  if (adaJadwal) [0, 1].forEach(function (h) {
     const d = new Date(today.getTime() + h * 864e5);
     if (d.getDate() !== hariRapat) return;
     const ym = ymd_(d).slice(0, 7), sudah = Object.keys(st.Rapat).some(function (k) { return String(st.Rapat[k].tanggal || '').slice(0, 7) === ym; });
@@ -114,10 +126,11 @@ function pengingat_(st, today) {
 }
 
 // ---------- Telegram lewat relay JuniorLabs ----------
-function relayOk_() { return /^https:\/\/script\.google\.com\//.test(RELAY_URL); }
+function relayOk_() { return /^https:\/\/script\.google\.com\//.test(relayUrl_()); }
 function relay_(action, data) {
-  const r = UrlFetchApp.fetch(RELAY_URL, { method: 'post', contentType: 'text/plain;charset=utf-8', muteHttpExceptions: true, followRedirects: true,
-    payload: JSON.stringify({ action: action, token: ScriptApp.getOAuthToken(), data: Object.assign({ fileId: FILE_ID }, data) }) });
+  if (!relayOk_()) throw new Error('RELAY_URL belum terisi — salin ulang kode dari aplikasi lalu jalankan setupPendamping');
+  const r = UrlFetchApp.fetch(relayUrl_(), { method: 'post', contentType: 'text/plain;charset=utf-8', muteHttpExceptions: true, followRedirects: true,
+    payload: JSON.stringify({ action: action, token: ScriptApp.getOAuthToken(), data: Object.assign({ fileId: fileId_() }, data) }) });
   let j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) { throw new Error('relay tidak membalas JSON (HTTP ' + r.getResponseCode() + ')'); }
   if (!j.success) throw new Error(j.message || 'relay menolak');
   return j.data;
@@ -159,6 +172,9 @@ function setupWA() {
 /** Periksa WhatsApp: token Fonnte, nomor anggota, dan ALAMAT WEBHOOK yang harus ditempel di fonnte.com. */
 function cekWA() {
   const L = function (ok, t) { Logger.log((ok === true ? '✅ ' : ok === false ? '❌ ' : 'ℹ️ ') + t); };
+  simpanKoneksi_();
+  L(!!fileId_(), 'FILE_ID ' + (fileId_() ? 'terisi' : 'KOSONG — salin ulang kode dari aplikasi, tempel, jalankan setupPendamping'));
+  L(relayOk_(), 'RELAY_URL ' + (relayOk_() ? 'terisi' : 'KOSONG — salin ulang kode dari aplikasi, tempel, jalankan setupPendamping (tanpa ini catatan WA gagal tersimpan)'));
   const tok = PROPS.getProperty('FONNTE_TOKEN');
   L(!!tok, 'FONNTE_TOKEN ' + (tok ? 'ada' : 'belum diisi — ⚙️ Setelan Proyek › Properti skrip'));
   const ang = waAnggota_(); L(Object.keys(ang).length > 0, 'WA_ANGGOTA: ' + (Object.keys(ang).map(function (k) { return k + ' → ' + ang[k]; }).join(', ') || 'belum diisi'));
@@ -211,7 +227,7 @@ function doPost(e) {
   const tgl = ts > 1e9 ? new Date(ts * 1000) : new Date(), telat = (Date.now() - tgl.getTime()) / 60000;
   const jam = Utilities.formatDate(tgl, 'Asia/Jakarta', 'HH.mm'), ket = ' (pesan pukul ' + jam + (telat > 5 ? ', baru diteruskan WhatsApp sekarang' : '') + ')';
   // Tidak membalas per pesan (hemat kuota Fonnte): semua dirangkum pukul 20.00 oleh ringkasanMalam().
-  const catat = function (o) { catatHari_(no, Object.assign({ j: jam, teks: teks.slice(0, 60) }, o)); };
+  const catat = function (o) { catatHari_(no, Object.assign({ j: jam, tg: Utilities.formatDate(tgl, 'Asia/Jakarta', 'yyyy-MM-dd'), teks: teks.slice(0, 60) }, o)); };
   // Pesan sama persis dari nomor yang sama dalam 30 menit = kiriman ulang → satu draf saja (awalan "lagi" = sengaja)
   const kembar = 'wak_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, no + teks.toLowerCase()));
   const lalu = Number(c.get(kembar) || 0);
@@ -239,10 +255,14 @@ function ringkasanMalam() {
   let n = 0;
   Object.keys(a).forEach(function (no) {
     const it = a[no] || [], ok = it.filter(function (x) { return x.s === 'ok'; }), lain = it.filter(function (x) { return x.s !== 'ok'; }); if (!it.length) return;
+    // Pesan setelah ringkasan kemarin (lewat pukul 20.00) ikut terkirim malam ini: beri tanggal agar tidak tampak "hari ini".
+    const kini = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd'), HR = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const lbl = function (x) { if (!x.tg || x.tg === kini) return x.j; const d = new Date(x.tg + 'T12:00:00+07:00'); return HR[d.getDay()] + ' ' + x.tg.slice(8) + '/' + x.tg.slice(5, 7) + ' ' + x.j; };
+    const semuaHariIni = it.every(function (x) { return !x.tg || x.tg === kini; });
     const ket = { dobel: 'sama dengan pesan sebelumnya, tidak dicatat dua kali (awali "lagi" bila memang dua transaksi)', nominal: 'nominal tidak terbaca — kirim ulang, mis. "makan siang 45rb gopay"', gagal: 'belum tersimpan — kirim ulang' };
-    let t = '🧾 Catatan WhatsApp hari ini: ' + ok.length + ' masuk sebagai draf' + (ok.length ? ' · total ' + rp_(ok.reduce(function (s, x) { return s + (x.v || 0); }, 0)) : '') + '\n';
-    t += ok.map(function (x) { return '• ' + x.j + '  ' + x.teks + ' — ' + rp_(x.v); }).join('\n');
-    if (lain.length) t += (ok.length ? '\n\n' : '') + '⚠️ Tidak dicatat:\n' + lain.map(function (x) { return '• ' + x.j + '  ' + x.teks + ' — ' + (ket[x.s] || x.s); }).join('\n');
+    let t = '🧾 Catatan WhatsApp ' + (semuaHariIni ? 'hari ini' : 'sejak ringkasan kemarin') + ': ' + ok.length + ' masuk sebagai draf' + (ok.length ? ' · total ' + rp_(ok.reduce(function (s, x) { return s + (x.v || 0); }, 0)) : '') + '\n';
+    t += ok.map(function (x) { return '• ' + lbl(x) + '  ' + x.teks + ' — ' + rp_(x.v); }).join('\n');
+    if (lain.length) t += (ok.length ? '\n\n' : '') + '⚠️ Tidak dicatat:\n' + lain.map(function (x) { return '• ' + lbl(x) + '  ' + x.teks + ' — ' + (ket[x.s] || x.s); }).join('\n');
     if (ok.length) t += '\n\nKonfirmasi di aplikasi SatuAtap › Mutasi › Menunggu konfirmasi (geser kanan ✓).';
     try { kirimWA_(t, no); n++; } catch (e) {}
   });
