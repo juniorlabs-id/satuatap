@@ -1,7 +1,7 @@
 /* Lainnya, Pengaturan (keluarga, anggota & izin, kategori, template, tampilan, notifikasi, keamanan, data), Laporkan Masalah */
 (function () {
   const I = UI.icon;
-  const MENU_IZIN = [['mutasi', 'Mutasi'], ['kalender', 'Kalender'], ['anggaran', 'Anggaran'], ['tujuan', 'Tujuan'], ['utang', 'Utang & Piutang'], ['aset', 'Aset'], ['rapor', 'Rapor']];
+  const MENU_IZIN = [['mutasi', 'Mutasi'], ['kalender', 'Kalender'], ['anggaran', 'Anggaran'], ['tujuan', 'Goals'], ['utang', 'Utang & Piutang'], ['aset', 'Aset'], ['rapor', 'Rapor']];
   const PERAN = { admin: 'Admin', pasangan: 'Pasangan (akses penuh)', anggota: 'Anggota (izin per menu)' };
   const WARNA = ['#0F5E59', '#F2B33D', '#476364', '#B3261E', '#6750A4', '#2E7D32', '#0061A4', '#8C5A00'];
 
@@ -20,7 +20,7 @@
           { id: 'kstat', icon: 'chart-column', label: 'Statistik', to: 'konsol/statistik', gold: true }
         ])}` : ''}
         ${UI.sec('Keuangan')}${UI.tiles([
-          { id: 'tuj', icon: 'target', label: 'Tujuan', to: 'tujuan' },
+          { id: 'tuj', icon: 'target', label: 'Goals', to: 'tujuan' },
           { id: 'ang', icon: 'clipboard-list', label: 'Anggaran', to: 'anggaran' },
           { id: 'zak', icon: 'hand-heart', label: 'Zakat & Sedekah', to: 'zakat', gold: true },
           { id: 'rapat', icon: 'users', label: 'Rapat Keuangan', to: 'rapat' }

@@ -45,6 +45,7 @@
       foot: `<button class="btn" data-ok>Simpan</button>` });
     s.el.querySelector('[data-ok]').onclick = () => { const f = UI.formData(s.el), v = {}; UI.NOTIF_JENIS.forEach(j => v[j[0]] = !!f[j[0]]); Store.commit([{ op: 'upsert', t: 'Pengaturan', row: { id: 'notifTelegram', nilai: JSON.stringify(v) } }]); s.close(); };
   });
+  UI.act('pend-aktif', () => { Store.commit([{ op: 'upsert', t: 'Pengaturan', row: { id: 'pendampingAktif', nilai: pendAktif() ? '' : '1' } }]); UI.toast(pendAktif() ? 'Pengingat dikirim script tiap pagi saja.' : 'Pengingat dari aplikasi aktif lagi.'); UI.render(); });
   UI.act('pend-salin', async () => {
     const t = `const FILE_ID = '${Store.fileId}';\nconst RELAY_URL = '${APP_CONFIG.RELAY_URL || ''}';`;
     try { await navigator.clipboard.writeText(t); UI.toast('Pengaturan Pendamping disalin.'); } catch (e) { prompt('Salin dua baris ini ke Pendamping.gs:', t); }
@@ -67,7 +68,8 @@
       <div class="card"><h4 class="mini-h">${I('message-circle')} WhatsApp <span class="pill">opsional</span></h4>
         <p class="small">Lewat akun <b>Fonnte milik keluarga</b> dan sebuah script di akun Google Anda: <b>pengingat tagihan tiap pagi</b>, <b>catat lewat chat WA</b>, dan <b>ringkasan catatan pukul 20.00</b>. Script yang sama juga mengirim pengingat Telegram walau aplikasi tidak dibuka.</p>
         <p class="muted small">Dipasang sekali (± 10–20 menit) dengan panduan langkah demi langkah — semua tinggal salin–tempel. Token Fonnte hanya disimpan di script Anda.</p>
-        <div class="row-btns"><button class="btn sm" data-act="panduan" data-k="pend">${I('book-open')} Pasang script</button><button class="btn ghost sm" data-act="panduan" data-k="wa">${I('message-circle')} Pasang WhatsApp</button></div></div>`;
+        <div class="row-btns"><button class="btn sm" data-act="panduan" data-k="pend">${I('book-open')} Pasang script</button><button class="btn ghost sm" data-act="panduan" data-k="wa">${I('message-circle')} Pasang WhatsApp</button></div>
+        ${Store.isAdminLike() ? `<div class="row" style="margin-top:10px"><span class="cat-ic ${pendAktif() ? 'ok' : ''}">${I(pendAktif() ? 'circle-check' : 'circle')}</span><div class="tx-txt"><b>Script sudah terpasang</b><small>${pendAktif() ? 'Pengingat tagihan & rapat dikirim script sekali tiap pagi (±08.00) ke Telegram dan WhatsApp — aplikasi tidak mengirim lagi saat dibuka.' : 'Nyalakan setelah script terpasang agar pengingat tidak ganda.'}</small></div><button class="btn ${pendAktif() ? 'ghost ' : ''}xs" data-act="pend-aktif">${pendAktif() ? 'Matikan' : 'Nyalakan'}</button></div>` : ''}</div>`;
   };
   UI.pendampingKartu = () => '';
 
@@ -132,6 +134,7 @@
       T('Selesai', `<p>Lihat <b>Log eksekusi</b> di bawah editor. Berhasil bila ada baris:</p><div class="kode-mini">✅ Pendamping aktif untuk "…" — … transaksi terbaca.</div>
         <ul class="ul"><li>Pengingat Telegram terkirim tiap pagi ke anggota yang sudah <b>Hubungkan Telegram</b>.</li><li>Tidak ada yang perlu dijalankan lagi — script bekerja sendiri.</li><li>Ada kode versi baru nanti? Salin ulang dari panduan ini, tempel menimpa, jalankan <b>setupPendamping</b> sekali lagi. Selesai.</li><li>Berhenti kapan saja: pilih fungsi <b>hentikanPendamping</b> › Jalankan.</li></ul>
         <div class="note small">${I('triangle-alert')} <span>Ada tulisan merah? Foto layar log-nya dan kirim ke JuniorLabs.</span></div>
+        <div class="note small">${I('info')} <span>Terakhir: di <b>Lainnya › Notifikasi</b> nyalakan <b>"Script sudah terpasang"</b> agar pengingat hanya datang sekali tiap pagi (dari script), tidak ganda.</span></div>
         <div class="row-btns"><button type="button" class="btn sm" data-pa="ke-wa">${I('message-circle')} Lanjut pasang WhatsApp</button></div>`)
     ] },
     wa: { judul: 'Pasang WhatsApp (Fonnte)', langkah: () => [
@@ -268,6 +271,7 @@
   });
 
   // ---------- Pengingat yang dikirim dari aplikasi (melengkapi Skrip Pendamping) ----------
+  const pendAktif = () => Store.setting('pendampingAktif', '') === '1';
   const adaTelegram = () => { const inf = infoCache(); return inf && inf.aktif && (inf.terhubung || []).length; };
   const kirim = (pesan) => pesan.length && relayOk() && Store.mode === 'live' ? Relay.call('tg.kirim', { fileId: Store.fileId, pesan }).catch(() => {}) : null;
   /** Dipanggil setelah sinkron: tagihan H-7/H-3/H-1/H & rapat (kunci sama dengan Pendamping → tidak dobel). Sekali per jam per perangkat. */
@@ -276,15 +280,15 @@
     const k = 'sa:tgNotif:' + Store.fileId, last = Number(localStorage.getItem(k) || 0);
     if (Date.now() - last < 3600e3 || new Date().getHours() < 7) return;
     localStorage.setItem(k, String(Date.now()));
-    const o = notifSet(), pesan = [], today = U.today();
-    if (o.tagihan) Calc.occurrences(today, U.addDays(today, 7)).forEach(x => {
+    const o = notifSet(), pesan = [], today = U.today(), pend = pendAktif();   // Pendamping terpasang → pengingat tagihan & rapat hanya dari script (sekali tiap pagi)
+    if (o.tagihan && !pend) Calc.occurrences(today, U.addDays(today, 7)).forEach(x => {
       if (x.arah !== 'keluar' || x.lunas || x.kind === 'rapat' || x.kind === 'tujuan') return;
       const h = U.diffDays(today, x.tanggal); if ([7, 3, 1, 0].indexOf(h) < 0) return;
       const occ = x.kind === 'acara' ? 'a|' + x.ref.id : x.id;
       pesan.push({ ke: 'semua', kunci: 'occ|' + occ + '|H-' + h, teks: (h <= 1 ? '🔔 ' : '🗓️ ') + U.esc(x.nama) + ' · <b>' + U.rp(x.sisa) + '</b> jatuh tempo ' + (h === 0 ? '<b>hari ini</b>' : h === 1 ? '<b>besok</b>' : h + ' hari lagi (' + U.tgl(x.tanggal, 'dm') + ')') + '.' });
     });
     // Rapat: hanya bila jadwal rutin sudah diatur, dan hanya pada H-1 & hari-H jadwalnya (bukan tiap hari setelah terlewat).
-    if (o.rapat && Store.setting('rapatTanggal', '') !== '') Calc.rapatJadwal(today, U.addDays(today, 1)).forEach(x => {
+    if (o.rapat && !pend && Store.setting('rapatTanggal', '') !== '') Calc.rapatJadwal(today, U.addDays(today, 1)).forEach(x => {
       if (x.lunas) return; const h = U.diffDays(today, x.tanggal), tahunan = x.tanggal.slice(5, 7) === '12';
       pesan.push({ ke: 'semua', kunci: 'rapat|' + x.tanggal.slice(0, 7) + '|H-' + h, teks: '👥 Rapat keuangan keluarga ' + (h === 0 ? '<b>hari ini</b>' : '<b>besok</b>') + (tahunan ? ' — rapat tahunan dengan Kilas Balik.' : '.') + '\nAgendanya sudah disusun otomatis di aplikasi.' });
     });

@@ -79,7 +79,7 @@
   const NAV = [['beranda', 'house', 'Beranda'], ['mutasi', 'arrow-left-right', 'Mutasi'], ['kalender', 'calendar-days', 'Kalender'],
                ['aset', 'wallet', 'Aset'], ['rapor', 'chart-column', 'Rapor'], ['lainnya', 'menu', 'Lainnya']];
   const SIDE = [['beranda', 'house', 'Beranda'], ['mutasi', 'arrow-left-right', 'Mutasi'], ['kalender', 'calendar-days', 'Kalender'], ['aset', 'wallet', 'Aset'],
-    ['rapor', 'chart-column', 'Rapor'], null, ['tujuan', 'target', 'Tujuan'], ['anggaran', 'clipboard-list', 'Anggaran'], ['zakat', 'hand-heart', 'Zakat & Sedekah'], ['rapat', 'users', 'Rapat Keuangan'], null,
+    ['rapor', 'chart-column', 'Rapor'], null, ['tujuan', 'target', 'Goals'], ['anggaran', 'clipboard-list', 'Anggaran'], ['zakat', 'hand-heart', 'Zakat & Sedekah'], ['rapat', 'users', 'Rapat Keuangan'], null,
     ['ai', 'sparkles', 'Tanya AI'], ['simulasi', 'git-fork', 'Simulasi Keputusan'], null, ['pengaturan', 'settings', 'Pengaturan'], ['laporan', 'message-square-warning', 'Laporkan Masalah']];
   UI.shell = () => {
     document.body.innerHTML = `

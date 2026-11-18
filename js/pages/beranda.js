@@ -32,21 +32,15 @@
           <div class="hero-days"><small>${p.label}</small><div class="bar light"><i style="width:${(di.now / di.total * 100).toFixed(0)}%"></i></div><small>hari ke-${di.now} dari ${di.total} · sisa ${safe.hari} hari</small></div></div>
       </section>
 
-      ${UI.tiles([
-        { id: 't', icon: 'target', label: 'Tujuan', to: 'tujuan' },
-        { id: 'a', icon: 'clipboard-list', label: 'Anggaran', to: 'anggaran' },
-        { id: 'u', icon: 'scale', label: 'Utang', to: 'utang' },
-        { id: 'k', icon: 'calendar-days', label: 'Tagihan', to: 'kalender/tagihan' }
-      ], '', 'compact')}
-
       ${UI.langgananAlert ? UI.langgananAlert() : ''}
       ${(() => { const due = Calc.occurrences(U.today(), U.addDays(U.today(), 3)).filter(o => !o.lunas && o.arah === 'keluar' && (o.kind === 'rutin' || o.kind === 'pinjaman' || o.kind === 'acara') && !UI.isTunda(o)); return due.length ? `<div class="alert warn" data-act="go" data-to="kalender">${I('bell-ring')}<div><b>${due.length} jadwal bayar ≤ 3 hari lagi</b><small>${due.slice(0, 3).map(o => U.esc(o.nama) + ' (' + U.relDay(o.tanggal).toLowerCase() + ')').join(' · ')}</small></div>${I('chevron-right')}</div>` : ''; })()}
       ${UI.emasAlert ? UI.emasAlert() : ''}
       ${UI.pasangKartu ? UI.pasangKartu('beranda') : ''}
       ${UI.kotakAlert ? UI.kotakAlert() : ''}
       ${UI.aiInsightCard ? UI.aiInsightCard() : ''}
-      ${(() => { const st = Calc.rapatStatus(), lewat = Calc.tugasList().filter(t => t.tenggat && t.tenggat < U.today()).length;
-        return (!st.sudahBulanIni && st.sisa <= 1 ? `<div class="alert" data-act="go" data-to="rapat">${I('users')}<div><b>Rapat keuangan ${st.sisa <= 0 ? 'hari ini' : 'besok'}</b><small>Agenda sudah disusun otomatis — 20 menit cukup.</small></div>${I('chevron-right')}</div>` : '')
+      ${(() => { const lewat = Calc.tugasList().filter(t => t.tenggat && t.tenggat < U.today()).length;
+        const jd = Store.setting('rapatTanggal', '') !== '' ? Calc.rapatJadwal(U.today(), U.addDays(U.today(), 1)).filter(x => !x.lunas)[0] : null, sisaJ = jd ? U.diffDays(U.today(), jd.tanggal) : 9;
+        return (jd ? `<div class="alert" data-act="go" data-to="rapat">${I('users')}<div><b>Rapat keuangan ${sisaJ <= 0 ? 'hari ini' : 'besok'}</b><small>Agenda sudah disusun otomatis — 20 menit cukup.</small></div>${I('chevron-right')}</div>` : '')
           + (lewat ? `<div class="alert warn" data-act="go" data-to="rapat">${I('list-checks')}<div><b>${lewat} tugas rapat lewat tenggat</b><small>Lihat di Rapat Keuangan.</small></div>${I('chevron-right')}</div>` : ''); })()}
       ${(() => { const z = Calc.zakatMal(); return z.haul && z.wajib && z.kurang > 0 && z.haul.sisa <= 14 ? `<div class="alert" data-act="go" data-to="zakat">${I('hand-heart')}<div><b>Haul zakat mal ${z.haul.sisa <= 0 ? 'sudah tiba' : z.haul.sisa + ' hari lagi'}</b><small>Perkiraan zakat ${UI.m(z.kurang)} (2,5% dari harta bersih).</small></div>${I('chevron-right')}</div>` : ''; })()}
       ${proj.kritis ? `<div class="alert warn" data-act="go" data-to="kalender/arus">${I('triangle-alert')}<div><b>Siaga Dana ${U.tgl(proj.kritis.d, 'dm')}</b><small>Perkiraan saldo tinggal ${UI.m(proj.kritis.bal)} saat ada tagihan. Siapkan dana atau geser jadwal.</small></div>${I('chevron-right')}</div>` : ''}

@@ -155,12 +155,12 @@
   }
 
   UI.page('tujuan', {
-    head: p => p ? { title: (Store.byId.Tujuan[p] || {}).nama || 'Tujuan', crumb: 'Tujuan', back: 'tujuan', right: Store.byId.Tujuan[p] ? `<button class="icon-btn" data-act="goal-edit" data-id="${p}" aria-label="Ubah">${I('pencil')}</button>` : '' }
-      : { title: 'Tujuan', crumb: 'Lainnya', back: 'lainnya', right: `<button class="icon-btn" data-act="goal-new" aria-label="Tujuan baru">${I('plus')}</button>` },
+    head: p => p ? { title: (Store.byId.Tujuan[p] || {}).nama || 'Tujuan', crumb: 'Goals', back: 'tujuan', right: Store.byId.Tujuan[p] ? `<button class="icon-btn" data-act="goal-edit" data-id="${p}" aria-label="Ubah">${I('pencil')}</button>` : '' }
+      : { title: 'Goals', crumb: 'Lainnya', back: 'lainnya', right: `<button class="icon-btn" data-act="goal-new" aria-label="Tujuan baru">${I('plus')}</button>` },
     nav: () => 'lainnya',
     after(v, p) { if (!p) pasangUrut(); },
     render(p) {
-      if (!Store.can('tujuan', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Tujuan.');
+      if (!Store.can('tujuan', 'lihat')) return UI.empty('lock', 'Tidak ada akses', 'Minta Admin memberi izin menu Goals.');
       if (p) return detail(p);
       const gs = Calc.goals(), act = gs.filter(g => !g.t.arsip), arsip = gs.filter(g => g.t.arsip);
       const vis = act.filter(canSee);

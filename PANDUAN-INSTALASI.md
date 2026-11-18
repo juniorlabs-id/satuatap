@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.7.9 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.7.11 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -179,6 +179,8 @@ Skrip ini dipasang **Admin keluarga** di akun Google-nya sendiri, untuk hal yang
 - (opsional) mengirim pengingat yang sama ke **WhatsApp** lewat akun Fonnte milik keluarga.
 
 Tanpa Pendamping, pengingat Telegram tetap terkirim **saat salah satu anggota membuka aplikasi** (tagihan ≤ 3 hari, amplop 80%/100%, insight mingguan, alert harga emas dari relay).
+
+> **Satu pengingat, sekali tiap pagi.** Setelah Pendamping terpasang, buka **Lainnya › Notifikasi** lalu nyalakan **"Script sudah terpasang"**. Sejak itu pengingat tagihan, cicilan, acara dan rapat dikirim **hanya oleh script, sekitar pukul 08.00, dengan isi yang sama ke Telegram dan WhatsApp**; aplikasi tidak lagi mengirimnya saat dibuka (itu penyebab pesan ganda dan isi yang berbeda). Tanpa Pendamping, saklar dibiarkan mati agar pengingat Telegram tetap terkirim saat aplikasi dibuka. Alert amplop, harga emas, dan insight mingguan tetap dikirim aplikasi/relay karena sifatnya kejadian, bukan jadwal.
 
 ### C1. Pasang — ikuti panduan di aplikasi
 Buka **Lainnya › Pengaturan › Notifikasi › Skrip Pendamping › Panduan pasang langkah demi langkah**. Panduan 7 langkah itu memandu dari membuat proyek di script.google.com sampai mengecek hasilnya, lengkap dengan tombol:

@@ -286,7 +286,7 @@
     { id: '', icon: 'gem', label: 'Ringkasan', to: 'emas', gold: true }, { id: 'koleksi', icon: 'layers', label: 'Koleksi', to: 'emas/koleksi', gold: true },
     { id: 'harga', icon: 'trending-up', label: 'Harga & Alert', to: 'emas/harga', gold: true }, { id: 'simulasi', icon: 'calculator', label: 'Simulasi Jual', to: 'emas/simulasi', gold: true },
     { id: 'beli', icon: 'circle-plus', label: 'Catat Beli', act: 'emas-beli', gold: true }, { id: 'zakat', icon: 'hand-heart', label: 'Zakat Emas', to: 'zakat', gold: true },
-    { id: 'tujuan', icon: 'target', label: 'Tujuan', to: 'tujuan', gold: true }, { id: 'alok', icon: 'scale', label: 'Alokasi', to: 'investasi/alokasi', gold: true }
+    { id: 'tujuan', icon: 'target', label: 'Goals', to: 'tujuan', gold: true }, { id: 'alok', icon: 'scale', label: 'Alokasi', to: 'investasi/alokasi', gold: true }
   ], cur);
   const priceChip = h => h ? `<div class="price-chip ${h.basi ? 'stale' : ''}">${I(h.mode === 'manual' ? 'pencil' : 'radio')}<span>Beli <b>${U.rpShort(h.beli)}</b> · Buyback <b>${U.rpShort(h.buyback)}</b> /g</span><small>${U.tgl(h.tanggal, 'dm')}${h.basi ? ' · perlu diperbarui' : ''}</small></div>`
     : `<div class="alert warn" data-act="emas-manual">${I('triangle-alert')}<div><b>Harga emas belum tersedia</b><small>Ketuk untuk mengisi harga manual sementara.</small></div></div>`;

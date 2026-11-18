@@ -287,6 +287,14 @@ function nominalTeks_(t) {
 }
 
 /** Jadwal rutin, cicilan, acara dalam N hari (logika sama dengan aplikasi). */
+/** Cicilan per bulan — rumus yang sama dengan aplikasi (kolom cicilan bila diisi, kalau tidak dihitung dari pokok/bunga/tenor). */
+function cicilan_(p) {
+  if (Number(p.cicilan)) return Number(p.cicilan);
+  const n = Math.max(1, Number(p.tenor) || 1), P = Number(p.pokok) || 0, r = (Number(p.bunga) || 0) / 1200;
+  if (p.metode === 'anuitas' && r > 0) return P * r / (1 - Math.pow(1 + r, -n));
+  if (p.metode === 'flat') return P / n + P * r;
+  return P / n;
+}
 function jadwal_(st, today, hari) {
   const out = [], bayar = {};
   Object.keys(st.Transaksi).forEach(function (k) { const t = st.Transaksi[k]; if (t.refId && t.periodeRef) { const key = t.refId + '|' + t.periodeRef; bayar[key] = (bayar[key] || 0) + (Number(t.jumlah) || 0); } });
@@ -303,12 +311,13 @@ function jadwal_(st, today, hari) {
       out.push({ occ: r.id + '|' + key, nama: r.nama, jumlah: j, h: h, arah: r.jenis === 'masuk' ? 'masuk' : 'keluar', lunas: (bayar[r.id + '|' + key] || 0) >= j * 0.999 && j > 0, tanggal: s, jenis: 'rutin' });
     });
     pinj.forEach(function (p) {
-      const c = Number(p.cicilan) || 0;
+      const c = cicilan_(p);
       if (p.lunas === 'true' || !Number(p.tanggalBayar) || !c) return;
       if (Math.min(Number(p.tanggalBayar), last) !== tgl) return;
       if (p.mulai && s < p.mulai) return;
+      if (Number(p.tenor) && p.mulai && ((d.getFullYear() - Number(p.mulai.slice(0, 4))) * 12 + d.getMonth() - (Number(p.mulai.slice(5, 7)) - 1)) >= Number(p.tenor) + 1) return;
       const key = s.slice(0, 7);
-      out.push({ occ: p.id + '|' + key, nama: (p.arah === 'piutang' ? 'Piutang: ' : 'Cicilan: ') + p.pihak, jumlah: c, h: h, arah: p.arah === 'piutang' ? 'masuk' : 'keluar', lunas: (bayar[p.id + '|' + key] || 0) >= c * 0.999, tanggal: s, jenis: 'pinjaman' });
+      out.push({ occ: p.id + '|' + key, nama: p.arah === 'piutang' ? 'Piutang: ' + p.pihak : (/^cicilan/i.test(p.pihak) ? p.pihak : 'Cicilan ' + p.pihak), jumlah: c, h: h, arah: p.arah === 'piutang' ? 'masuk' : 'keluar', lunas: (bayar[p.id + '|' + key] || 0) >= c * 0.999, tanggal: s, jenis: 'pinjaman' });
     });
   }
   Object.keys(st.Acara).forEach(function (k) {
