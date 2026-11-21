@@ -14,12 +14,12 @@
     const src = F.all ? Calc.txSorted() : Calc.txSorted().filter(t => t.tanggal >= p.start && t.tanggal <= p.end);
     list = src.filter(t => {
       if (F.jenis && (F.jenis === 'lain' ? (t.jenis === 'keluar' || t.jenis === 'masuk' || t.jenis === 'transfer') : t.jenis !== F.jenis)) return false;
-      if (F.kat && t.kategoriId !== F.kat) return false;
+      if (F.kat && t.kategoriId !== F.kat && !(Array.isArray(t.rincian) && t.rincian.some(x => x.k === F.kat))) return false;
       if (F.wallet && t.walletId !== F.wallet && t.walletTujuan !== F.wallet) return false;
       if (F.who && (t.dibayarOleh || t.dicatatOleh) !== F.who) return false;
       if (q) {
         const k = Store.byId.Kategori[t.kategoriId];
-        const hay = (UI.note(t) + ' ' + UI.note(t, 'tag')) + ' ' + (k ? k.nama : '') + ' ' + UI.txTitle(t) + ' ' + t.jumlah;
+        const hay = (UI.note(t) + ' ' + UI.note(t, 'tag')) + ' ' + (k ? k.nama : '') + ' ' + UI.txTitle(t) + ' ' + t.jumlah + (Array.isArray(t.rincian) && !UI.isPrivate(t) ? ' ' + t.rincian.map(x => x.n).join(' ') : '');
         if (hay.toLowerCase().indexOf(q) < 0) return false;
       }
       return true;

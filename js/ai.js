@@ -1,7 +1,8 @@
 /* ============================================================
- * AI — Gemini dengan kunci API milik keluarga (R-06, R-07, T-11, M-05)
- *  - Kunci disimpan HANYA di perangkat ini (localStorage per akun),
- *    tidak di spreadsheet, tidak lewat server JuniorLabs.
+ * AI — Gemini (R-06, R-07, T-11, M-05)
+ *  - Bawaan: AI milik JuniorLabs lewat relay (keluarga tidak perlu memasang apa pun).
+ *    Relay memeriksa lisensi & jatah harian; isi permintaan tidak disimpan.
+ *  - Opsi lanjutan: kunci Gemini sendiri (disimpan HANYA di HP ini) → langsung ke Google.
  *  - Angka dihitung aplikasi; Gemini hanya merangkai kalimat.
  *  - Yang dikirim: ringkasan angka (tanpa catatan transaksi, tanpa kategori pribadi).
  * ============================================================ */
@@ -14,7 +15,17 @@
   AI.simpanCfg = c => { try { localStorage.setItem(kunciLS(), JSON.stringify(c)); } catch (e) {} };
   AI.hapus = () => { try { localStorage.removeItem(kunciLS()); localStorage.removeItem(kunciLS() + ':insight'); } catch (e) {} };
   AI.demo = () => Store.mode === 'demo';
-  AI.siap = () => AI.demo() || !!AI.cfg().key;
+  AI.pribadi = () => !!AI.cfg().key;
+  AI.lewatRelay = () => !AI.pribadi() && Store.mode === 'live' && !!(window.Relay && Relay.enabled());
+  AI.siap = () => AI.demo() || AI.pribadi() || AI.lewatRelay();
+  /** Lewat relay JuniorLabs. */
+  const mintaRelay = async (prompt, opt) => {
+    const r = await Relay.call('ai.minta', { fileId: Store.fileId, jenis: opt.jenis || '', prompt, sistem: opt.sistem || '', gambar: opt.gambar ? { mime: opt.gambar.mime, data: opt.gambar.data } : null, json: !!opt.json, maks: opt.maks || 0 },
+      { timeout: opt.gambar ? 90000 : 60000, sekali: true });
+    if (!r || !r.success) throw new Error((r && r.message) || 'AI tidak bisa dihubungi. Coba lagi.');
+    AI.terakhirModel = r.data.model; AI.sisaKuota = r.data.sisa;
+    return r.data.teks + (r.data.terpotong && !opt.json ? '… (jawaban terpotong — coba tanyakan lebih spesifik)' : '');
+  };
 
   /** Daftar model yang bisa dipakai kunci ini → pilih Flash stabil terbaru (bukan lite/preview/live/tts/image). */
   const UTAMA = 'gemini-3.5-flash';   // terbukti cepat & stabil di kunci gratis (Nov 2026)
@@ -61,7 +72,8 @@
   AI.minta = async (prompt, opt) => {
     opt = opt || {};
     if (AI.demo()) return AI.contohDemo(prompt, opt);
-    const c = AI.cfg(); if (!c.key) throw new Error('Kunci Gemini belum diisi. Buka Lainnya › Tanya AI.');
+    const c = AI.cfg();
+    if (!c.key) { if (AI.lewatRelay()) return mintaRelay(prompt, opt); throw new Error('AI belum tersedia di perangkat ini.'); }
     const parts = [{ text: prompt }];
     if (opt.gambar) parts.push({ inline_data: { mime_type: opt.gambar.mime, data: opt.gambar.data } });
     const body = { contents: [{ role: 'user', parts }], generationConfig: { temperature: opt.json ? 0.1 : 0.4, maxOutputTokens: Math.max(2048, opt.maks || 0) } };
@@ -181,32 +193,73 @@
   };
 
   /** Foto struk → {total, tanggal, toko, kategori}. Gambar diperkecil dulu di HP (maks 1280 px). */
-  AI.kecilkan = (file) => new Promise((res, rej) => {
+  AI.kecilkan = (file, maks) => new Promise((res, rej) => {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
-      const s = Math.min(1, 1280 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+      const s = Math.min(1, (maks || 1280) / Math.max(img.width, img.height)), cv = document.createElement('canvas');
       cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
       cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
-      cv.toBlob(b => { if (!b) return rej(new Error('Gagal membaca foto.')); const fr = new FileReader(); fr.onload = () => res({ blob: b, mime: 'image/jpeg', data: String(fr.result).split(',')[1] }); fr.readAsDataURL(b); }, 'image/jpeg', 0.8);
+      cv.toBlob(b => { if (!b) return rej(new Error('Gagal membaca foto.')); const fr = new FileReader(); fr.onload = () => res({ blob: b, mime: 'image/jpeg', data: String(fr.result).split(',')[1] }); fr.readAsDataURL(b); }, 'image/jpeg', 0.82);
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('File bukan gambar.')); };
     img.src = url;
   });
+  /** Nama kategori dari AI → kategoriId keluarga (persis, lalu mirip, lalu kamus). */
+  const cariKat = (nama, cadangan) => {
+    const kats = Store.kategori('keluar').filter(k => !k.arsip), n = String(nama || '').toLowerCase().trim();
+    let k = kats.find(x => x.nama.toLowerCase() === n) || (n && kats.find(x => x.nama.toLowerCase().indexOf(n) >= 0 || n.indexOf(x.nama.toLowerCase()) >= 0));
+    if (!k && window.Kamus && cadangan) { const id = Kamus.tebak(cadangan, 'keluar'); if (id) return id; }
+    return k ? k.id : '';
+  };
+  /** Kategori hasil koreksi pengguna sebelumnya (belajar dari "Ubah kategori"). */
+  const dariAjaran = teks => { if (!window.Voice) return ''; const a = Voice.ajaran(); let id = ''; String(teks || '').toLowerCase().split(/[^a-z]+/).some(w => { id = w.length >= 4 && a[w] && Store.byId.Kategori[a[w]] ? a[w] : ''; return !!id; }); return id; };
+  AI.kategoriBarang = (nama, saranAI) => dariAjaran(nama) || cariKat(saranAI, nama) || (window.Kamus ? Kamus.tebak(nama, 'keluar') : '');
+
+  /** Foto struk → rincian per barang. Hasil: {toko, tanggal, jam, bayar, items:[{nama,qty,harga,jumlah,kategoriId,cek}], pajak, potongan, total, yakin}. */
   AI.bacaStruk = async (gb) => {
-    const kats = Store.kategori('keluar').filter(k => !k.pribadi).map(k => k.nama);
-    const t = await AI.minta('Baca foto struk/nota belanja ini. Balas JSON saja: {"total": angka rupiah tanpa titik (total yang dibayar), "tanggal": "YYYY-MM-DD" atau "", "toko": "nama toko/merchant", "kategori": salah satu dari ' + JSON.stringify(kats) + ', "yakin": 0-1}. Hari ini ' + U.today() + '. Jika bukan struk, total 0.',
-      { gambar: gb, json: true, maks: 300 });
+    const kats = Store.kategori('keluar').filter(k => !k.pribadi && !k.arsip).map(k => k.nama);
+    const pet = window.Kamus ? Kamus.petunjuk('keluar') : '';
+    const t = await AI.minta('Baca foto struk/nota belanja ini dengan teliti, baris demi baris. Balas JSON saja dengan bentuk:\n' +
+      '{"toko":"nama toko","tanggal":"YYYY-MM-DD","jam":"HH:MM","bayar":"tunai|debit|kredit|qris|ewallet|transfer|","items":[{"nama":"nama barang","qty":1,"harga":0,"jumlah":0,"kategori":"","cek":false}],"pajak":0,"potongan":0,"total":0,"yakin":0.9}\n' +
+      'Aturan:\n- items: SETIAP barang yang dibeli, urut sesuai struk. "nama" ditulis rapi (Title Case), singkatan diperjelas bila jelas (mis. "DAG. SAPI SLICE" → "Daging Sapi Slice", "KNTG BELANJA" → "Kantong Belanja"). "harga" = harga satuan, "jumlah" = total baris setelah diskon baris itu.\n' +
+      '- Baris DISCOUNT/DISKON/POTONGAN/HEMAT yang ada di bawah sebuah barang dikurangkan ke "jumlah" barang itu (bukan barang terpisah), dan barang itu diberi "cek": true. Beri "cek": true juga bila angka/nama barang ragu terbaca.\n' +
+      '- "kategori": pilih SATU dari ' + JSON.stringify(kats) + ' yang paling cocok untuk barang itu.' + (pet ? ' Panduan:\n' + pet : '') + '\n' +
+      '- "pajak": pajak/biaya layanan/ongkir yang DITAMBAHKAN ke total (0 bila PPN sudah termasuk harga — baris "DPP/PPN" hanya informasi). "potongan": diskon total di luar diskon per barang (angka positif). "total": jumlah yang dibayar (TOTAL BAYAR/GRAND TOTAL), bukan TUNAI/KEMBALI.\n' +
+      '- Semua angka rupiah bulat tanpa titik. Abaikan baris SUBTOTAL, TUNAI, KEMBALI, TOTAL ITEM, alamat & ucapan.\n' +
+      '- Hari ini ' + U.today() + '. Jika foto bukan struk, items [] dan total 0.',
+      { gambar: gb, json: true, maks: 8000, jenis: 'struk' });
     let o; try { o = JSON.parse(t.replace(/^```json|```$/g, '').trim()); } catch (e) { throw new Error('Struk tidak terbaca. Coba foto lebih terang dan lurus.'); }
-    const total = Math.round(Number(String(o.total || 0).replace(/[^\d.]/g, '')) || 0);
-    const k = Store.kategori('keluar').find(x => x.nama === o.kategori);
+    const angka = v => Math.round(Number(String(v == null ? 0 : v).replace(/[^\d.-]/g, '')) || 0);
+    const items = (Array.isArray(o.items) ? o.items : []).map(x => {
+      const qty = Math.max(1, Number(x.qty) || 1), harga = angka(x.harga), jumlah = angka(x.jumlah) || harga * qty, nama = String(x.nama || 'Barang').replace(/\s+/g, ' ').trim().slice(0, 60);
+      return { nama, qty, harga: harga || Math.round(jumlah / qty), jumlah, kategoriId: AI.kategoriBarang(nama, x.kategori), cek: !!x.cek };
+    }).filter(x => x.jumlah > 0);
+    let total = angka(o.total); const sum = U.sum(items, x => x.jumlah);
+    if (!total) total = sum + angka(o.pajak) - angka(o.potongan);
     const tgl = /^\d{4}-\d{2}-\d{2}$/.test(o.tanggal || '') && o.tanggal <= U.today() && o.tanggal >= U.addDays(U.today(), -400) ? o.tanggal : U.today();
-    return { total, tanggal: tgl, toko: String(o.toko || '').slice(0, 60), kategoriId: k ? k.id : '', yakin: Number(o.yakin) || 0 };
+    return { toko: String(o.toko || '').replace(/\s+/g, ' ').trim().slice(0, 60), tanggal: tgl, jam: /^\d{1,2}[:.]\d{2}$/.test(o.jam || '') ? String(o.jam).replace('.', ':') : '', bayar: String(o.bayar || ''),
+      items, pajak: angka(o.pajak), potongan: angka(o.potongan), total, yakin: Number(o.yakin) || 0,
+      kategoriId: items.length ? '' : cariKat(o.kategori, o.toko) };
+  };
+  /** Kelompokkan beberapa catatan teks yang belum berkategori, sekali panggil. names → [kategoriId|'']. */
+  AI.kategorikan = async (list, arah) => {
+    const kats = Store.kategori(arah === 'masuk' ? 'masuk' : 'keluar').filter(k => !k.pribadi && !k.arsip).map(k => k.nama);
+    const t = await AI.minta('Kelompokkan catatan keuangan berikut ke kategori. Pilihan kategori: ' + JSON.stringify(kats) + '.\nCatatan: ' + JSON.stringify(list) +
+      '\nBalas JSON saja: {"kategori": [nama kategori untuk tiap catatan, urut sama; "" bila benar-benar tidak jelas]}', { json: true, maks: 2048, jenis: 'kategori' });
+    let o = {}; try { o = JSON.parse(t.replace(/^```json|```$/g, '').trim()); } catch (e) {}
+    const arr = Array.isArray(o.kategori) ? o.kategori : [];
+    const ks = Store.kategori(arah === 'masuk' ? 'masuk' : 'keluar');
+    return list.map((_, i) => { const n = String(arr[i] || '').toLowerCase(); const k = n && ks.find(x => x.nama.toLowerCase() === n); return k ? k.id : ''; });
   };
 
   // ---------- Mode demo: jawaban contoh tanpa kunci ----------
   AI.contohDemo = async (prompt, opt) => {
     await new Promise(r => setTimeout(r, 600));
-    if (opt.gambar) return JSON.stringify({ total: 187500, tanggal: U.today(), toko: 'Superindo Ciputat', kategori: (Store.kategori('keluar').find(k => /belanja|dapur/i.test(k.nama)) || {}).nama || '', yakin: 0.9 });
+    if (opt.gambar) return JSON.stringify({ toko: 'Superindo Ciputat', tanggal: U.today(), jam: '10:42', bayar: 'tunai', total: 187500, pajak: 0, potongan: 0, yakin: 0.9, items: [
+      { nama: 'Beras Premium 5kg', qty: 1, harga: 74500, jumlah: 74500, kategori: '' }, { nama: 'Minyak Goreng 2L', qty: 1, harga: 36500, jumlah: 31500, kategori: '', cek: true },
+      { nama: 'Sabun Cuci Piring 755ml', qty: 1, harga: 16900, jumlah: 16900, kategori: '' }, { nama: 'Sampo Anti Ketombe', qty: 1, harga: 44500, jumlah: 44500, kategori: '' },
+      { nama: 'Keripik Kentang', qty: 1, harga: 15100, jumlah: 15100, kategori: '' }, { nama: 'Air Mineral 600ml', qty: 1, harga: 5000, jumlah: 5000, kategori: '' }] });
+    if (/Kelompokkan catatan/.test(prompt)) return JSON.stringify({ kategori: [] });
     if (/DATA RAPAT/.test(prompt)) return '• Makan di luar naik cukup tajam dibanding rata-rata 3 bulan — mau dibatasi 2× seminggu?\n• Amplop Belanja Dapur melewati batas; apakah batasnya memang perlu dinaikkan?\n• Bulan depan ada tagihan tahunan; sudah disisihkan dari mana?\n• Dana darurat baru sebagian tercapai — setoran bisa ditambah Rp 250 rb?';
     if (/DATA MINGGUAN/.test(prompt)) return 'Minggu ini pengeluaran keluarga relatif terkendali.\n• Belanja dapur sedikit naik dibanding minggu lalu.\n• Amplop Makan & Minum sudah terpakai lebih dari 80%.\n• Ada tagihan listrik & internet dalam 7 hari ke depan.\nSaran kecil: masak di rumah 2 hari ekstra minggu ini.';
     return '(Contoh jawaban mode demo) Pengeluaran jajan bulan ini sekitar Rp 1,1 jt, naik ±18% dibanding rata-rata 3 bulan terakhir. Kenaikan terbesar dari makan di luar akhir pekan. Coba tetapkan batas Rp 250 rb per minggu di amplop Makan & Minum.';

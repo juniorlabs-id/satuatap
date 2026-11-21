@@ -19,7 +19,8 @@
   }
   const Relay = {
     enabled: () => !!APP_CONFIG.RELAY_URL,
-    async call(action, data) {
+    async call(action, data, opt) {
+      opt = opt || {};
       if (Store.mode === 'demo') {
         await new Promise(r => setTimeout(r, 120));
         if (action === 'laporan.kirim') return { success: true, data: { tiket: 'DEMO-' + Math.floor(Math.random() * 9000 + 1000) }, message: 'Mode demo: laporan tidak benar-benar dikirim.' };
@@ -33,7 +34,8 @@
       if (!Relay.enabled()) return { success: false, off: true, message: 'Server lisensi belum diatur (RELAY_URL kosong).' };
       if (action.indexOf('auth.') !== 0 && !Auth.valid()) await Auth.ensure();
       let r;
-      for (let i = 0; i < 2; i++) { if (i) await new Promise(x => setTimeout(x, 1500)); r = await once(action, data, i ? 45000 : 25000); if (r.success || !r.network) break; }
+      const kali = opt.sekali ? 1 : 2;
+      for (let i = 0; i < kali; i++) { if (i) await new Promise(x => setTimeout(x, 1500)); r = await once(action, data, opt.timeout || (i ? 45000 : 25000)); if (r.success || !r.network) break; }
       return r;
     },
     warm() { if (Relay.enabled() && Store.mode === 'live') fetch(APP_CONFIG.RELAY_URL + '?ping=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); }

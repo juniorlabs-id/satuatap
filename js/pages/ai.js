@@ -8,19 +8,26 @@
   /** Teks AI → HTML aman (butir "• " dan baris baru). */
   UI.aiTeks = t => U.esc(String(t || '')).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^\s*[-*•]\s+/gm, '• ').replace(/\n/g, '<br>');
 
-  // ---------- Pengaturan kunci ----------
-  UI.act('ai-sambung', async el => {
-    const inp = document.getElementById('ai-key'); if (!inp) return;
-    el.disabled = true; el.innerHTML = I('loader') + ' Memeriksa…';
-    try { const m = await AI.sambung(inp.value); inp.value = ''; UI.toast('Tersambung · model ' + m); UI.render(); }
-    catch (e) { UI.toast(e.message, 'warn'); el.disabled = false; el.innerHTML = I('plug') + ' Sambungkan'; }
-  });
-  UI.act('ai-putus', async () => { if (await UI.confirm('Hapus kunci Gemini dari HP ini?', 'Fitur AI berhenti di perangkat ini. Kunci di Google AI Studio tidak terhapus.', 'Hapus', true)) { AI.hapus(); UI.render(); } });
-  UI.act('ai-model', () => {
+  // ---------- Pengaturan AI (bawaan: AI JuniorLabs; opsional: kunci Gemini sendiri) ----------
+  UI.act('ai-atur', () => {
     const c = AI.cfg(), list = (c.models || []).filter(n => /gemini/.test(n));
-    const s = UI.sheet({ title: 'Model Gemini', body: UI.field('Model', `<select name="model">${list.map(n => `<option ${n === c.model ? 'selected' : ''}>${U.esc(n)}</option>`).join('')}</select>`, 'Bawaan: gemini-3.5-flash (cepat & stabil). Ganti hanya bila sering gagal atau kuota habis.'),
-      foot: `<button class="btn" data-ok>Simpan</button>` });
-    s.el.querySelector('[data-ok]').onclick = () => { AI.simpanCfg(Object.assign(c, { model: UI.formData(s.el).model, manual: true })); s.close(); UI.render(); };
+    const s = UI.sheet({ title: 'Pengaturan AI', cls: 'small', body: AI.pribadi()
+      ? `<div class="note">${I('key-round')} <span>Memakai <b>kunci Gemini pribadi</b> di HP ini.</span></div>
+         ${UI.field('Model', `<select name="model">${list.map(n => `<option ${n === c.model ? 'selected' : ''}>${U.esc(n)}</option>`).join('')}</select>`, 'Ganti hanya bila sering gagal atau kuota habis.')}
+         <button class="btn block ghost" data-simpan>Simpan model</button><button class="btn block ghost danger" data-putus>${I('unplug')} Hapus kunci · kembali ke AI JuniorLabs</button>`
+      : `<div class="note ok">${I('sparkles')} <span><b>AI JuniorLabs aktif</b> — sudah termasuk langganan SatuAtap, tanpa pemasangan apa pun.${AI.sisaKuota != null ? ' Sisa jatah keluarga hari ini: <b>' + AI.sisaKuota + '</b>.' : ''}</span></div>
+         <details class="adv"><summary>Pakai kunci Gemini sendiri (opsional)</summary>
+           <p class="small muted">Hanya bila ingin jatah tak terbatas dari akun Google sendiri. Buat kunci di <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Kunci disimpan hanya di HP ini.</p>
+           ${UI.field('Kunci API Gemini', `<input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="AQ.… / AIza…">`)}
+           <button class="btn block" data-sambung>${I('plug')} Sambungkan</button></details>` });
+    const q = x => s.el.querySelector(x);
+    if (q('[data-simpan]')) q('[data-simpan]').onclick = () => { AI.simpanCfg(Object.assign(c, { model: UI.formData(s.el).model, manual: true })); s.close(); UI.render(); };
+    if (q('[data-putus]')) q('[data-putus]').onclick = () => { AI.hapus(); s.close(); UI.toast('Kembali memakai AI JuniorLabs.'); UI.render(); };
+    if (q('[data-sambung]')) q('[data-sambung]').onclick = async () => {
+      const b = q('[data-sambung]'); b.disabled = true; b.innerHTML = I('loader') + ' Memeriksa…';
+      try { const m = await AI.sambung(q('#ai-key').value); s.close(); UI.toast('Kunci pribadi tersambung · ' + m); UI.render(); }
+      catch (e) { UI.toast(e.message, 'warn'); b.disabled = false; b.innerHTML = I('plug') + ' Sambungkan'; }
+    };
   });
 
   // ---------- Tanya AI ----------
@@ -37,11 +44,10 @@
   UI.act('ai-kirim', () => { const i = document.getElementById('ai-q'); if (i) { const v = i.value; i.value = ''; tanya(v); } });
   UI.act('ai-bersih', () => { A.chat = []; simpanChat(); UI.render(); });
 
-  // ---------- Foto struk (T-11) ----------
+  // ---------- Foto struk (T-11): dibaca per barang → 1 mutasi berisi rincian ----------
   UI.fotoStruk = () => {
-    if (!AI.siap()) { UI.toast('Sambungkan kunci Gemini dulu di Lainnya › Tanya AI.', 'warn'); return UI.go('ai'); }
-    // Pilih sumber dulu: kamera (langsung foto) atau galeri (struk yang sudah difoto / screenshot e-struk).
-    const pil = UI.sheet({ title: 'Foto struk', cls: 'small', body: `<p class="muted small">Gemini membaca total, tanggal & nama toko, lalu mengisikan form catat.</p>
+    if (!AI.siap()) return UI.toast('Fitur AI belum tersedia. Pastikan lisensi aktif dan internet tersambung.', 'warn');
+    const pil = UI.sheet({ title: 'Scan struk', cls: 'small', body: `<p class="muted small">AI membaca setiap barang, memilihkan kategorinya, lalu Anda cek sebelum disimpan sebagai satu catatan.</p>
       <div class="setor-via dua"><button type="button" data-src="kamera">${I('camera')}Kamera<small>foto sekarang</small></button><button type="button" data-src="galeri">${I('image')}Galeri<small>foto / screenshot</small></button></div>` });
     pil.el.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { pil.close(); pilihFoto(b.dataset.src === 'kamera'); });
   };
@@ -51,19 +57,87 @@
     inp.style.display = 'none'; document.body.appendChild(inp);
     inp.onchange = async () => {
       const f = inp.files[0]; inp.remove(); if (!f) return;
-      const s = UI.sheet({ title: 'Membaca struk', cls: 'small', body: `<div class="voice"><div class="mic-pulse">${I('scan-line', 'big')}</div><p class="muted">Gemini sedang membaca total, tanggal, dan nama toko…</p></div>` });
+      const s = UI.sheet({ title: 'Membaca struk', cls: 'small', body: `<div class="voice"><div class="mic-pulse">${I('scan-line', 'big')}</div><p class="muted">AI sedang membaca setiap barang di struk…<br><small>Biasanya 5–20 detik.</small></p></div>` });
       try {
-        const gb = await AI.kecilkan(f), r = await AI.bacaStruk(gb);
+        const gb = await AI.kecilkan(f, 1600), r = await AI.bacaStruk(gb);
         s.close();
-        if (!r.total) { UI.toast('Total belanja tidak terbaca. Isi manual ya.', 'warn'); return UI.catat({ preset: { jenis: 'keluar', sumber: 'struk' } }); }
-        let lampiran = '';
-        if (Store.mode === 'live' && Cloud.simpanStruk) { try { lampiran = await Cloud.simpanStruk(gb.blob, (r.toko || 'struk') + ' ' + r.tanggal + '.jpg'); } catch (e) { UI.toast('Foto tidak tersimpan ke Drive: ' + e.message, 'warn'); } }
-        UI.catat({ preset: { jenis: 'keluar', jumlah: r.total, tanggal: r.tanggal, kategoriId: r.kategoriId, catatan: r.toko, sumber: 'struk', lampiran } });
-        if (r.yakin && r.yakin < 0.6) UI.toast('Periksa lagi angkanya — fotonya agak sulit dibaca.', 'warn');
+        if (!r.items.length && !r.total) { UI.toast('Struk tidak terbaca. Coba foto lebih terang dan lurus, atau isi manual.', 'warn'); return UI.catat({ preset: { jenis: 'keluar', sumber: 'struk' } }); }
+        if (!r.items.length) return UI.catat({ preset: { jenis: 'keluar', jumlah: r.total, tanggal: r.tanggal, kategoriId: r.kategoriId, catatan: r.toko, sumber: 'struk' } });
+        UI.cekStruk(r, gb);
       } catch (e) { s.close(); UI.toast(e.message, 'warn'); }
     };
     inp.click();
   }
+  /** Layar periksa hasil scan: ubah nama/nominal/kategori per barang, lalu simpan sebagai 1 mutasi. */
+  UI.cekStruk = (r, gb) => {
+    const wl = Store.wallets();
+    const tunai = /tunai|cash/i.test(r.bayar || '') ? (wl.find(w => w.jenis === 'tunai') || {}).id : '';
+    const st = { toko: r.toko || 'Belanja', tanggal: r.tanggal || U.today(), walletId: tunai || UI.defWallet(), total: r.total, items: r.items.map(x => Object.assign({ asli: x.kategoriId }, x)) };
+    const s = UI.sheet({ title: 'Cek hasil scan', cls: 'struk-sheet', body: '<div class="cs-body"></div>',
+      foot: `<button class="btn block" data-ok>${I('check')} Simpan</button>` });
+    const body = s.el.querySelector('.cs-body');
+    const subtotal = () => U.sum(st.items, x => x.jumlah || 0);
+    const ringkas = () => {
+      const sub = subtotal(), tot = st.total || sub, sel = tot - sub, el = body.querySelector('.cs-sum');
+      if (!el) return;
+      el.querySelector('[data-sub]').textContent = U.rp(sub);
+      const adj = el.querySelector('[data-adj]'); adj.hidden = !sel;
+      adj.innerHTML = `<span>${sel > 0 ? 'Pajak & biaya' : 'Potongan'}</span><b>${sel > 0 ? '+' : '−'}${U.rp(Math.abs(sel))}</b>`;
+    };
+    const render = () => {
+      const cek = st.items.filter(x => x.cek).map(x => x.nama), kosong = st.items.filter(x => !x.kategoriId).length;
+      body.innerHTML = `<div class="cs-head"><input class="cs-toko" data-g="toko" value="${U.esc(st.toko)}" maxlength="60" aria-label="Nama toko">
+          <div class="grid2">${UI.field('Tanggal', `<input type="date" data-g="tanggal" value="${st.tanggal}" max="${U.today()}">`)}${UI.field('Bayar pakai', `<select data-g="walletId">${UI.walletOpts(st.walletId)}</select>`)}</div></div>
+        ${cek.length ? `<div class="note warn small">${I('circle-alert')} <span><b>Perlu dicek:</b> ${U.esc(cek.slice(0, 4).join(', '))}${cek.length > 4 ? ' +' + (cek.length - 4) : ''}. Ketuk untuk mengubah.</span></div>` : ''}
+        ${kosong ? `<div class="note warn small">${I('tag')} <span>${kosong} barang belum berkategori — pilih dulu sebelum menyimpan.</span></div>` : ''}
+        <div class="card cs-list">${st.items.map((x, i) => { const k = Store.byId.Kategori[x.kategoriId];
+          return `<div class="cs-row ${x.cek ? 'cek' : ''}" data-i="${i}"><div class="cs-t"><input class="cs-nama" data-f="nama" value="${U.esc(x.nama)}" maxlength="60" aria-label="Nama barang">
+              <small>${x.qty > 1 ? x.qty + ' × ' + U.rp(x.harga) : ''}</small>
+              <label class="vq-pill ${x.kategoriId ? '' : 'kosong'}">${I(k ? k.ikon || 'tag' : 'tag')}<select data-f="kategoriId" aria-label="Kategori"><option value="">Pilih kategori</option>${UI.katOpts('keluar', x.kategoriId)}</select>${I('chevron-down')}</label></div>
+            <div class="cs-r"><div class="cs-amt"><span>Rp</span><input data-f="jumlah" data-rp inputmode="numeric" value="${U.fmtNum(x.jumlah)}" aria-label="Nominal"></div><button type="button" class="icon-btn sm" data-hapus aria-label="Hapus barang">${I('x')}</button></div></div>`; }).join('')}
+          <button type="button" class="link cs-add" data-tambah>${I('plus')} Tambah barang</button>
+          <div class="cs-sum"><div class="kv"><span>Subtotal</span><b data-sub></b></div><div class="kv" data-adj hidden></div>
+            <div class="kv cs-total"><span>Total dibayar</span><div class="cs-amt big"><span>Rp</span><input data-g="total" data-rp inputmode="numeric" value="${U.fmtNum(st.total || subtotal())}" aria-label="Total dibayar"></div></div></div></div>
+        <button type="button" class="link block" data-satu>Simpan sebagai 1 transaksi tanpa item</button>`;
+      UI.bindRp(body); ringkas();
+    };
+    const x0 = row => { const x = st.items[+row.dataset.i]; if (x && x.cek) { x.cek = false; row.classList.remove('cek'); } return true; };   // ketuk baris = sudah dicek
+    body.addEventListener('input', e => {
+      const g = e.target.dataset.g, f = e.target.dataset.f, row = e.target.closest('.cs-row');
+      if (g === 'total') { st.total = U.parseRp(e.target.value); return ringkas(); }
+      if (g) { st[g] = e.target.value; return; }
+      if (!row || !f) return; const x = st.items[+row.dataset.i];
+      if (f === 'jumlah') { x.jumlah = U.parseRp(e.target.value); ringkas(); } else if (f === 'nama') x.nama = e.target.value;
+    });
+    body.addEventListener('change', e => {
+      const row = e.target.closest('.cs-row'); if (!row || e.target.dataset.f !== 'kategoriId') return;
+      const x = st.items[+row.dataset.i]; x.kategoriId = e.target.value; x.cek = false; render();
+    });
+    body.addEventListener('click', e => {
+      const row = e.target.closest('.cs-row');
+      if (row && e.target.closest('[data-hapus]')) { st.items.splice(+row.dataset.i, 1); render(); }
+      else if (row) x0(row);
+      else if (e.target.closest('[data-tambah]')) { st.items.push({ nama: 'Barang', qty: 1, harga: 0, jumlah: 0, kategoriId: '', cek: false }); render(); const n = body.querySelectorAll('.cs-nama'); if (n.length) { n[n.length - 1].focus(); n[n.length - 1].select(); } }
+      else if (e.target.closest('[data-satu]')) { s.close(); UI.catat({ preset: { jenis: 'keluar', jumlah: st.total || subtotal(), tanggal: st.tanggal, walletId: st.walletId, kategoriId: UI.katUtama(st.items.map(x => ({ k: x.kategoriId, j: x.jumlah }))), catatan: st.toko, sumber: 'struk' } }); }
+    });
+    s.el.querySelector('[data-ok]').onclick = async () => {
+      const items = st.items.filter(x => x.jumlah > 0);
+      if (!items.length) return UI.toast('Belum ada barang dengan nominal.', 'warn');
+      if (items.some(x => !x.kategoriId)) return UI.toast('Pilih kategori untuk semua barang dulu.', 'warn');
+      const total = st.total || U.sum(items, x => x.jumlah);
+      const rincian = items.map(x => ({ n: String(x.nama || 'Barang').trim().slice(0, 60), q: x.qty || 1, h: x.qty > 1 ? x.harga : x.jumlah, j: x.jumlah, k: x.kategoriId }));
+      let lampiran = '';
+      if (Store.mode === 'live' && gb && Cloud.simpanStruk) { try { lampiran = await Cloud.simpanStruk(gb.blob, st.toko + ' ' + st.tanggal + '.jpg'); } catch (e) { /* foto opsional */ } }
+      const me = Store.me.email, row = { id: U.uid('t'), tanggal: st.tanggal, jenis: 'keluar', jumlah: total, kategoriId: UI.katUtama(rincian), walletId: st.walletId, walletTujuan: '', biaya: 0,
+        catatan: st.toko, dibayarOleh: me, tag: '', sumber: 'struk', refId: '', periodeRef: '', dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [], lampiran, rincian };
+      if (!(await UI.commitPriv([{ op: 'upsert', t: 'Transaksi', row }]))) return;
+      items.forEach(x => { if (x.kategoriId !== x.asli && window.Voice) Voice.ajari(x.nama, x.kategoriId); });   // belajar dari koreksi
+      try { localStorage.setItem('sa:lastWallet', st.walletId); } catch (e) {}
+      s.close();
+      UI.toast('Tersimpan · ' + st.toko + ' ' + U.rp(total) + ' (' + items.length + ' item)', 'ok', { undo: () => Store.remove('Transaksi', row.id), ms: 5000 });
+    };
+    render();
+  };
   UI.act('ai-struk', () => UI.fotoStruk());
 
   // ---------- Insight mingguan (kartu Beranda) ----------
@@ -79,7 +153,7 @@
     if (!o && A.insightJalan) return `<div class="card ai-card"><div class="row-sp"><b>${I('sparkles')} Insight minggu ini</b><small class="muted">menyusun…</small></div></div>`;
     if (!o) return A.insightGagal ? `<div class="card ai-card"><div class="row-sp"><b>${I('sparkles')} Insight minggu ini</b><button class="icon-btn sm" data-act="ai-insight" aria-label="Coba lagi">${I('refresh-cw')}</button></div><small class="muted">${U.esc(A.insightGagal)}</small></div>` : '';
     return `<div class="card ai-card"><div class="row-sp"><b>${I('sparkles')} Insight minggu ini</b><button class="icon-btn sm" data-act="ai-insight" aria-label="Perbarui">${I(A.insightJalan ? 'loader' : 'refresh-cw')}</button></div>
-      <div class="ai-out">${UI.aiTeks(o.teks)}</div><small class="muted">Dirangkum Gemini dari angka minggu ini · ${U.timeAgo(o.at)}</small></div>`;
+      <div class="ai-out">${UI.aiTeks(o.teks)}</div><small class="muted">Dirangkum AI dari angka minggu ini · ${U.timeAgo(o.at)}</small></div>`;
   };
   UI.act('ai-insight', async () => { if (A.insightJalan) return; A.insightJalan = true; A.insightGagal = ''; UI.render(); try { A.insight = await AI.insight(true); } catch (e) { UI.toast(e.message, 'warn'); } A.insightJalan = false; UI.render(); });
 
@@ -87,31 +161,25 @@
   UI.act('rp-ai', async el => {
     const box = document.getElementById('rp-ai'); if (!box) return;
     box.innerHTML = `<small class="muted">${I('loader')} Menyusun bahan diskusi…</small>`;
-    try { box.innerHTML = UI.aiTeks(await AI.bahanRapat()) + `<small class="muted">Angka dari catatan keluarga; kalimat oleh Gemini.</small>`; }
+    try { box.innerHTML = UI.aiTeks(await AI.bahanRapat()) + `<small class="muted">Angka dari catatan keluarga; kalimat oleh AI.</small>`; }
     catch (e) { box.innerHTML = `<small class="bad">${U.esc(e.message)}</small>`; }
   });
 
   UI.page('ai', {
-    head: () => ({ title: 'Tanya AI', crumb: 'Lainnya', back: 'lainnya', right: AI.siap() && !AI.demo() ? `<button class="icon-btn" data-act="ai-model" aria-label="Pengaturan AI">${I('settings')}</button>` : '' }),
+    head: () => ({ title: 'Tanya AI', crumb: 'Lainnya', back: 'lainnya', right: AI.siap() && !AI.demo() ? `<button class="icon-btn" data-act="ai-atur" aria-label="Pengaturan AI">${I('settings')}</button>` : '' }),
     nav: () => 'lainnya',
     render() {
-      if (!AI.siap()) return `<div class="card"><h3>${I('sparkles')} Sambungkan Gemini (gratis)</h3>
-          <p class="muted">Fitur AI memakai kunci Gemini milik keluarga Anda sendiri — tanpa biaya untuk pemakaian wajar, dan data tidak lewat server JuniorLabs.</p>
-          <ol class="steps"><li>Buka <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> dan masuk dengan akun Google.</li>
-            <li>Ketuk <b>Create API key</b>, lalu salin kuncinya (diawali <code>AQ.</code>, atau <code>AIza</code> untuk kunci lama).</li><li>Tempel di bawah, lalu ketuk Sambungkan.</li></ol>
-          ${UI.field('Kunci API Gemini', `<input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="AQ.… / AIza…">`)}
-          <button class="btn block" data-act="ai-sambung">${I('plug')} Sambungkan</button></div>
-        <div class="note">${I('shield-check')} Kunci disimpan hanya di HP ini (setiap anggota memasukkan sendiri bila ingin memakai AI). Yang dikirim ke Gemini hanya ringkasan angka — tanpa catatan transaksi dan tanpa kategori pribadi. Pada kunci gratis, Google dapat memakai isi permintaan untuk meningkatkan layanannya; aktifkan penagihan di AI Studio bila tidak ingin.</div>`;
+      if (!AI.siap()) return UI.empty('sparkles', 'AI belum tersedia', 'Fitur AI aktif otomatis setelah aplikasi tersambung ke data keluarga dengan lisensi aktif. Periksa internet lalu buka lagi.');
       if (!A.chat.length) muatChat();
       const c = AI.cfg();
-      return `<div class="tiles-row"><button class="btn ghost" data-act="ai-struk">${I('camera')} Foto struk</button><button class="btn ghost" data-act="go" data-to="rapat">${I('users')} Bahan rapat</button></div>
+      return `<div class="tiles-row"><button class="btn ghost" data-act="ai-struk">${I('scan-line')} Scan struk</button><button class="btn ghost" data-act="go" data-to="rapat">${I('users')} Bahan rapat</button></div>
         <div class="ai-chat">${A.chat.length ? A.chat.map(m => `<div class="bubble ${m.dari} ${m.galat ? 'err' : ''}">${m.dari === 'ai' ? UI.aiTeks(m.teks) : U.esc(m.teks)}</div>`).join('')
-          : `<div class="ai-kosong">${I('sparkles', 'big')}<p>Tanyakan apa saja tentang keuangan keluarga. Angka dihitung dari catatan Anda; Gemini merangkai jawabannya.</p></div>`}
+          : `<div class="ai-kosong">${I('sparkles', 'big')}<p>Tanyakan apa saja tentang keuangan keluarga. Angka dihitung dari catatan Anda; AI merangkai jawabannya.</p></div>`}
           ${A.sibuk ? `<div class="bubble ai typing"><i></i><i></i><i></i></div>` : ''}</div>
         <div class="chips">${SARAN.map(q => `<button class="chip" data-act="ai-saran" data-q="${U.esc(q)}">${U.esc(q)}</button>`).join('')}</div>
         <div class="ai-input"><input id="ai-q" maxlength="300" placeholder="Tulis pertanyaan…" enterkeyhint="send"><button class="btn" data-act="ai-kirim" aria-label="Kirim">${I('send')}</button></div>
-        <div class="row-sp"><small class="muted">${AI.demo() ? 'Mode demo: jawaban contoh' : 'Model: ' + U.esc(c.model || '-')}</small>${A.chat.length ? `<button class="link" data-act="ai-bersih">Bersihkan</button>` : ''}</div>
-        ${!AI.demo() ? `<button class="btn block ghost danger" data-act="ai-putus">${I('unplug')} Hapus kunci dari HP ini</button>` : ''}<div class="spacer"></div>`;
+        <div class="row-sp"><small class="muted">${AI.demo() ? 'Mode demo: jawaban contoh' : AI.pribadi() ? 'Kunci pribadi · ' + U.esc(c.model || '-') : 'AI JuniorLabs' + (AI.sisaKuota != null ? ' · sisa jatah hari ini ' + AI.sisaKuota : '')}</small>${A.chat.length ? `<button class="link" data-act="ai-bersih">Bersihkan</button>` : ''}</div>
+        <div class="note small">${I('shield-check')} <span>Yang dikirim ke AI hanya ringkasan angka — tanpa catatan transaksi dan tanpa kategori pribadi. Foto struk dibaca lalu tidak disimpan oleh server.</span></div><div class="spacer"></div>`;
     },
     after(el) { const i = el.querySelector('#ai-q'); if (i) i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const v = i.value; i.value = ''; tanya(v); } }; }
   });

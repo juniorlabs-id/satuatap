@@ -874,3 +874,52 @@ button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opac
 .demo-banner .db-t { display: inline-flex; align-items: center; gap: 6px; }
 .demo-banner .db-beli { display: inline-flex; align-items: center; gap: 5px; background: var(--primary, #0F5E59); color: #fff; padding: 4px 12px; border-radius: 999px; font-weight: 800; text-decoration: none; white-space: nowrap; }
 .demo-banner .db-beli .ic { width: 14px; height: 14px; }
+
+/* ---------- Catat cepat (ketik) ---------- */
+.qt-bar { display: flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 18px; padding: 5px 5px 5px 14px; margin-bottom: 6px; }
+.qt-bar input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 40px !important; font-size: 16px; color: var(--text); padding: 6px 0 !important; outline: none; }
+.qt-bar:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-c); }
+.qt-go { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; cursor: pointer; }
+.qt-go .ic { width: 20px; height: 20px; }
+.qt-mini { margin-bottom: 12px; } .qt-mini input { font-size: 15px; }
+.qt-hint { margin: 0 2px 10px; }
+.vq-ai { margin: 2px 2px 8px; }
+
+/* ---------- Cek hasil scan struk ---------- */
+.cs-head { margin-bottom: 10px; }
+.cs-toko { width: 100%; border: 0 !important; border-bottom: 1px dashed var(--line-2) !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; min-height: 0 !important; font: inherit; font-size: 22px; font-weight: 700; color: var(--text); padding: 2px 0 8px !important; outline: none; margin-bottom: 12px; }
+.cs-list { padding: 6px 14px 12px; }
+.cs-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.cs-row.cek { background: linear-gradient(90deg, var(--warn-c), transparent 70%); margin: 0 -14px; padding: 10px 14px; }
+.cs-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cs-nama { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 0 !important; font-weight: 600; font-size: 15px; color: var(--text); padding: 2px 0 !important; outline: none; width: 100%; }
+.cs-nama:focus { border-bottom: 1px solid var(--primary) !important; }
+.cs-t small { color: var(--muted); min-height: 0; } .cs-t small:empty { display: none; }
+.cs-t .vq-pill { align-self: flex-start; margin-top: 2px; }
+.cs-r { display: flex; align-items: center; gap: 2px; flex: none; }
+.cs-amt { display: flex; align-items: baseline; gap: 3px; border-bottom: 1px solid var(--line-2); padding: 2px 0; }
+.cs-amt span { font-size: 12px; color: var(--muted); }
+.cs-amt input { width: 92px !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 0 !important; padding: 2px 0 !important; font-size: 15px; font-weight: 600; text-align: right; color: var(--text); outline: none; font-variant-numeric: tabular-nums; }
+.cs-amt.big input { width: 130px !important; font-size: 20px; font-weight: 700; }
+.cs-add { display: inline-flex; margin: 10px 0 4px; }
+.cs-sum { border-top: 1px dashed var(--line-2); margin-top: 8px; padding-top: 6px; }
+.cs-sum .kv { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 14px; color: var(--text-2); }
+.cs-sum .kv[hidden] { display: none; }
+.cs-total { font-weight: 700; color: var(--text) !important; font-size: 15px !important; }
+.link.block { display: block; width: 100%; text-align: center; padding: 12px 0 4px; }
+
+/* ---------- Rincian struk di detail transaksi ---------- */
+.struk-det { padding: 12px 14px; margin-top: 12px; }
+.sd-row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.sd-row:last-of-type { border-bottom: 0; }
+.sd-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-t small { color: var(--muted); }
+.sd-j { flex: none; font-variant-numeric: tabular-nums; }
+.sd-kat { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; background: var(--primary-c); color: var(--primary); border-radius: 999px; padding: 2px 4px 2px 8px; font-size: 12px; margin-top: 2px; }
+.sd-kat .ic { width: 13px; height: 13px; }
+.sd-kat select { border: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 0 !important; width: auto !important; color: inherit; font: inherit; font-weight: 600; padding: 2px 2px !important; max-width: 170px; }
+.sd-adj { color: var(--muted); font-size: 13px; justify-content: space-between; }
+.sd-grup { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+details.adv { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.adv summary { cursor: pointer; font-weight: 600; color: var(--primary); font-size: 14px; }
+.note.ok { background: var(--ok-c); } .note.ok > .ic:first-child { color: var(--ok); }

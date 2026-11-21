@@ -44,7 +44,14 @@
   /** Pengeluaran sebuah transaksi: jumlah (bila keluar) + biaya admin/lain (semua jenis). */
   C.expAmount = t => (t.jenis === 'keluar' ? t.jumlah : 0) + (Number(t.biaya) || 0);
   /** Pecahan pengeluaran per kategori: [[kategoriId, nilai]] — biaya masuk ke kategori Biaya Admin. */
-  C.expSplit = t => { const o = []; if (t.jenis === 'keluar' && t.jumlah) o.push([t.kategoriId, t.jumlah]); if (Number(t.biaya)) o.push([C.adminKatId(), Number(t.biaya)]); return o; };
+  /** Rincian barang struk → [[kategoriId, bagian]] — total transaksi dibagi sebanding nilai barang (pajak/diskon ikut terbagi). */
+  C.rincianSplit = t => {
+    const r = Array.isArray(t.rincian) ? t.rincian : [], sum = U.sum(r, x => Number(x.j) || 0);
+    if (!r.length || sum <= 0) return null;
+    const m = {}; r.forEach(x => { const k = x.k || t.kategoriId; m[k] = (m[k] || 0) + (Number(x.j) || 0) / sum * t.jumlah; });
+    return Object.keys(m).map(k => [k, m[k]]);
+  };
+  C.expSplit = t => { const o = []; if (t.jenis === 'keluar' && t.jumlah) { const rs = t.rincian && t.rincian.length ? C.rincianSplit(t) : null; if (rs) rs.forEach(x => o.push(x)); else o.push([t.kategoriId, t.jumlah]); } if (Number(t.biaya)) o.push([C.adminKatId(), Number(t.biaya)]); return o; };
   C.adminKatId = () => M('adminKat', () => { const k = Store.t.Kategori.find(x => /biaya admin/i.test(x.nama)); return k ? k.id : ''; });
 
   C.periodTotals = (p) => M('pt:' + p.key, () => {

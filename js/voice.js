@@ -65,6 +65,7 @@
     const kats = Store.kategori(jenis);
     // kata yang pernah dipilihkan kategorinya oleh pengguna (belajar dari koreksi)
     const ajar = V.ajaran(); s.split(/[^a-z]+/).some(w => { const id = w.length >= 3 && ajar[w]; if (id && kats.some(k => k.id === id)) { kategoriId = id; return true; } return false; });
+    if (!kategoriId && window.Kamus) kategoriId = Kamus.tebak(s.replace(/\b(masuk|terima|diterima|dapat)\b/g, ' '), jenis);
     if (!kategoriId)
     for (const [re, katRe] of KATA_KAT) { if (kategoriId) break; if (re.test(s)) { const k = kats.find(x => katRe.test(x.nama)); if (k) { kategoriId = k.id; break; } } }
     if (!kategoriId) { const k = kats.find(x => s.includes(x.nama.toLowerCase().split(' ')[0])); if (k) kategoriId = k.id; }

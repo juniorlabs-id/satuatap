@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.7.11 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.8.0 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -12,7 +12,7 @@
 | **Fungsi Vercel** | `api/emas.js` (harga emas), `api/saham.js` (harga saham IDX), `api/tg.js` (jembatan Telegram), `vercel.json` | JuniorLabs | Sekali (ikut repo) |
 | **Bot Telegram** @SatuAtapBot | Dibuat lewat @BotFather, token di Script Properties relay | JuniorLabs | Sekali (Bagian G) |
 | **Skrip Pendamping** (opsional) | `Pendamping.gs` — pengingat Telegram/WA pukul 08.00, catat lewat WA, ringkasan WA pukul 20.00 | Admin keluarga yang menginginkannya | Opsional (Bagian C) |
-| **Kunci Gemini** (opsional) | Untuk Tanya AI, foto struk, insight mingguan | Tiap keluarga, disimpan hanya di HP | Opsional (Bagian H) |
+| **Kunci Gemini JuniorLabs** | Untuk Tanya AI, scan struk per barang, kategori otomatis, insight mingguan — dipakai semua keluarga | JuniorLabs, sekali di relay (Script Property `GEMINI_API_KEY`) | Wajib bila fitur AI ingin aktif (A2 langkah 5b) |
 
 Pembeli **tidak perlu** membuka Apps Script, men-deploy, atau menyalin URL. Mereka cukup membuka aplikasi, menekan **Masuk dengan Google**, lalu memasukkan kode lisensi.
 
@@ -48,6 +48,7 @@ Sebaiknya semua langkah dilakukan memakai akun **juniorlabs.id@gmail.com**.
 3. Tempel isi `appsscript-relay.json` ke `appsscript.json`, lalu tempel isi `Relay.gs` ke `Kode.gs`.
 4. Di baris atas `Relay.gs`, isi `const CLIENT_ID = '…apps.googleusercontent.com'` dengan Client ID dari A1. Simpan.
 5. **Client secret (rahasia):** buka ⚙️ **Setelan Proyek › Script Properties › Tambahkan properti**. Isi nama `GOOGLE_CLIENT_SECRET` dan nilainya Client secret dari A1. **Jangan** menulisnya di kode atau di file lain.
+5b. **Kunci AI (rahasia):** buat kunci di <https://aistudio.google.com/apikey> dengan akun JuniorLabs, lalu di **Script Properties** tambahkan `GEMINI_API_KEY` = kunci tersebut. Opsional: `AI_KUOTA_HARIAN` (jatah permintaan AI per keluarga per hari, bawaan 80) dan `GEMINI_MODEL` (bawaan `gemini-3.5-flash`). Setelah relay terpasang, jalankan fungsi **`cekAI`** — log harus menampilkan "✅ AI berfungsi". Disarankan mengaktifkan penagihan (billing) di AI Studio agar kuota tidak cepat habis dan isi permintaan pelanggan tidak dipakai Google untuk pelatihan.
 6. Pilih fungsi **`setupRelay`** lalu tekan **▶ Jalankan**. Izinkan akses. Layar peringatan Google wajar muncul di sini karena ini skrip milik JuniorLabs sendiri.
    Log akan menampilkan "Client secret: tersimpan ✓". Kunci enkripsi sesi (`TOKEN_KEY`, `TOKEN_MAC`) dibuat otomatis.
 7. Buka **Deploy › New deployment › Web app**:
@@ -263,7 +264,8 @@ WhatsApp hanya mengirim **2 pesan sehari**: pengingat pagi dan ringkasan catatan
 | Bot tidak membalas /start | Di editor relay jalankan **`cekTelegram`** › baca log. Fungsi ini memeriksa token, webhook (termasuk galat terakhir dari Telegram), `api/tg.js` di Vercel, `RELAY_URL`, dan versi deployment relay, lalu menyebut langkah perbaikannya. Webhook yang belum/beda alamat didaftarkan ulang otomatis. |
 | Pengingat Telegram pagi tidak datang | Pastikan Pendamping terpasang dengan `RELAY_URL` terisi (C1) dan anggota sudah menghubungkan Telegram di **Lainnya › Notifikasi**. |
 | Catat lewat WA tidak masuk | Cek webhook Fonnte memakai URL web app Pendamping lengkap dengan `?k=…`, dan nomor pengirim ada di `WA_ANGGOTA` (format 62…). |
-| "Kunci Gemini ditolak" / AI tidak menjawab | Buat kunci baru di Google AI Studio (Bagian H) lalu tempel ulang di **Lainnya › Tanya AI**. |
+| "Fitur AI belum diaktifkan JuniorLabs" | Isi `GEMINI_API_KEY` di Script Properties relay, lalu jalankan `cekAI` (A2 langkah 5b). |
+| "Jatah AI keluarga hari ini sudah habis" | Tunggu besok, atau naikkan `AI_KUOTA_HARIAN` di Script Properties relay. |
 | Saldo tidak cocok dengan bank | Buka **Aset › Kas & Bank › (dompet) › Cocokkan saldo**. |
 
 ---
@@ -297,16 +299,13 @@ Telegram mengirim pesan ke `https://satuatap.vercel.app/api/tg`, lalu fungsi Ver
 
 Batas: maksimal 60 pesan per jam per keluarga. Kode penghubung berlaku 15 menit dan sekali pakai. Ketik `/putus` di bot untuk memutus.
 
-## Bagian H — Kunci Gemini untuk fitur AI (tiap keluarga, opsional)
+## Bagian H — Fitur AI (aktif otomatis)
 
-Fitur AI memakai kunci Gemini **milik keluarga sendiri**, sehingga biaya dan kuota tidak menumpuk di JuniorLabs.
+Mulai 1.8.0 fitur AI memakai **AI milik JuniorLabs** lewat relay, jadi pelanggan **tidak perlu memasang apa pun**. Fitur yang memakainya: Tanya AI, scan struk per barang, pemilihan kategori otomatis di Catat cepat, insight mingguan, dan bahan rapat.
 
-1. Buka <https://aistudio.google.com/apikey> dengan akun Google mana saja › **Create API key** › salin.
-2. Di aplikasi: **Lainnya › Tanya AI** › tempel kunci › **Sambungkan**. Aplikasi memilih model Gemini Flash terbaru secara otomatis.
-3. Kunci hanya disimpan di HP itu (tidak di Drive, tidak di relay). Pasangan yang ingin memakai AI di HP-nya perlu menempelkan kunci juga.
-
-Yang dikirim ke Gemini hanya **ringkasan angka** (total per kategori, saldo, tagihan, Tujuan). Kategori dan catatan uang pribadi tidak dikirim. Foto struk dikirim ke Gemini untuk dibaca, lalu disimpan di folder Drive "SatuAtap – Struk". Pada kunci gratis, Google dapat memakai data permintaan untuk meningkatkan layanannya. Bila keberatan, aktifkan penagihan di AI Studio (paket berbayar tidak dipakai untuk pelatihan).
-
+- Relay memeriksa lisensi (hanya anggota keluarga berlisensi aktif) dan membatasi jatah per keluarga per hari (`AI_KUOTA_HARIAN`, bawaan 80). Sisa jatah tampil di **Lainnya › Tanya AI**.
+- Isi permintaan AI tidak disimpan relay. Yang dikirim hanya **ringkasan angka**; kategori dan catatan uang pribadi tidak dikirim. Foto struk dibaca lalu disimpan hanya di folder Drive keluarga "SatuAtap – Struk".
+- Pelanggan yang ingin jatah tak terbatas tetap bisa memakai **kunci Gemini sendiri**: **Lainnya › Tanya AI › ⚙️ › Pakai kunci Gemini sendiri**. Kunci itu hanya disimpan di HP tersebut.
 
 Butuh bantuan? WhatsApp dukungan JuniorLabs **0856-1254-689**, atau gunakan menu **Lainnya › Laporkan Masalah** di aplikasi.
 
