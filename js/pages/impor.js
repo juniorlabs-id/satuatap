@@ -1,199 +1,230 @@
-/* Lainnya › Impor CSV mutasi rekening (T-13) */
+/* ============================================================
+ * Halaman "Impor dari Excel / CSV" (Lainnya › Pengaturan › Impor dari Excel)
+ * 1 Pilih berkas → 2 Cek kolom → 3 Cocokkan kategori & dompet → 4 Ringkasan & impor.
+ * Setiap impor bisa dibatalkan seluruhnya dari riwayat.
+ * ============================================================ */
 (function () {
   const I = UI.icon;
-  const P = { raw: null, nama: '', rows: [], head: 0, map: {}, walletId: '', items: [], tahun: new Date().getFullYear() };
+  const PERAN = [['tanggal', 'Tanggal', true], ['catatan', 'Keterangan'], ['jumlah', 'Jumlah / nominal'], ['jenis', 'Jenis (masuk/keluar)'], ['masuk', 'Kolom pemasukan (kredit)'], ['keluar', 'Kolom pengeluaran (debit)'],
+    ['kategori', 'Kategori'], ['sub', 'Sub-kategori'], ['dompet', 'Dompet / rekening']];
+  const LEWATI = '__lewati';
+  let S = null;   // state wizard
+  const baru = () => { S = { langkah: 'pilih', berkas: null, sheets: null, d: null, items: [], peta: {}, petaW: {}, walletId: UI.defWallet(), jaga: true, sibuk: '', ai: {}, hasil: null }; };
 
-  // ---------- Pembaca CSV ----------
-  const pisah = (text) => {
-    const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim()).slice(0, 8);
-    const cand = [',', ';', '\t', '|'], score = d => lines.reduce((s, l) => s + (l.split(d).length - 1), 0);
-    return cand.sort((a, b) => score(b) - score(a))[0];
-  };
-  const csv = (text, d) => {
-    const out = []; let row = [], cell = '', q = false;
-    text = text.replace(/^﻿/, '');
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
-      else if (c === '"') q = true;
-      else if (c === d) { row.push(cell.trim()); cell = ''; }
-      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell.trim()); if (row.some(x => x !== '')) out.push(row); row = []; cell = ''; }
-      else cell += c;
-    }
-    row.push(cell.trim()); if (row.some(x => x !== '')) out.push(row);
-    return out;
-  };
-  const KUNCI = {
-    tanggal: /^(tgl|tanggal|date|tanggal transaksi|transaction date|posting date|tgl\.? ?transaksi|waktu)/i,
-    ket: /(keterangan|deskripsi|description|uraian|remark|berita|detail|transaksi$)/i,
-    debit: /^(debit|debet|db|mutasi keluar|keluar|withdrawal|pengeluaran)$/i,
-    kredit: /^(kredit|credit|cr|mutasi masuk|masuk|deposit|pemasukan)$/i,
-    jumlah: /^(jumlah|amount|nominal|mutasi|nilai)/i,
-    tipe: /^(tipe|type|jenis|d\/k|db\/cr|dk)$/i
-  };
-  const tebakHeader = rows => {
-    let best = 0, bi = 0;
-    rows.slice(0, 25).forEach((r, i) => { const n = r.filter(c => Object.values(KUNCI).some(k => k.test(c))).length; if (n > best) { best = n; bi = i; } });
-    return bi;
-  };
-  const tebakMap = (head, data) => {
-    const m = {};
-    Object.keys(KUNCI).forEach(k => { const i = head.findIndex((h, j) => KUNCI[k].test(h) && !Object.values(m).includes(j)); if (i >= 0) m[k] = i; });
-    // kolom tanpa judul berisi DB/CR (format BCA) → kolom jenis
-    if (m.tipe === undefined && data && data.length) {
-      for (let j = 0; j < head.length; j++) {
-        if (Object.values(m).includes(j)) continue;
-        const v = data.slice(0, 30).map(r => String(r[j] || '').trim()).filter(Boolean);
-        if (v.length >= 2 && v.filter(x => /^(db|cr|d|k|dr|debit|kredit|credit)$/i.test(x)).length >= v.length * 0.8) { m.tipe = j; break; }
-      }
-    }
-    if (m.ket === undefined) { const i = head.findIndex((h, j) => !Object.values(m).includes(j) && h); if (i >= 0) m.ket = i; }
-    return m;
-  };
-  /** "50,000.00 DB" · "1.234.567,89" · "(50.000)" · "-50000" → angka bertanda (negatif = keluar) */
-  const angka = (s) => {
-    s = String(s || '').replace(/^['"`]+/, '').trim(); if (!s) return null;
-    let neg = /^-|^\(.*\)$|\b(db|d|dr|debit|debet)\.?$/i.test(s.replace(/\s+/g, ' ').trim());
-    if (/\b(cr|k|kredit|credit)\.?$/i.test(s)) neg = false;
-    let t = s.replace(/[^\d.,]/g, '');
-    if (!t) return null;
-    const lc = t.lastIndexOf(','), ld = t.lastIndexOf('.');
-    if (lc > -1 && ld > -1) t = lc > ld ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
-    else if (lc > -1) t = /,\d{1,2}$/.test(t) && (t.match(/,/g) || []).length === 1 ? t.replace(',', '.') : t.replace(/,/g, '');
-    else if (ld > -1) t = /\.\d{1,2}$/.test(t) && (t.match(/\./g) || []).length === 1 ? t : t.replace(/\./g, '');
-    const v = Number(t); if (!isFinite(v)) return null;
-    return neg ? -v : v;
-  };
-  const BLN = { jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, may: 5, jun: 6, jul: 7, agu: 8, agt: 8, aug: 8, sep: 9, okt: 10, oct: 10, nov: 11, des: 12, dec: 12 };
-  /** Tanggal bank → yyyy-mm-dd. Mendukung dd/mm/yyyy, dd-mm-yy, yyyy-mm-dd, dd MMM yyyy, dd/mm (tanpa tahun). */
-  const tanggal = (s, urut) => {
-    s = String(s || '').replace(/^['"`]+/, '').trim(); if (!s || /pend/i.test(s)) return '';
-    let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s);
-    if (m) return m[1] + '-' + U.pad(+m[2]) + '-' + U.pad(+m[3]);
-    m = /^(\d{1,2})[-/. ]([A-Za-z]{3})[A-Za-z]*[-/. ]?(\d{2,4})?/.exec(s);
-    if (m && BLN[m[2].toLowerCase()]) { const y = m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) : String(P.tahun); return y + '-' + U.pad(BLN[m[2].toLowerCase()]) + '-' + U.pad(+m[1]); }
-    m = /^(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?/.exec(s);
-    if (m) {
-      let d = +m[1], mo = +m[2];
-      if (urut === 'mdy' || mo > 12) { const x = d; d = mo; mo = x; }
-      if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
-      let y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : P.tahun;
-      if (!m[3] && y === new Date().getFullYear() && mo > new Date().getMonth() + 1) y--;   // dd/mm tanpa tahun dari bulan "depan" = tahun lalu
-      return y + '-' + U.pad(mo) + '-' + U.pad(d);
-    }
-    return '';
-  };
+  // ---------- riwayat & pembelajaran ----------
+  const riwayat = () => { try { const r = JSON.parse(Store.setting('imporRiwayat', '[]') || '[]'); return Array.isArray(r) ? r : []; } catch (e) { return []; } };
+  const petaBelajar = () => { try { return JSON.parse(Store.setting('imporPeta', '{}') || '{}') || {}; } catch (e) { return {}; } };
 
-  // ---------- Tebak kategori dari riwayat ----------
-  const kataKunci = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^\d+$/.test(w) && !/^(trsf|transfer|trf|e-banking|ebanking|debit|kredit|switching|biaya|pembayaran|bayar|dari|untuk|kepada)$/.test(w));
-  let indeksKat = null;
-  const bangunIndeks = () => {
-    const idx = {};
-    Store.t.Transaksi.slice(-4000).forEach(t => {
-      const kk = Store.byId.Kategori[t.kategoriId];
-      if (!kk || kk.pribadi || kk.arsip || UI.isPrivate(t)) return;
-      kataKunci(UI.note(t)).forEach(w => { const o = idx[w] = idx[w] || {}; const k = t.jenis + '|' + t.kategoriId; o[k] = (o[k] || 0) + 1; });
+  // ---------- langkah 1: baca berkas ----------
+  async function bacaBerkas(f) {
+    S.sibuk = 'Membaca ' + f.name + '…'; UI.render();
+    try {
+      const x = await Impor.baca(f);
+      S.berkas = x.nama; S.sheets = x.sheets.filter(s => s.rows.some(r => r && r.length));
+      if (!S.sheets.length) throw new Error('Berkas kosong.');
+      S.d = Impor.deteksi(S.sheets);
+      if ((!S.d || S.d.ragu) && AI.siap() && !AI.demo()) { S.sibuk = 'Susunan kolom tidak biasa — AI sedang membacanya…'; UI.render(); await kolomAI(); }
+      if (!S.d) S.d = { si: 0, header: 0, kol: {}, skor: 0, ragu: true };
+      hitung(); S.langkah = 'kolom';
+    } catch (e) { UI.toast(e.message, 'warn'); }
+    S.sibuk = ''; UI.render();
+  }
+  /** AI membaca susunan kolom dari ±15 baris teratas (bukan seluruh data). */
+  async function kolomAI() {
+    const kand = S.sheets.map((s, si) => ({ si, n: s.rows.filter(r => r && r.some(c => Impor.teks(c))).length })).sort((a, b) => b.n - a.n).slice(0, 3);
+    const contoh = kand.map(k => ({ sheet: k.si, nama: S.sheets[k.si].nama, baris: S.sheets[k.si].rows.slice(0, 15).map((r, i) => i + ': ' + (r || []).slice(0, 14).map(c => Impor.teks(c).slice(0, 28)).join(' | ')) }));
+    try {
+      const t = await AI.minta('Ini potongan atas dari file Excel/CSV catatan keuangan keluarga (format sel: "nomorBaris: kolom0 | kolom1 | ..."). Tentukan sheet & susunan tabel transaksinya.\n' + JSON.stringify(contoh) +
+        '\nBalas JSON saja: {"sheet": nomor sheet, "header": nomor baris judul, "kolom": {"tanggal": i, "catatan": i, "jumlah": i, "jenis": i, "masuk": i, "keluar": i, "kategori": i, "sub": i, "dompet": i}, "urut": "DMY"|"MDY"|"YMD", "jenisMasuk": ["nilai di kolom jenis yang berarti pemasukan"]}\n' +
+        'Pakai -1 untuk kolom yang tidak ada. Isi "masuk" & "keluar" hanya bila pemasukan & pengeluaran ada di dua kolom terpisah (mis. Kredit/Debit); jika satu kolom nominal, isi "jumlah".', { json: true, maks: 1024, jenis: 'impor' });
+      const o = JSON.parse(t.replace(/^```json|```$/g, '').trim()), kol = {};
+      Object.keys(o.kolom || {}).forEach(k => { const v = Number(o.kolom[k]); if (v >= 0) kol[k] = v; });
+      if (o.sheet == null || !S.sheets[o.sheet] || kol.tanggal == null) return;
+      const petaJenis = {}; (o.jenisMasuk || []).forEach(v => { petaJenis[String(v).toLowerCase().replace(/[^a-z0-9/ ]/g, ' ').replace(/\s+/g, ' ').trim()] = 'masuk'; });
+      S.d = { si: Number(o.sheet), header: Math.max(0, Number(o.header) || 0), kol, urut: /^(DMY|MDY|YMD)$/.test(o.urut) ? o.urut : 'DMY', petaJenis, skor: 10, dariAI: true };
+    } catch (e) { /* tetap pakai deteksi otomatis; pengguna bisa atur manual */ }
+  }
+  function hitung() {
+    const sh = S.sheets[S.d.si]; S.items = sh ? Impor.terapkan(sh, S.d) : [];
+    S.ai = {};
+  }
+
+  // ---------- langkah 3: kategori & dompet ----------
+  function kelompok() {
+    const g = {};
+    S.items.forEach(x => { if (x.jenis === 'transfer') return; const k = Impor.kunciKat(x);
+      const o = g[k] || (g[k] = { kunci: k, jenis: x.jenis, nama: x.subAsal || x.katAsal || '', induk: x.subAsal ? x.katAsal : '', n: 0, total: 0, contoh: [] });
+      o.n++; o.total += x.jumlah; if (o.contoh.length < 3 && x.catatan && o.contoh.indexOf(x.catatan) < 0) o.contoh.push(x.catatan); });
+    return Object.values(g).sort((a, b) => (a.jenis > b.jenis ? -1 : 1) || b.total - a.total);
+  }
+  function sarankan() {
+    const belajar = petaBelajar(), kats = j => Store.kategori(j).filter(k => !k.arsip);
+    kelompok().forEach(g => {
+      if (S.peta[g.kunci] !== undefined) return;
+      const nm = g.nama.toLowerCase().trim(), ks = kats(g.jenis);
+      let id = belajar[g.kunci] && Store.byId.Kategori[belajar[g.kunci]] ? belajar[g.kunci] : '';
+      if (!id) { const k = ks.find(x => x.nama.toLowerCase() === nm) || (g.induk && ks.find(x => x.nama.toLowerCase() === g.induk.toLowerCase())); if (k) id = k.id; }
+      if (!id && window.Kamus) id = Kamus.tebak(g.nama, g.jenis) || g.contoh.map(c => Kamus.tebak(c, g.jenis)).find(Boolean) || (g.induk && Kamus.tebak(g.induk, g.jenis)) || '';
+      S.peta[g.kunci] = id;
     });
-    return idx;
-  };
-  const ATURAN = [[/gaji|salary|payroll/i, 'masuk', /gaji/i], [/biaya adm|adm\.? ?bulanan|admin fee|biaya kartu|pajak bunga/i, 'keluar', /biaya admin|admin/i], [/bunga|interest/i, 'masuk', /bunga|lain/i],
-    [/pln|token listrik/i, 'keluar', /listrik|tagihan/i], [/pdam/i, 'keluar', /air|tagihan/i], [/indomaret|alfamart|superindo|hypermart|transmart/i, 'keluar', /belanja|dapur|harian/i],
-    [/gopay|ovo|dana|shopeepay|linkaja/i, 'keluar', /dompet|top ?up|lain/i], [/grab|gojek|maxim/i, 'keluar', /transport|makan/i], [/pertamina|spbu|shell/i, 'keluar', /bensin|bbm|transport/i]];
-  const tebakKat = (ket, jenis) => {
-    const skor = {};
-    kataKunci(ket).forEach(w => { const o = indeksKat[w]; if (o) Object.keys(o).forEach(k => { if (k.indexOf(jenis + '|') === 0) skor[k] = (skor[k] || 0) + o[k]; }); });
-    const best = Object.keys(skor).sort((a, b) => skor[b] - skor[a])[0];
-    if (best) return best.split('|')[1];
-    const kats = Store.kategori(jenis);
-    for (const a of ATURAN) if (a[0].test(ket) && a[1] === jenis) { const k = kats.find(x => a[2].test(x.nama)); if (k) return k.id; }
-    return (kats.find(k => /lain/i.test(k.nama)) || kats[kats.length - 1] || {}).id || '';
-  };
+    const dw = {}; S.items.forEach(x => { if (x.dompetAsal) dw[x.dompetAsal] = 1; });
+    Object.keys(dw).forEach(n => { if (S.petaW[n] !== undefined) return; const s = n.toLowerCase(), w = Store.wallets().find(w => w.nama.toLowerCase() === s || s.indexOf(w.nama.toLowerCase()) > -1 || w.nama.toLowerCase().indexOf(s) > -1); S.petaW[n] = w ? w.id : S.walletId; });
+  }
+  async function kategoriAI() {
+    const kosong = kelompok().filter(g => !S.peta[g.kunci]); if (!kosong.length) return;
+    S.sibuk = 'AI mencocokkan ' + kosong.length + ' kategori…'; UI.render();
+    try {
+      for (const j of ['keluar', 'masuk']) {
+        const grp = kosong.filter(g => g.jenis === j); if (!grp.length) continue;
+        const opsi = Store.kategori(j).filter(k => !k.arsip).map(k => k.nama);
+        const t = await AI.minta('Cocokkan kategori dari catatan keuangan lama ke kategori aplikasi. Pilihan kategori ' + (j === 'masuk' ? 'pemasukan' : 'pengeluaran') + ': ' + JSON.stringify(opsi) +
+          '\nKategori lama (dengan induk & contoh catatan): ' + JSON.stringify(grp.map((g, i) => ({ i, nama: g.nama, induk: g.induk, contoh: g.contoh }))) +
+          '\nBalas JSON saja: {"peta": [nama kategori aplikasi untuk tiap i, urut sama; "" bila tidak ada yang cocok]}', { json: true, maks: 2048, jenis: 'impor' });
+        const o = JSON.parse(t.replace(/^```json|```$/g, '').trim()), ks = Store.kategori(j);
+        (o.peta || []).forEach((n, i) => { const k = ks.find(x => x.nama.toLowerCase() === String(n || '').toLowerCase()); if (k && grp[i]) { S.peta[grp[i].kunci] = k.id; S.ai[grp[i].kunci] = 1; } });
+      }
+    } catch (e) { UI.toast('AI belum bisa membantu (' + e.message + '). Pilih manual ya.', 'warn'); }
+    S.sibuk = ''; UI.render();
+  }
 
-  // ---------- Pratinjau ----------
-  const susun = () => {
-    const m = P.map, out = [];
-    indeksKat = indeksKat || bangunIndeks();
-    const ada = Store.t.Transaksi.filter(t => t.walletId === P.walletId && (t.jenis === 'masuk' || t.jenis === 'keluar' || t.jenis === 'transfer'));
-    const dipakai = new Set();
-    P.rows.slice(P.head + 1).forEach((r, i) => {
-      const tg = tanggal(r[m.tanggal]); if (!tg) return;
-      let v = null;
-      if (m.debit !== undefined || m.kredit !== undefined) {
-        const d = angka(r[m.debit]), k = angka(r[m.kredit]);
-        if (d) v = -Math.abs(d); else if (k) v = Math.abs(k);
-      }
-      if (v === null && m.jumlah !== undefined) {
-        v = angka(r[m.jumlah]);
-        if (v !== null && m.tipe !== undefined) { const tp = String(r[m.tipe] || ''); if (/^(d|db|dr|debit|debet|keluar)/i.test(tp)) v = -Math.abs(v); else if (/^(k|cr|kredit|credit|masuk)/i.test(tp)) v = Math.abs(v); }
-      }
-      if (!v) return;
-      const jenis = v < 0 ? 'keluar' : 'masuk', jumlah = Math.round(Math.abs(v)), ket = String(r[m.ket] || '').replace(/\s+/g, ' ').trim();
-      // dobel: dompet sama, jumlah sama, arah sama, selisih tanggal ≤ 2 hari
-      const dup = ada.find(t => !dipakai.has(t.id) && Math.round(t.jenis === 'transfer' ? t.jumlah + (t.biaya || 0) : t.jumlah) === jumlah && (t.jenis === 'transfer' ? jenis === 'keluar' : t.jenis === jenis) && Math.abs(U.diffDays(t.tanggal, tg)) <= 2);
-      if (dup) dipakai.add(dup.id);
-      out.push({ i, tanggal: tg, jenis, jumlah, ket, dup: dup || null, pilih: !dup, kategoriId: tebakKat(ket, jenis) });
+  // ---------- langkah 4: simpan ----------
+  function rencana() {
+    const ada = new Set(Store.t.Transaksi.map(t => Impor.sidik(t.tanggal, t.jenis, t.jumlah, t.catatan)));
+    const out = [], dup = [], lewat = [];
+    S.items.forEach(x => {
+      if (x.jenis === 'transfer') return lewat.push(x);
+      const kat = S.peta[Impor.kunciKat(x)];
+      if (kat === LEWATI) return lewat.push(x);
+      if (ada.has(Impor.sidik(x.tanggal, x.jenis, x.jumlah, x.catatan))) return dup.push(x);
+      out.push(Object.assign({}, x, { kategoriId: kat || '', walletId: (x.dompetAsal && S.petaW[x.dompetAsal]) || S.walletId }));
     });
-    P.items = out;
-  };
-  const muat = (text, nama) => {
-    const d = pisah(text); P.raw = text; P.nama = nama; P.rows = csv(text, d);
-    P.head = tebakHeader(P.rows); P.map = tebakMap(P.rows[P.head] || [], P.rows.slice(P.head + 1));
-    if (!P.walletId) P.walletId = (Store.wallets().find(w => w.jenis === 'bank') || Store.wallets()[0] || {}).id || '';
-    indeksKat = null; susun(); UI.render();
-  };
-  UI.act('imp-file', () => document.getElementById('imp-input').click());
-  UI.act('imp-reset', () => { P.raw = null; P.rows = []; P.items = []; UI.render(); });
-  UI.act('imp-pilih', el => { const it = P.items[+el.dataset.i]; if (it) { it.pilih = !it.pilih; UI.render(); } });
-  UI.act('imp-semua', el => { const v = el.dataset.v === '1'; P.items.forEach(x => { if (!x.dup || !v) x.pilih = v; }); UI.render(); });
-  UI.act('imp-simpan', async () => {
-    const pilih = P.items.filter(x => x.pilih);
-    if (!pilih.length) return UI.toast('Belum ada baris yang dipilih.', 'warn');
-    if (!P.walletId) return UI.toast('Pilih dompet/rekening tujuan impor.', 'warn');
-    const me = Store.me.email, now = new Date().toISOString();
-    const ops = pilih.map(x => ({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: x.tanggal, jenis: x.jenis, jumlah: x.jumlah, kategoriId: x.kategoriId, walletId: P.walletId, walletTujuan: '', biaya: 0,
-      catatan: x.ket.slice(0, 200), dibayarOleh: me, tag: '', sumber: 'impor', refId: '', periodeRef: '', dicatatOleh: me, dibuat: now, riwayat: [] } }));
-    const ok = await UI.confirm('Impor ' + pilih.length + ' transaksi?', 'Masuk ke ' + ((Store.byId.Wallet[P.walletId] || {}).nama || 'dompet') + '. Bisa diubah atau dihapus satu per satu di Mutasi.', 'Impor');
-    if (!ok) return;
-    for (let i = 0; i < ops.length; i += 200) Store.commit(ops.slice(i, i + 200));
-    UI.toast(pilih.length + ' transaksi diimpor.'); P.raw = null; P.items = []; UI.go('mutasi');
-  });
+    return { out, dup, lewat, kurang: out.filter(x => !x.kategoriId).length };
+  }
+  async function simpan() {
+    const r = rencana(); if (!r.out.length) return UI.toast('Tidak ada baris baru untuk diimpor.', 'warn');
+    if (r.kurang) return UI.toast(r.kurang + ' baris belum berkategori — pilih kategorinya di langkah 3.', 'warn');
+    const id = U.uid('imp'), me = Store.me.email, now = new Date().toISOString(), ops = r.out.map(x => ({ op: 'upsert', t: 'Transaksi', row: {
+      id: U.uid('t'), tanggal: x.tanggal, jenis: x.jenis, jumlah: x.jumlah, kategoriId: x.kategoriId, walletId: x.walletId, walletTujuan: '', biaya: 0, catatan: x.catatan,
+      dibayarOleh: me, tag: '', sumber: 'impor', refId: '', periodeRef: 'impor:' + id, dicatatOleh: me, dibuat: now, riwayat: [] } }));
+    // Jaga saldo dompet sekarang: transaksi lama hanya riwayat → saldo awal digeser sebesar selisihnya
+    const adj = {};
+    if (S.jaga) r.out.forEach(x => { adj[x.walletId] = (adj[x.walletId] || 0) + (x.jenis === 'masuk' ? -x.jumlah : x.jumlah); });
+    Object.keys(adj).forEach(w => { const wl = Store.byId.Wallet[w]; if (wl && adj[w]) ops.push({ op: 'upsert', t: 'Wallet', row: { id: w, saldoAwal: (Number(wl.saldoAwal) || 0) + adj[w] } }); else delete adj[w]; });
+    const belajar = petaBelajar(); kelompok().forEach(g => { const v = S.peta[g.kunci]; if (v && v !== LEWATI) belajar[g.kunci] = v; });
+    const rw = riwayat(); rw.unshift({ id, berkas: S.berkas, n: r.out.length, tgl: U.today(), dari: r.out.reduce((m, x) => x.tanggal < m ? x.tanggal : m, '9999'), sampai: r.out.reduce((m, x) => x.tanggal > m ? x.tanggal : m, ''), adj });
+    ops.push({ op: 'upsert', t: 'Pengaturan', row: { id: 'imporPeta', nilai: JSON.stringify(belajar) } }, { op: 'upsert', t: 'Pengaturan', row: { id: 'imporRiwayat', nilai: JSON.stringify(rw.slice(0, 20)) } });
+    S.langkah = 'proses';
+    for (let i = 0; i < ops.length; i += 300) { S.sibuk = 'Menyimpan ' + Math.min(r.out.length, i + 300) + ' dari ' + r.out.length + ' transaksi…'; UI.render(); await Store.commit(ops.slice(i, i + 300)); }
+    S.sibuk = ''; S.hasil = { n: r.out.length, dup: r.dup.length, lewat: r.lewat.length, id }; S.langkah = 'selesai'; UI.render();
+  }
+  async function batalkan(id) {
+    const rw = riwayat(), h = rw.find(x => x.id === id); if (!h) return;
+    const tx = Store.t.Transaksi.filter(t => t.periodeRef === 'impor:' + id);
+    if (!(await UI.confirm('Batalkan impor "' + h.berkas + '"?', tx.length + ' transaksi hasil impor ini akan dihapus' + (Object.keys(h.adj || {}).length ? ' dan saldo awal dompet dikembalikan' : '') + '.', 'Ya, batalkan', true))) return;
+    const ops = tx.map(t => ({ op: 'delete', t: 'Transaksi', id: t.id }));
+    Object.keys(h.adj || {}).forEach(w => { const wl = Store.byId.Wallet[w]; if (wl) ops.push({ op: 'upsert', t: 'Wallet', row: { id: w, saldoAwal: (Number(wl.saldoAwal) || 0) - h.adj[w] } }); });
+    ops.push({ op: 'upsert', t: 'Pengaturan', row: { id: 'imporRiwayat', nilai: JSON.stringify(rw.filter(x => x.id !== id)) } });
+    for (let i = 0; i < ops.length; i += 300) await Store.commit(ops.slice(i, i + 300));
+    UI.toast('Impor dibatalkan · ' + tx.length + ' transaksi dihapus.'); UI.render();
+  }
+
+  // ---------- tampilan ----------
+  const langkahBar = () => { const L = [['pilih', 'Berkas'], ['kolom', 'Kolom'], ['kategori', 'Kategori'], ['ringkas', 'Impor']], i = L.findIndex(x => x[0] === S.langkah);
+    return `<div class="mw-steps imp-steps">${L.map((l, j) => `<span class="${j < i || S.langkah === 'selesai' ? 'done' : j === i ? 'on' : ''}" title="${l[1]}">${j < i || S.langkah === 'selesai' ? I('check') : j + 1}</span>`).join('<i></i>')}</div>`; };
+  const kolNama = ki => { const h = ((S.sheets[S.d.si] || {}).rows || [])[S.d.header] || []; const t = Impor.teks(h[ki]); return String.fromCharCode(65 + (ki % 26)) + (t ? ' · ' + t.slice(0, 24) : ''); };
+  function vPilih() {
+    const rw = riwayat();
+    return `<div class="card imp-drop"><div class="mw-hero">${I('sheet', 'big')}<h3>Pindahkan catatan lama ke SatuAtap</h3>
+        <p class="muted small">Excel (.xlsx) atau CSV — dari template apa pun: Duit Tracker, catatan buatan sendiri, mutasi rekening bank, dll. AI membantu membaca susunan kolom & mencocokkan kategori.</p></div>
+        <label class="btn block">${I('upload')} Pilih berkas<input type="file" accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" data-imp-file hidden></label>
+        <ul class="ul small muted imp-tips"><li>Cukup kolom <b>tanggal</b> dan <b>jumlah</b>; keterangan, jenis (masuk/keluar), kategori, dan dompet dibaca bila ada.</li>
+          <li>Berkas dibaca di HP ini. Ke AI hanya dikirim judul kolom, beberapa baris contoh, dan nama-nama kategori.</li><li>Format .xls lama? Simpan ulang sebagai .xlsx atau .csv dulu.</li></ul></div>
+      ${rw.length ? `<h4 class="mini-h">${I('history')} Riwayat impor</h4><div class="card list">${rw.map(h => `<div class="row"><span class="cat-ic">${I('sheet')}</span><div class="tx-txt"><b>${U.esc(h.berkas)}</b><small>${h.n} transaksi · ${U.tgl(h.dari)} – ${U.tgl(h.sampai)} · diimpor ${U.tgl(h.tgl)}</small></div>
+        ${Store.isAdminLike() ? `<button class="btn ghost xs danger" data-act="imp-batal" data-id="${h.id}">Batalkan</button>` : ''}</div>`).join('')}</div>` : ''}`;
+  }
+  function vKolom() {
+    const sh = S.sheets[S.d.si], hdr = (sh.rows[S.d.header] || []), nk = Math.max(hdr.length, ...sh.rows.slice(S.d.header, S.d.header + 30).map(r => (r || []).length));
+    const opsiKol = sel => `<option value="">—</option>` + Array.from({ length: nk }, (_, ki) => `<option value="${ki}" ${sel === ki ? 'selected' : ''}>${U.esc(kolNama(ki))}</option>`).join('');
+    const teksTgl = S.items.length === 0 || sh.rows.slice(S.d.header + 1, S.d.header + 30).some(r => r && typeof r[S.d.kol.tanggal] === 'string');
+    const masuk = S.items.filter(x => x.jenis === 'masuk'), keluar = S.items.filter(x => x.jenis === 'keluar');
+    return `<h3 class="mw-h">Cek susunan kolom</h3><p class="muted small">${S.d.dariAI ? I('sparkles') + ' Dibaca AI' : 'Terbaca otomatis'} dari <b>${U.esc(S.berkas)}</b>. Ubah bila ada yang keliru.</p>
+      ${S.sheets.length > 1 ? UI.field('Sheet', `<select data-imp="sheet">${S.sheets.map((s, i) => `<option value="${i}" ${i === S.d.si ? 'selected' : ''}>${U.esc(s.nama)}</option>`).join('')}</select>`) : ''}
+      <div class="card imp-kol">${UI.field('Baris judul', `<select data-imp="header">${Array.from({ length: Math.min(40, sh.rows.length) }, (_, i) => `<option value="${i}" ${i === S.d.header ? 'selected' : ''}>Baris ${i + 1}: ${U.esc((sh.rows[i] || []).map(Impor.teks).filter(Boolean).slice(0, 3).join(' · ').slice(0, 40))}</option>`).join('')}</select>`)}
+        <div class="grid2">${PERAN.map(p => UI.field(p[1], `<select data-imp-kol="${p[0]}">${opsiKol(S.d.kol[p[0]])}</select>`)).join('')}</div>
+        ${teksTgl ? UI.field('Urutan tanggal', `<select data-imp="urut">${[['DMY', 'Hari/Bulan/Tahun (31/12/2025)'], ['MDY', 'Bulan/Hari/Tahun (12/31/2025)'], ['YMD', 'Tahun-Bulan-Hari']].map(o => `<option value="${o[0]}" ${(S.d.urut || 'DMY') === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`) : ''}
+        ${S.d.kol.jenis == null && S.d.kol.masuk == null ? UI.field('Tanpa kolom jenis — anggap semua', `<select data-imp="jenisBawaan"><option value="keluar">Pengeluaran (angka minus = pengeluaran)</option><option value="masuk" ${S.d.jenisBawaan === 'masuk' ? 'selected' : ''}>Pemasukan</option></select>`) : ''}
+        ${AI.siap() && !AI.demo() ? `<button class="btn ghost sm" data-act="imp-ai-kolom">${I('sparkles')} Minta AI membaca ulang</button>` : ''}</div>
+      <div class="card imp-hasil">${S.items.length ? `<div class="imp-angka"><div><b>${U.fmtNum(S.items.length)}</b><small>transaksi terbaca</small></div><div><b class="bad">${U.rpShort(U.sum(keluar, x => x.jumlah))}</b><small>${keluar.length} pengeluaran</small></div><div><b class="ok">${U.rpShort(U.sum(masuk, x => x.jumlah))}</b><small>${masuk.length} pemasukan</small></div></div>
+        <div class="imp-prev">${S.items.slice(0, 5).map(x => `<div class="row"><div class="tx-txt"><b>${U.esc(x.catatan || '-')}</b><small>${U.tgl(x.tanggal)} · ${U.esc(x.subAsal || x.katAsal || 'tanpa kategori')}</small></div><b class="${x.jenis === 'masuk' ? 'ok' : 'bad'}">${x.jenis === 'masuk' ? '+' : '−'}${U.rp(x.jumlah)}</b></div>`).join('')}</div>`
+        : `<p class="muted">${I('circle-alert')} Belum ada transaksi terbaca. Pastikan kolom <b>Tanggal</b> dan <b>Jumlah</b> (atau Pemasukan & Pengeluaran) sudah benar.</p>`}</div>
+      <div class="mw-foot"><button class="btn ghost" data-act="imp-ulang">${I('chevron-left')}</button><button class="btn grow" data-act="imp-ke" data-l="kategori" ${S.items.length ? '' : 'disabled'}>Lanjut ${I('chevron-right')}</button></div>`;
+  }
+  function vKategori() {
+    sarankan();
+    const gs = kelompok(), kosong = gs.filter(g => !S.peta[g.kunci]).length, dw = Object.keys(S.petaW);
+    const baris = g => `<div class="row imp-k ${S.peta[g.kunci] ? '' : 'kurang'}"><div class="tx-txt"><b>${U.esc(g.nama || '(tanpa kategori)')}${S.ai[g.kunci] ? ` <span class="pill">${I('sparkles')} AI</span>` : ''}</b><small>${g.induk ? U.esc(g.induk) + ' · ' : ''}${g.n} baris · ${U.rpShort(g.total)}${g.contoh.length ? ' · mis. ' + U.esc(g.contoh[0]) : ''}</small></div>
+      <label class="vq-pill ${S.peta[g.kunci] ? '' : 'kosong'}"><select data-imp-kat="${U.esc(g.kunci)}"><option value="">Pilih…</option>${UI.katOpts(g.jenis, S.peta[g.kunci] === LEWATI ? '' : S.peta[g.kunci])}<option value="${LEWATI}" ${S.peta[g.kunci] === LEWATI ? 'selected' : ''}>— Jangan impor —</option></select>${I('chevron-down')}</label></div>`;
+    const kel = gs.filter(g => g.jenis === 'keluar'), mas = gs.filter(g => g.jenis === 'masuk');
+    return `<h3 class="mw-h">Cocokkan kategori</h3><p class="muted small">${gs.length} kategori dari berkas sudah dipasangkan ke kategori SatuAtap. Periksa yang belum pas.</p>
+      ${kosong ? `<div class="note warn small">${I('tag')} <span>${kosong} kategori belum ada pasangannya.${AI.siap() && !AI.demo() ? '' : ' Pilih manual ya.'}</span>${AI.siap() && !AI.demo() ? `<button class="btn xs" data-act="imp-ai-kat">${I('sparkles')} Cocokkan dengan AI</button>` : ''}</div>` : ''}
+      ${kel.length ? `<h4 class="mini-h">Pengeluaran</h4><div class="card list">${kel.map(baris).join('')}</div>` : ''}
+      ${mas.length ? `<h4 class="mini-h">Pemasukan</h4><div class="card list">${mas.map(baris).join('')}</div>` : ''}
+      <h4 class="mini-h">Dompet</h4><div class="card imp-kol">${dw.length ? dw.map(n => UI.field(U.esc(n), `<select data-imp-w="${U.esc(n)}">${UI.walletOpts(S.petaW[n])}</select>`)).join('') + UI.field('Baris tanpa dompet', `<select data-imp="walletId">${UI.walletOpts(S.walletId)}</select>`)
+        : UI.field('Semua transaksi masuk ke dompet', `<select data-imp="walletId">${UI.walletOpts(S.walletId)}</select>`, 'Berkas tidak punya kolom dompet/rekening.')}</div>
+      <div class="mw-foot"><button class="btn ghost" data-act="imp-ke" data-l="kolom">${I('chevron-left')}</button><button class="btn grow" data-act="imp-ke" data-l="ringkas">Lanjut ${I('chevron-right')}</button></div>`;
+  }
+  function vRingkas() {
+    const r = rencana(), kel = r.out.filter(x => x.jenis === 'keluar'), mas = r.out.filter(x => x.jenis === 'masuk');
+    const dari = r.out.reduce((m, x) => x.tanggal < m ? x.tanggal : m, '9999'), sampai = r.out.reduce((m, x) => x.tanggal > m ? x.tanggal : m, '');
+    return `<h3 class="mw-h">Siap diimpor</h3>
+      <div class="card kv-list"><div class="kv"><span>Transaksi baru</span><b>${U.fmtNum(r.out.length)}</b></div>${r.out.length ? `<div class="kv"><span>Periode</span><b>${U.tgl(dari)} – ${U.tgl(sampai)}</b></div>` : ''}
+        <div class="kv"><span>Pengeluaran</span><b class="bad">${U.rp(U.sum(kel, x => x.jumlah))}</b></div><div class="kv"><span>Pemasukan</span><b class="ok">${U.rp(U.sum(mas, x => x.jumlah))}</b></div>
+        ${r.dup.length ? `<div class="kv"><span>Sudah ada (dilewati)</span><b>${r.dup.length}</b></div>` : ''}${r.lewat.length ? `<div class="kv"><span>Tidak diimpor</span><b>${r.lewat.length}</b></div>` : ''}</div>
+      ${r.kurang ? `<div class="note warn small">${I('tag')} <span>${r.kurang} baris belum berkategori — kembali ke langkah sebelumnya.</span></div>` : ''}
+      <label class="check imp-jaga"><input type="checkbox" data-imp="jaga" ${S.jaga ? 'checked' : ''}><span><b>Jangan ubah saldo dompet saat ini</b><small class="muted">Disarankan. Saldo dompet di SatuAtap sudah sesuai kenyataan — catatan lama hanya jadi riwayat untuk laporan & rapor.</small></span></label>
+      <div class="note small">${I('rotate-ccw')} <span>Bisa dibatalkan seluruhnya kapan saja dari <b>Riwayat impor</b>.</span></div>
+      <div class="mw-foot"><button class="btn ghost" data-act="imp-ke" data-l="kategori">${I('chevron-left')}</button><button class="btn grow" data-act="imp-simpan" ${r.out.length && !r.kurang ? '' : 'disabled'}>${I('download')} Impor ${U.fmtNum(r.out.length)} transaksi</button></div>`;
+  }
+  function vSelesai() {
+    const h = S.hasil;
+    return `<div class="mw-hero">${I('party-popper', 'big')}<h2>Impor selesai</h2><p class="muted">${U.fmtNum(h.n)} transaksi masuk${h.dup ? ' · ' + h.dup + ' sudah ada (dilewati)' : ''}${h.lewat ? ' · ' + h.lewat + ' tidak diimpor' : ''}.</p></div>
+      <div class="card list">${[['arrow-left-right', 'Lihat di Mutasi', 'mutasi'], ['chart-column', 'Lihat Rapor', 'rapor']].map(x => `<div class="row" data-act="go" data-to="${x[2]}"><span class="cat-ic">${I(x[0])}</span><div class="tx-txt"><b>${x[1]}</b></div>${I('chevron-right')}</div>`).join('')}</div>
+      <button class="btn ghost block" data-act="imp-ulang">${I('upload')} Impor berkas lain</button>`;
+  }
 
   UI.page('impor', {
-    head: () => ({ title: 'Impor CSV', crumb: 'Mutasi', back: 'mutasi' }), nav: () => 'mutasi',
+    noFab: true,
+    head: () => ({ title: 'Impor dari Excel', crumb: 'Lainnya', back: 'lainnya' }),
+    nav: () => 'lainnya',
     render() {
-      const input = `<input type="file" id="imp-input" accept=".csv,.txt,text/csv" hidden>`;
-      if (!P.raw) return input + `<div class="card"><h3>${I('file-up')} Impor mutasi rekening</h3>
-          <p class="muted">Unduh mutasi dari internet/mobile banking dalam format <b>CSV</b>, lalu pilih filenya di sini. Kolom dicocokkan otomatis dan transaksi yang sudah tercatat ditandai agar tidak dobel.</p>
-          <button class="btn block" data-act="imp-file">${I('upload')} Pilih file CSV</button></div>
-        <div class="note">${I('info')} Bank yang memberi PDF saja: buka PDF di Excel/Google Sheets lalu simpan sebagai CSV. Data tidak dikirim ke mana pun — dibaca langsung di HP ini.</div>`;
-      const head = P.rows[P.head] || [], cols = head.map((h, i) => `<option value="${i}">${U.esc(h || 'Kolom ' + (i + 1))}</option>`).join('');
-      const sel = (k, lbl) => UI.field(lbl, `<select data-map="${k}"><option value="">—</option>${cols}</select>`);
-      const n = P.items.length, pilih = P.items.filter(x => x.pilih), dup = P.items.filter(x => x.dup).length;
-      const kats = j => Store.kategori(j);
-      return input + `<div class="card"><div class="row-sp"><b>${I('file-text')} ${U.esc(P.nama)}</b><button class="btn ghost sm" data-act="imp-reset">Ganti</button></div>
-          <div class="grid2">${UI.field('Masuk ke dompet', `<select id="imp-wallet">${Store.wallets().map(w => `<option value="${w.id}" ${w.id === P.walletId ? 'selected' : ''}>${U.esc(w.nama)}</option>`).join('')}</select>`)}
-            ${UI.field('Baris judul kolom', `<select id="imp-head">${P.rows.slice(0, 25).map((r, i) => `<option value="${i}" ${i === P.head ? 'selected' : ''}>${i + 1}: ${U.esc(r.slice(0, 3).join(' | ').slice(0, 40))}</option>`).join('')}</select>`)}</div>
-          <details ${n ? '' : 'open'}><summary>Pencocokan kolom</summary><div class="grid2" id="imp-map">${sel('tanggal', 'Tanggal')}${sel('ket', 'Keterangan')}${sel('debit', 'Debit (keluar)')}${sel('kredit', 'Kredit (masuk)')}${sel('jumlah', 'Jumlah (bila satu kolom)')}${sel('tipe', 'Jenis D/K (opsional)')}</div>
-            ${UI.field('Tahun (bila tanggal tanpa tahun)', `<input type="number" id="imp-tahun" value="${P.tahun}">`)}</details></div>
-        ${n ? `<div class="row-sp"><small class="muted">${n} baris terbaca · ${dup} sudah tercatat · ${pilih.length} dipilih</small><span><button class="btn ghost sm" data-act="imp-semua" data-v="1">Pilih semua</button> <button class="btn ghost sm" data-act="imp-semua" data-v="0">Kosongkan</button></span></div>
-          <div class="card list imp-list">${P.items.slice(0, 400).map((x, k) => `<div class="row ${x.pilih ? '' : 'off'}">
-              <button class="cek ${x.pilih ? 'on' : ''}" data-act="imp-pilih" data-i="${k}" aria-label="Pilih">${I(x.pilih ? 'square-check' : 'square')}</button>
-              <div class="tx-txt"><b>${U.esc(x.ket || '(tanpa keterangan)')}</b><small>${U.tgl(x.tanggal)}${x.dup ? ' · <span class="bad">sudah tercatat</span>' : ''}</small>
-                <select class="imp-kat" data-i="${k}">${kats(x.jenis).map(c => `<option value="${c.id}" ${c.id === x.kategoriId ? 'selected' : ''}>${U.esc(c.nama)}</option>`).join('')}</select></div>
-              ${UI.amount(x.jumlah, x.jenis)}</div>`).join('')}${n > 400 ? `<div class="row muted">+${n - 400} baris lagi ikut diimpor sesuai pilihan.</div>` : ''}</div>
-          <button class="btn block" data-act="imp-simpan">${I('download')} Impor ${pilih.length} transaksi</button>`
-        : `<div class="alert warn">${I('triangle-alert')}<div><b>Belum ada transaksi terbaca</b><small>Periksa baris judul dan pencocokan kolom (Tanggal + Debit/Kredit atau Jumlah).</small></div></div>`}
-        <div class="spacer"></div>`;
+      if (!S) baru();
+      if (!Store.isAdminLike()) return UI.empty('lock', 'Khusus Admin / Pasangan', 'Minta Admin keluarga untuk mengimpor catatan lama.');
+      if (S.sibuk) return `${langkahBar()}<div class="voice"><div class="mic-pulse">${I('sheet', 'big')}</div><p class="muted">${U.esc(S.sibuk)}</p></div>`;
+      const v = { pilih: vPilih, kolom: vKolom, kategori: vKategori, ringkas: vRingkas, selesai: vSelesai }[S.langkah] || vPilih;
+      return `<div class="mw imp">${S.langkah === 'pilih' ? '' : langkahBar()}${v()}<div class="spacer"></div></div>`;
     },
     after(el) {
-      const inp = el.querySelector('#imp-input');
-      if (inp) inp.onchange = () => { const f = inp.files[0]; if (!f) return; if (f.size > 5e6) return UI.toast('File terlalu besar (maks 5 MB).', 'warn'); const r = new FileReader(); r.onload = () => muat(String(r.result), f.name); r.readAsText(f); };
-      el.querySelectorAll('[data-map]').forEach(s => { const v = P.map[s.dataset.map]; s.value = v === undefined ? '' : String(v); s.onchange = () => { if (s.value === '') delete P.map[s.dataset.map]; else P.map[s.dataset.map] = Number(s.value); susun(); UI.render(); }; });
-      const w = el.querySelector('#imp-wallet'); if (w) w.onchange = () => { P.walletId = w.value; susun(); UI.render(); };
-      const h = el.querySelector('#imp-head'); if (h) h.onchange = () => { P.head = Number(h.value); P.map = tebakMap(P.rows[P.head] || [], P.rows.slice(P.head + 1)); susun(); UI.render(); };
-      const t = el.querySelector('#imp-tahun'); if (t) t.onchange = () => { P.tahun = Number(t.value) || P.tahun; susun(); UI.render(); };
-      el.querySelectorAll('.imp-kat').forEach(s => s.onchange = () => { const it = P.items[+s.dataset.i]; if (it) it.kategoriId = s.value; });
+      const f = el.querySelector('[data-imp-file]'); if (f) f.onchange = () => { if (f.files[0]) bacaBerkas(f.files[0]); };
+      if (el._imp) return; el._imp = true;
+      el.addEventListener('change', e => {
+        if (UI.cur !== 'impor' || !S) return; const t = e.target, y = window.scrollY;
+        if (t.dataset.impKol) { const v = t.value === '' ? null : Number(t.value); if (v == null) delete S.d.kol[t.dataset.impKol]; else S.d.kol[t.dataset.impKol] = v; hitung(); }
+        else if (t.dataset.impKat !== undefined) { S.peta[t.dataset.impKat] = t.value; delete S.ai[t.dataset.impKat]; }
+        else if (t.dataset.impW !== undefined) S.petaW[t.dataset.impW] = t.value;
+        else if (t.dataset.imp === 'sheet') { const d = Impor.deteksiSheet(S.sheets[+t.value].rows); S.d = Object.assign({ si: +t.value }, d || { header: 0, kol: {} }); hitung(); }
+        else if (t.dataset.imp === 'header') { S.d.header = +t.value; const d = Impor.deteksiSheet(S.sheets[S.d.si].rows.slice(0)); if (d && d.header === S.d.header) S.d.kol = d.kol; hitung(); }
+        else if (t.dataset.imp === 'urut' || t.dataset.imp === 'jenisBawaan') { S.d[t.dataset.imp] = t.value; hitung(); }
+        else if (t.dataset.imp === 'walletId') { S.walletId = t.value; Object.keys(S.petaW).forEach(n => { if (!S.petaW[n]) S.petaW[n] = t.value; }); }
+        else if (t.dataset.imp === 'jaga') S.jaga = t.checked;
+        else return;
+        UI.render(); window.scrollTo(0, y);
+      });
     }
   });
-  UI._imporTest = { angka, tanggal, csv, pisah, tebakHeader, tebakMap, muat, P };
+  UI.act('imp-ke', el => { S.langkah = el.dataset.l; UI.render(); window.scrollTo(0, 0); if (S.langkah === 'kategori' && AI.siap() && !AI.demo() && !S.aiKatSudah) { S.aiKatSudah = true; sarankan(); if (kelompok().some(g => !S.peta[g.kunci])) kategoriAI(); } });
+  UI.act('imp-ulang', () => { baru(); UI.render(); });
+  UI.act('imp-ai-kolom', async () => { S.sibuk = 'AI sedang membaca susunan kolom…'; UI.render(); await kolomAI(); hitung(); S.sibuk = ''; UI.render(); });
+  UI.act('imp-ai-kat', () => kategoriAI());
+  UI.act('imp-simpan', () => simpan().catch(e => { S.sibuk = ''; S.langkah = 'ringkas'; UI.toast('Gagal menyimpan: ' + e.message, 'warn'); UI.render(); }));
+  UI.act('imp-batal', el => batalkan(el.dataset.id));
 })();

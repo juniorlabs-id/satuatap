@@ -64,7 +64,7 @@
     const h = W.hasil;
     return `<div class="mw-hero">${I('party-popper', 'big')}<h2>Siap dipakai!</h2><p class="muted">${[h.w ? h.w + ' dompet' : '', h.r ? h.r + ' jadwal rutin' : '', h.g ? h.g + ' goals' : ''].filter(Boolean).join(' · ') || 'Pengaturan dasar tersimpan'}.</p></div>
       <div class="card list">${[['user-plus', 'Undang pasangan', 'Catat bersama dari HP masing-masing', 'mw-ke', 'pengaturan/anggota'], ['bell', 'Pasang pengingat Telegram & WhatsApp', 'Tagihan, rapat, dan catat lewat chat', 'mw-ke', 'pengaturan/notif'],
-        ['clipboard-list', 'Bagi gaji ke amplop', 'Batas belanja per kategori', 'mw-ke', 'anggaran'], ['zap', 'Catat pengeluaran pertama', 'Ketik "makan 25rb, bensin 50rb"', 'mw-catat', '']]
+        ['clipboard-list', 'Bagi gaji ke amplop', 'Batas belanja per kategori', 'mw-ke', 'anggaran'], ['sheet', 'Impor catatan lama dari Excel', 'Riwayat langsung masuk ke laporan', 'mw-ke', 'impor'], ['zap', 'Catat pengeluaran pertama', 'Ketik "makan 25rb, bensin 50rb"', 'mw-catat', '']]
         .map(x => `<div class="row" data-act="${x[3]}" data-to="${x[4]}"><span class="cat-ic">${I(x[0])}</span><div class="tx-txt"><b>${x[1]}</b><small>${x[2]}</small></div>${I('chevron-right')}</div>`).join('')}</div>`;
   }
 

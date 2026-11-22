@@ -33,6 +33,7 @@
         ])}
         ${UI.sec('Pengaturan')}${UI.tiles([
           { id: 'mulai', icon: 'wand-sparkles', label: 'Panduan Mulai', to: 'mulai' },
+          { id: 'impor', icon: 'sheet', label: 'Impor dari Excel', to: 'impor' },
           { id: 'kel', icon: 'heart-handshake', label: 'Keluarga', to: 'pengaturan/keluarga' },
           { id: 'agt', icon: 'user-cog', label: 'Anggota & Izin', to: 'pengaturan/anggota' },
           { id: 'kat', icon: 'tags', label: 'Kategori', to: 'pengaturan/kategori' },
@@ -314,6 +315,7 @@
       <div class="row-btns"><button class="btn" data-act="sync-now">${I('refresh-cw')} Sinkron sekarang</button><button class="btn ghost" data-act="sync-full">${I('database-zap')} Muat ulang penuh</button></div>
       ${Store.mode === 'live' ? `<div class="row-btns"><a class="btn ghost" href="${Cloud.link()}" target="_blank" rel="noopener">${I('sheet')} Buka spreadsheet</a>${Store.isAdminLike() ? `<button class="btn ghost" data-act="mirror-now">${I('table')} Perbarui tabel</button>` : ''}</div>` : ''}
       <button class="btn block ghost" data-act="backup">${I('download')} Unduh cadangan (JSON)</button>
+      ${Store.isAdminLike() ? `<button class="btn block ghost" data-act="go" data-to="impor">${I('sheet')} Impor catatan lama dari Excel / CSV</button>` : ''}
       <p class="muted small">Aplikasi menyimpan salinan data di perangkat agar terbuka instan & tetap bisa dipakai saat sinyal lemah; perubahan dikirim otomatis saat online. Tab tabel di spreadsheet diperbarui otomatis sekali sehari dari perangkat Admin.</p>`;
   }
   UI.act('sync-now', async () => { await Store.flush(); const r = await Store.sync(); UI.toast(r && r.ok ? 'Sinkron selesai.' : (r && r.message) || 'Belum bisa sinkron.', r && r.ok ? 'ok' : 'warn'); UI.render(); });

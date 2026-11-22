@@ -40,6 +40,11 @@
         <li>Belanja bareng teman? Ketuk <b>Split bill dengan teman</b>, isi nama teman, lalu pilih <b>milik</b> tiap barang. Bagian teman tercatat sebagai <b>piutang</b>.</li>
         <li><b>Simpan</b> → satu struk = satu mutasi; rinciannya ada di <b>Detail transaksi</b>, dan anggaran dihitung per kategori barang.</li></ol>
       <div class="row-btns">${coba('ai-struk', 'Coba scan struk', 'scan-line')}</div>`],
+    ['impor', 'sheet', 'Pindahkan catatan lama dari Excel', () => `
+      <p>Pernah mencatat di Excel atau Google Sheets? Unduh sebagai <b>.xlsx</b> atau <b>.csv</b>, lalu buka <b>Lainnya › Impor dari Excel</b>.</p>
+      <ol class="steps"><li><b>Pilih berkas</b> — template apa pun, termasuk mutasi rekening bank. Cukup ada kolom tanggal & jumlah.</li><li><b>Cek kolom</b> — terbaca otomatis (dibantu AI bila susunannya tidak biasa); ubah bila keliru.</li>
+        <li><b>Cocokkan kategori</b> — kategori lama dipasangkan ke kategori SatuAtap; pilihan Anda diingat untuk impor berikutnya.</li><li><b>Impor</b> — saldo dompet saat ini tidak berubah. Catatan yang sudah ada dilewati, dan impor bisa dibatalkan seluruhnya.</li></ol>
+      <div class="row-btns">${ke('impor', 'Buka Impor dari Excel')}</div>`],
     ['chat', 'message-circle', 'Catat lewat Telegram & WhatsApp', () => `
       <p>Kirim pesan seperti ${contoh('makan siang 45rb gopay')} ke bot Telegram SatuAtap (atau nomor WA keluarga bila dipasang). Catatan masuk ke <b>Menunggu konfirmasi</b> di aplikasi.</p>
       <div class="row-btns">${ke('pengaturan/notif', 'Hubungkan Telegram / WA')}</div>`],

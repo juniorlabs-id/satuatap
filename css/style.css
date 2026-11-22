@@ -999,3 +999,18 @@ details.adv summary { cursor: pointer; font-weight: 600; color: var(--primary); 
 .pg-help { margin-top: 14px; padding: 14px 16px; }
 .pg-item .tx-txt b { white-space: normal; overflow: visible; text-overflow: clip; color: var(--text); }
 .warn-t { color: var(--warn, #b7791f) !important; }
+
+/* ---------- Impor dari Excel ---------- */
+.imp-drop { padding: 18px 16px; } .imp-drop label.btn { cursor: pointer; margin: 6px 0 10px; }
+.imp-tips { margin: 6px 0 0; padding-left: 18px; }
+.imp-kol { padding: 12px 14px; } .imp-kol .grid2 { gap: 8px 10px; }
+.imp-hasil { padding: 12px 14px; margin-top: 12px; }
+.imp-angka { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 8px; }
+.imp-angka b { display: block; font-size: 18px; } .imp-angka small { color: var(--muted); font-size: 12px; }
+.imp-prev .row { padding: 8px 0; } .imp-prev .row b.ok, .imp-prev .row b.bad { white-space: nowrap; font-size: 14px; }
+.imp-k { align-items: center; gap: 8px; } .imp-k .tx-txt small { white-space: normal; }
+.imp-k .vq-pill select { max-width: 150px; }
+.imp-k.kurang { background: color-mix(in srgb, var(--warn-c, #fdf1d8) 60%, transparent); }
+.imp-jaga { display: flex; gap: 10px; align-items: flex-start; margin: 14px 2px; } .imp-jaga span { display: flex; flex-direction: column; gap: 2px; }
+.imp-steps { margin-bottom: 14px; }
+.note.warn .btn.xs { margin-left: auto; flex: none; }
