@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.7)
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.8)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
  *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (tagihan < Rp 1 juta: H-1 & hari H saja) (lewat @SatuAtapBot, bila anggota sudah
@@ -440,10 +440,14 @@ function hentikanEmail() {
 /** Baca ulang email yang tadi dilewati / gagal (mis. setelah kode diperbarui). Email yang sudah jadi draf tidak diulang. */
 function prosesUlangEmail() {
   let j = [], sudah = []; try { j = JSON.parse(PROPS.getProperty('EMAIL_JEJAK') || '[]'); sudah = JSON.parse(PROPS.getProperty('EMAIL_SUDAH') || '[]'); } catch (e) {}
+  const lama = j.some(function (x) { return !x.id && x.s !== 'OK'; });   // catatan dari versi lama (tanpa ID email)
+  const ok = j.filter(function (x) { return x.id && x.s === 'OK'; }).map(function (x) { return x.id; });
   const ulang = j.filter(function (x) { return x.id && x.s !== 'OK'; }).map(function (x) { return x.id; });
-  PROPS.setProperty('EMAIL_SUDAH', JSON.stringify(sudah.filter(function (id) { return ulang.indexOf(id) < 0; })));
-  PROPS.setProperty('EMAIL_JEJAK', JSON.stringify(j.filter(function (x) { return ulang.indexOf(x.id) < 0; })));
-  Logger.log('Membaca ulang ' + ulang.length + ' email…');
+  // Versi lama tidak menyimpan ID → baca ulang semua email 2 hari terakhir sejak aktif, kecuali yang sudah jadi draf
+  const sisa = lama ? sudah.filter(function (id) { return ok.indexOf(id) > -1; }) : sudah.filter(function (id) { return ulang.indexOf(id) < 0; });
+  PROPS.setProperty('EMAIL_SUDAH', JSON.stringify(sisa));
+  PROPS.setProperty('EMAIL_JEJAK', JSON.stringify(j.filter(function (x) { return x.s === 'OK' && x.id; })));
+  Logger.log('Membaca ulang ' + (sudah.length - sisa.length) + ' email…');
   cekEmailLog();
 }
 /** Diagnosa: periksa sekarang & tampilkan 20 hasil terakhir. */
