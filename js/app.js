@@ -332,7 +332,14 @@
   // ---------- Inisialisasi ----------
   App.init = async () => {
     App.applyTheme();
-    if ('serviceWorker' in navigator && location.protocol === 'https:' && !/[?&]embed\b/.test(location.search)) navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && location.protocol === 'https:' && !/[?&]embed\b/.test(location.search)) {
+      const adaSW = !!navigator.serviceWorker.controller; let muatUlang = false;
+      // Versi baru aktif → muat ulang sekali agar langsung terpakai
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (adaSW && !muatUlang) { muatUlang = true; location.reload(); } });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+      }).catch(() => {});
+    }
     const params = new URLSearchParams(location.search);
     if (params.has('demo')) return App.demo(params.get('demo') === 'big');
     if (!APP_CONFIG.GOOGLE_CLIENT_ID) return App.login('Konfigurasi belum lengkap: GOOGLE_CLIENT_ID di js/config.js masih kosong. Mode demo tetap bisa dicoba.');
