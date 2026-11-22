@@ -3,7 +3,7 @@
  *  SatuAtap — SKRIP PENDAMPING (opsional, v1.7.0)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
- *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (lewat @SatuAtapBot, bila anggota sudah
+ *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (tagihan < Rp 1 juta: H-1 & hari H saja) (lewat @SatuAtapBot, bila anggota sudah
  *      menghubungkan Telegram di aplikasi) + pengingat Rapat Keuangan.
  *   2. (Opsional) WhatsApp lewat akun Fonnte MILIK KELUARGA: pengingat yang sama ke nomor WA setiap pagi,
  *      dan catat lewat chat WA ("makan 45rb gopay") yang masuk ke aplikasi sebagai draf.
@@ -25,7 +25,10 @@ const FILE_ID = 'TEMPEL_ID_FILE_DI_SINI';           // diisi otomatis oleh aplik
 const RELAY_URL = 'TEMPEL_ALAMAT_RELAY_DI_SINI';   // alamat /exec relay JuniorLabs (diisi otomatis oleh aplikasi)
 const JAM_KIRIM = 8;          // jam pengingat setiap pagi (Asia/Jakarta)
 const JAM_RINGKAS = 20;       // jam ringkasan catatan WA malam hari
-const PENGINGAT = [7, 3, 1, 0];  // H-7, H-3, H-1, hari H
+const PENGINGAT = [7, 3, 1, 0];  // H-7, H-3, H-1, hari H (tagihan ≥ Rp 1 juta)
+const PENGINGAT_KECIL = [1, 0];  // tagihan < Rp 1 juta: hanya H-1 & hari H
+const BATAS_KECIL = 1000000;
+function hariIngat_(jumlah) { return (Number(jumlah) || 0) < BATAS_KECIL ? PENGINGAT_KECIL : PENGINGAT; }
 
 const PROPS = PropertiesService.getScriptProperties();
 
@@ -105,9 +108,9 @@ function tugasHarian_(st) {
   return out;
 }
 
-/** Pengingat hari ini: tagihan/cicilan/acara H-7, H-3, H-1, H yang belum lunas + rapat keuangan H-1 & H. */
+/** Pengingat hari ini: tagihan/cicilan/acara H-7, H-3, H-1, H (di bawah Rp 1 juta hanya H-1 & H) yang belum lunas + rapat keuangan H-1 & H. */
 function pengingat_(st, today) {
-  const items = jadwal_(st, today, Math.max.apply(null, PENGINGAT)).filter(function (x) { return x.arah === 'keluar' && !x.lunas && PENGINGAT.indexOf(x.h) > -1; });
+  const items = jadwal_(st, today, Math.max.apply(null, PENGINGAT)).filter(function (x) { return x.arah === 'keluar' && !x.lunas && hariIngat_(x.jumlah).indexOf(x.h) > -1; });
   const pesan = items.map(function (x) {
     const kapan = x.h === 0 ? '<b>hari ini</b>' : x.h === 1 ? '<b>besok</b>' : x.h + ' hari lagi (' + tglId_(x.tanggal) + ')';
     return { ke: 'semua', kunci: 'occ|' + x.occ + '|H-' + x.h, teks: (x.h <= 1 ? '🔔 ' : '🗓️ ') + esc_(x.nama) + ' · <b>' + rp_(x.jumlah) + '</b> jatuh tempo ' + kapan + '.' + (x.h === 0 ? '\nTandai lunas di aplikasi setelah dibayar.' : '') };

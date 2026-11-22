@@ -448,6 +448,7 @@
       <div class="vq-ai" hidden></div><div class="vq-list"></div><div class="vq-sum"></div>`,
       foot: `<button class="btn block" data-ok disabled>${I('check')} Simpan</button>`, onClose: () => Voice.stop() });
     const q = x => s.el.querySelector(x);
+    if (opt.suara) s.el.classList.add('mode-suara');   // pintasan suara: tampil dari mikrofon ke bawah saja
     const mic = q('[data-mic]'), txt = q('.voice-txt'), list = q('.vq-list'), ok = q('[data-ok]'), sum = q('.vq-sum'), box = q('.vq-voice'), inp = q('[data-qt]'), aiBox = q('.vq-ai');
     const lengkap = r => r.jumlah > 0 && r.kategoriId && r.walletId;
     const kat = id => Store.byId.Kategori[id] || null;

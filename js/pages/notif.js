@@ -8,7 +8,7 @@
   const relayOk = () => Store.mode === 'demo' || (Store.mode === 'live' && Relay.enabled() && Store.fileId);
 
   /** Jenis pengingat Telegram yang aktif untuk keluarga (pengaturan bersama). */
-  UI.NOTIF_JENIS = [['tagihan', 'Tagihan & cicilan (H-7, H-3, H-1, hari H)'], ['amplop', 'Amplop anggaran terpakai 80% & 100%'], ['emas', 'Alert harga emas'], ['rapat', 'Rapat keuangan'], ['insight', 'Insight mingguan AI (untuk yang memakai AI)']];
+  UI.NOTIF_JENIS = [['tagihan', 'Tagihan & cicilan (H-7, H-3, H-1, hari H · di bawah Rp 1 juta: H-1 & hari H)'], ['amplop', 'Amplop anggaran terpakai 80% & 100%'], ['emas', 'Alert harga emas'], ['rapat', 'Rapat keuangan'], ['insight', 'Insight mingguan AI (untuk yang memakai AI)']];
   const notifSet = () => { let o = {}; try { o = JSON.parse(Store.setting('notifTelegram', '{}')) || {}; } catch (e) {} UI.NOTIF_JENIS.forEach(j => { if (o[j[0]] === undefined) o[j[0]] = true; }); return o; };
 
   // ---------- Status Telegram ----------
@@ -115,7 +115,7 @@
   const PANDUAN = {
     pend: { judul: 'Pasang script', langkah: () => [
       T('Apa ini & siapkan', `<p>Script ini berjalan di akun Google <b>Anda sendiri</b> setiap pagi ± pukul 08.00, walau aplikasi tidak dibuka. Tugasnya:</p>
-        <ul class="ul"><li>mengirim pengingat tagihan & cicilan (H-7, H-3, H-1, hari H) ke <b>Telegram</b>,</li><li>dan ke <b>WhatsApp</b> bila Anda memasangnya di panduan berikutnya.</li></ul>
+        <ul class="ul"><li>mengirim pengingat tagihan & cicilan (H-7, H-3, H-1, hari H; di bawah Rp 1 juta cukup H-1 & hari H) ke <b>Telegram</b>,</li><li>dan ke <b>WhatsApp</b> bila Anda memasangnya di panduan berikutnya.</li></ul>
         <div class="note small">${I('clock')} <span>± 10 menit, sekali saja. Semua kode tinggal <b>salin–tempel</b> dari panduan ini.</span></div>
         <div class="note small">${I('monitor')} <span>Paling mudah di <b>laptop/komputer</b>. Di HP: Chrome › ⋮ › centang <b>Situs desktop</b>.</span></div>
         <div class="note small">${I('user')} <span>Masuk Google dengan akun <b>${U.esc(admin())}</b> (Admin keluarga).</span></div>`),
@@ -283,7 +283,7 @@
     const o = notifSet(), pesan = [], today = U.today(), pend = pendAktif();   // Pendamping terpasang → pengingat tagihan & rapat hanya dari script (sekali tiap pagi)
     if (o.tagihan && !pend) Calc.occurrences(today, U.addDays(today, 7)).forEach(x => {
       if (x.arah !== 'keluar' || x.lunas || x.kind === 'rapat' || x.kind === 'tujuan') return;
-      const h = U.diffDays(today, x.tanggal); if ([7, 3, 1, 0].indexOf(h) < 0) return;
+      const h = U.diffDays(today, x.tanggal); if (((Number(x.sisa) || 0) < 1000000 ? [1, 0] : [7, 3, 1, 0]).indexOf(h) < 0) return;   // < Rp 1 juta: H-1 & hari H saja
       const occ = x.kind === 'acara' ? 'a|' + x.ref.id : x.id;
       pesan.push({ ke: 'semua', kunci: 'occ|' + occ + '|H-' + h, teks: (h <= 1 ? '🔔 ' : '🗓️ ') + U.esc(x.nama) + ' · <b>' + U.rp(x.sisa) + '</b> jatuh tempo ' + (h === 0 ? '<b>hari ini</b>' : h === 1 ? '<b>besok</b>' : h + ' hari lagi (' + U.tgl(x.tanggal, 'dm') + ')') + '.' });
     });

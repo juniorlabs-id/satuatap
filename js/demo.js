@@ -160,6 +160,14 @@
     T.Pengaturan.push({ id: 'mulaiTagih', nilai: U.addMonths(today, -24) });
     T.Pengaturan.push({ id: 'zakatAset', nilai: 'emas,kas,saham,reksadana,sbn,deposito' });
     T.Pengaturan.push({ id: 'zakatJiwa', nilai: '4' });
+    // Fitur 1.8: struk per barang (1 mutasi + rincian), split bill → piutang, saham tertaut Goals
+    { const d2 = U.addDays(today, -2), rc = [['Beras Premium 5kg', 1, 74500, 'k_dpr'], ['Minyak Goreng 2L', 2, 34000, 'k_dpr'], ['Susu UHT 1L', 2, 19800, 'k_dpr'], ['Sabun Cuci Piring', 1, 16900, 'k_rmh'],
+        ['Deterjen Cair 750ml', 1, 26500, 'k_rmh'], ['Sampo Anti Ketombe', 1, 44500, 'k_rmh'], ['Keripik Kentang', 2, 16750, 'k_jjn'], ['Kopi Arabika 200g', 1, 48000, 'k_dpr']]
+        .map(x => ({ n: x[0], q: x[1], h: x[2], j: x[1] * x[2], k: x[3] }));
+      tx(d2, 'keluar', U.sum(rc, x => x.j), 'k_dpr', 'w_tunai', 'Superindo Ciputat', N, { sumber: 'struk', rincian: JSON.stringify(rc) });
+      T.Pinjaman.push({ id: 'p_split', arah: 'piutang', jenis: 'patungan', pihak: 'Mbak Sari', pokok: '48000', bunga: '0', metode: 'tanpa', tenor: '1', mulai: d2, tanggalBayar: '0', cicilan: '48000', walletId: 'w_tunai', lunas: 'false', catatan: 'Split bill Superindo Ciputat: Kopi Arabika 200g', dibuat: d2 + 'T10:00:00.000Z' });
+      tx(d2, 'pinjam_beri', 48000, '', 'w_tunai', 'Split bill · Mbak Sari · Superindo Ciputat', N, { refId: 'p_split', sumber: 'patungan' }); }
+    T.Pengaturan.push({ id: 'sahamTujuan', nilai: JSON.stringify({ 'w_rdn:BBCA': 'g_pdd' }) });
     T.Pengaturan.push({ id: 'hargaAlert', nilai: JSON.stringify({ jual: 2400000, beli: 2400000 }) });
     // Fase 3: rapat, tugas, skenario
     const bl = n => U.addMonths(today, -n).slice(0, 7) + '-01';

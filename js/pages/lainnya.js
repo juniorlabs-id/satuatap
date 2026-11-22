@@ -32,6 +32,7 @@
           { id: 'sim', icon: 'git-fork', label: 'Simulasi Keputusan', to: 'simulasi' }
         ])}
         ${UI.sec('Pengaturan')}${UI.tiles([
+          { id: 'mulai', icon: 'wand-sparkles', label: 'Panduan Mulai', to: 'mulai' },
           { id: 'kel', icon: 'heart-handshake', label: 'Keluarga', to: 'pengaturan/keluarga' },
           { id: 'agt', icon: 'user-cog', label: 'Anggota & Izin', to: 'pengaturan/anggota' },
           { id: 'kat', icon: 'tags', label: 'Kategori', to: 'pengaturan/kategori' },
