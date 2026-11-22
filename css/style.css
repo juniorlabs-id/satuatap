@@ -998,3 +998,4 @@ details.adv summary { cursor: pointer; font-weight: 600; color: var(--primary); 
 .pg-ex { background: var(--primary-c); color: var(--primary); border-radius: 8px; padding: 3px 8px; font-size: 13px; }
 .pg-help { margin-top: 14px; padding: 14px 16px; }
 .pg-item .tx-txt b { white-space: normal; overflow: visible; text-overflow: clip; color: var(--text); }
+.warn-t { color: var(--warn, #b7791f) !important; }

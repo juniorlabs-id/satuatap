@@ -96,8 +96,49 @@
         <div class="tx-txt"><b>${U.esc(m.nama)} ${m.aktif === false ? UI.pill('Nonaktif', '') : ''}</b><small>${U.esc(m.email)} · ${U.esc(PERAN[m.peran] || m.peran)}</small></div>${I('chevron-right')}</div>`).join('')}</div>
       ${Store.me.peran === 'admin' && Store.t.Anggota.filter(m => m.aktif !== false).length < 5 ? `<button class="btn block" data-act="member-add">${I('user-plus')} Undang anggota</button>` : ''}
       <div class="card"><b>Cara anggota bergabung</b><ol class="steps small"><li>Admin menambahkan email di sini — Google Drive otomatis membagikan file keluarga & mengirim email undangan.</li><li>Anggota membuka aplikasi, <b>Masuk dengan Google</b>, lalu pilih <b>Saya diundang</b> dan pilih file "SatuAtap – Data …".</li></ol>
-        <div class="row-btns"><button class="btn ghost" data-act="wa-invite">${I('message-circle')} Kirim petunjuk via WA</button></div></div>`;
+        <div class="row-btns"><button class="btn ghost" data-act="wa-invite">${I('message-circle')} Kirim petunjuk via WA</button></div></div>
+      ${ingatKartu()}`;
   }
+  // ---------- Ingatkan anggota mencatat ----------
+  const aktivitasCatat = email => {
+    const tx = Store.t.Transaksi.filter(t => (t.dicatatOleh || t.dibayarOleh) === email && t.jenis !== 'penyesuaian');
+    const akhir = tx.reduce((m, t) => { const d = String(t.dibuat || t.tanggal || '').slice(0, 10); return d > m ? d : m; }, '');
+    const minggu = U.addDays(U.today(), -6);
+    return { akhir, hari: akhir ? U.diffDays(akhir, U.today()) : null, minggu: tx.filter(t => String(t.dibuat || t.tanggal).slice(0, 10) >= minggu).length };
+  };
+  function ingatKartu() {
+    const lain = Store.members().filter(m => m.email !== Store.me.email && m.aktif !== false);
+    if (!lain.length) return '';
+    if (UI.tgMuat && !ingatKartu._muat) { ingatKartu._muat = true; UI.tgMuat().then(() => { if (UI.cur === 'pengaturan') UI.render(); }); }
+    return `<div class="card"><b>${I('bell-ring')} Ingatkan mencatat</b><p class="muted small">Kirim pengingat ramah agar catatan keuangan keluarga tetap lengkap.</p>
+      <div class="list">${lain.map(m => { const a = aktivitasCatat(m.email);
+        const ket = a.hari == null ? 'Belum pernah mencatat' : a.hari === 0 ? 'Mencatat hari ini' : 'Terakhir mencatat ' + (a.hari === 1 ? 'kemarin' : a.hari + ' hari lalu');
+        return `<div class="row">${UI.avaHtml(m.email, m.nama, m.warna, 'xs')}<div class="tx-txt"><b>${U.esc(m.nama)}</b><small class="${a.hari == null || a.hari >= 3 ? 'warn-t' : ''}">${ket} · ${a.minggu} catatan minggu ini</small></div>
+          <button class="btn ${a.hari === 0 ? 'ghost ' : ''}xs" data-act="ingat-catat" data-email="${U.esc(m.email)}">${I('send')} Ingatkan</button></div>`; }).join('')}</div></div>`;
+  }
+  UI.act('ingat-catat', el => {
+    const m = Store.member(el.dataset.email); if (!m) return;
+    const a = aktivitasCatat(m.email), link = location.origin + location.pathname, tg = UI.tgTerhubung && UI.tgTerhubung(m.email);
+    const awal = 'Halo ' + m.nama + ' 👋\nJangan lupa catat pengeluaran & pemasukan hari ini di SatuAtap ya' + (a.hari != null && a.hari >= 2 ? ' — catatan terakhirmu ' + a.hari + ' hari lalu' : '') + ', supaya laporan keluarga tetap lengkap 🙏\n\n' +
+      'Cara cepat:\n• Tombol + › ketik "makan 25rb, parkir 2rb"\n• Tahan tombol + untuk bicara\n• Screenshot bukti bayar › Bagikan › SatuAtap\n\n' + link + '\n— ' + Store.me.nama;
+    const s = UI.sheet({ title: 'Ingatkan ' + m.nama, cls: 'small', body: `${UI.field('Pesan', `<textarea name="pesan" rows="9" maxlength="900">${U.esc(awal)}</textarea>`, 'Boleh diubah sebelum dikirim.')}
+      ${tg ? '' : `<p class="muted small">${I('info')} ${U.esc(m.nama)} belum menghubungkan Telegram — kirim lewat WhatsApp, atau minta ${U.esc(m.nama)} menghubungkan Telegram di Lainnya › Notifikasi agar pengingat bisa terkirim langsung.</p>`}`,
+      foot: `<button class="btn ghost" data-k="salin" aria-label="Salin">${I('copy')}</button><button class="btn ${tg ? 'ghost' : ''}" data-k="wa">${I('message-circle')} WhatsApp</button>${tg ? `<button class="btn" data-k="tg">${I('send')} Telegram</button>` : ''}` });
+    const teks = () => s.el.querySelector('[name=pesan]').value.trim();
+    s.el.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.k, t = teks(); if (!t) return UI.toast('Pesan masih kosong.', 'warn');
+      if (k === 'wa') { window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank'); s.close(); }
+      else if (k === 'salin') { try { await navigator.clipboard.writeText(t); UI.toast('Pesan disalin.'); } catch (e) { UI.toast('Gagal menyalin — tahan teks lalu salin manual.', 'warn'); } }
+      else {
+        if (Store.mode !== 'live') { s.close(); return UI.toast('Mode demo: pesan tidak benar-benar dikirim.'); }
+        b.disabled = true; b.innerHTML = I('loader') + ' Mengirim…';
+        try { const r = await UI.tgKirimKe(m.email, U.esc(t), 'ingat|' + m.email + '|' + U.today() + '|' + t.length);
+          if (r && r.success && r.data && r.data.terkirim) { s.close(); UI.toast('Pengingat terkirim ke Telegram ' + m.nama + '.', 'ok'); }
+          else { UI.toast((r && r.message) || 'Tidak terkirim — mungkin pesan yang sama sudah dikirim hari ini.', 'warn'); b.disabled = false; b.innerHTML = I('send') + ' Telegram'; } }
+        catch (e) { UI.toast(e.message, 'warn'); b.disabled = false; b.innerHTML = I('send') + ' Telegram'; }
+      }
+    });
+  });
   /** Apakah email anggota sudah dipakai di data (transaksi, kategori pribadi, tugas, dll.)? */
   const dipakai = (email) => {
     if (!email) return false;

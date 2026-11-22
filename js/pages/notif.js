@@ -19,6 +19,10 @@
     if (r.success) { N.info = r.data; N.infoAt = Date.now(); try { localStorage.setItem('sa:tginfo:' + Store.fileId, JSON.stringify(r.data)); } catch (e) {} }
     return N.info;
   };
+  /** Apakah anggota ini sudah menghubungkan Telegram (dari info terakhir). */
+  UI.tgTerhubung = email => { const i = infoCache(); return !!(i && (i.terhubung || []).some(r => r.email === email)); };
+  UI.tgMuat = () => N.muatInfo().catch(() => null);
+  UI.tgKirimKe = (email, teks, kunci) => Relay.call('tg.kirim', { fileId: Store.fileId, pesan: [{ ke: email, teks, kunci }] });
   const infoCache = () => { if (N.info) return N.info; try { return JSON.parse(localStorage.getItem('sa:tginfo:' + Store.fileId) || 'null'); } catch (e) { return null; } };
   UI.act('tg-hubung', async el => {
     el.disabled = true;
