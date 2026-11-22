@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.4)
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.5)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
  *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (tagihan < Rp 1 juta: H-1 & hari H saja) (lewat @SatuAtapBot, bila anggota sudah
@@ -304,9 +304,21 @@ function pengirimEmail_() {
 function gmail_(path) {
   const r = UrlFetchApp.fetch('https://gmail.googleapis.com/gmail/v1/users/me/' + path, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
   const kode = r.getResponseCode(); let j = {}; try { j = JSON.parse(r.getContentText()); } catch (e) {}
-  if (kode === 403 || kode === 401) throw new Error('Izin baca Gmail belum diberikan. Tempel ulang appsscript.json dari aplikasi, lalu jalankan setupEmail.');
-  if (kode !== 200) throw new Error('Gmail galat ' + kode + ((j.error && ': ' + j.error.message) || ''));
-  return j;
+  if (kode === 200) return j;
+  const pesan = String((j.error && j.error.message) || r.getContentText() || '');
+  if (/has not been used|is disabled|SERVICE_DISABLED|accessNotConfigured/i.test(pesan)) {
+    const url = (/https:\/\/console\.(?:developers|cloud)\.google\.com\/[^\s"']+/.exec(pesan) || [])[0] || 'https://console.cloud.google.com/apis/library/gmail.googleapis.com';
+    Logger.log('👉 Gmail API belum aktif untuk script ini. Buka tautan berikut › klik AKTIFKAN › tunggu 1–2 menit › jalankan setupEmail lagi:');
+    Logger.log(url);
+    throw new Error('Gmail API belum aktif — klik tautan di log di atas, tekan AKTIFKAN, tunggu 1–2 menit, lalu jalankan setupEmail lagi.');
+  }
+  if (kode === 401 || kode === 403) throw new Error('Izin baca Gmail belum ada. Pastikan appsscript.json sudah ditempel ULANG dari aplikasi lalu DISIMPAN (berisi gmail.readonly), kemudian jalankan setupEmail dan pilih Izinkan. (' + pesan.slice(0, 120) + ')');
+  throw new Error('Gmail galat ' + kode + (pesan ? ': ' + pesan.slice(0, 160) : ''));
+}
+/** Cek apakah izin baca Gmail sudah ada di token script (artinya appsscript.json baru sudah tersimpan & diizinkan). */
+function izinGmail_() {
+  try { const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(ScriptApp.getOAuthToken()), { muteHttpExceptions: true });
+    return /gmail\.readonly/.test(String(JSON.parse(r.getContentText()).scope || '')); } catch (e) { return true; }   // tidak bisa dicek → lanjut saja
 }
 /** Isi teks email (text/plain diutamakan; HTML dibersihkan). */
 function teksEmail_(payload) {
@@ -398,7 +410,8 @@ function cekEmail_() {
 }
 /** Jalankan sekali: izinkan baca Gmail & pasang pemeriksaan tiap 15 menit. Email lama tidak ikut dicatat. */
 function setupEmail() {
-  gmail_('profile');   // memicu & menguji izin baca Gmail
+  if (!izinGmail_()) throw new Error('appsscript.json di proyek ini belum berisi izin baca Gmail. Di aplikasi: Lainnya › Notifikasi › Catat otomatis › Pasang › langkah 2 › Salin appsscript.json, tempel menimpa isi appsscript.json di editor, SIMPAN (Ctrl+S), lalu jalankan setupEmail lagi — akan muncul permintaan izin.');
+  gmail_('profile');   // menguji akses Gmail API
   if (!PROPS.getProperty('EMAIL_MULAI')) PROPS.setProperty('EMAIL_MULAI', String(Date.now()));
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'cekEmail') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('cekEmail').timeBased().everyMinutes(15).create();
