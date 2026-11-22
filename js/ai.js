@@ -226,7 +226,8 @@
       '- "kategori": pilih SATU dari ' + JSON.stringify(kats) + ' yang paling cocok untuk barang itu.' + (pet ? ' Panduan:\n' + pet : '') + '\n' +
       '- "pajak": pajak/biaya layanan/ongkir yang DITAMBAHKAN ke total (0 bila PPN sudah termasuk harga — baris "DPP/PPN" hanya informasi). "potongan": diskon total di luar diskon per barang (angka positif). "total": jumlah yang dibayar (TOTAL BAYAR/GRAND TOTAL), bukan TUNAI/KEMBALI.\n' +
       '- Semua angka rupiah bulat tanpa titik. Abaikan baris SUBTOTAL, TUNAI, KEMBALI, TOTAL ITEM, alamat & ucapan.\n' +
-      '- Hari ini ' + U.today() + '. Jika foto bukan struk, items [] dan total 0.',
+      '- Bila ini SCREENSHOT BUKTI BAYAR/TRANSFER (m-banking, e-wallet, QRIS) tanpa daftar barang: items [], "toko" = nama merchant/penerima (atau pengirim bila uang masuk), "bayar" = nama aplikasi/bank sumber dana (mis. "GoPay", "BCA"), "total" = nominal, dan tambahkan "arah": "masuk" bila uang diterima (selain itu "keluar"). Tambahkan "kategori" yang paling cocok.\n' +
+      '- Hari ini ' + U.today() + '. Jika gambar bukan struk/bukti transaksi, items [] dan total 0.',
       { gambar: gb, json: true, maks: 8000, jenis: 'struk' });
     let o; try { o = JSON.parse(t.replace(/^```json|```$/g, '').trim()); } catch (e) { throw new Error('Struk tidak terbaca. Coba foto lebih terang dan lurus.'); }
     const angka = v => Math.round(Number(String(v == null ? 0 : v).replace(/[^\d.-]/g, '')) || 0);
@@ -237,9 +238,12 @@
     let total = angka(o.total); const sum = U.sum(items, x => x.jumlah);
     if (!total) total = sum + angka(o.pajak) - angka(o.potongan);
     const tgl = /^\d{4}-\d{2}-\d{2}$/.test(o.tanggal || '') && o.tanggal <= U.today() && o.tanggal >= U.addDays(U.today(), -400) ? o.tanggal : U.today();
-    return { toko: String(o.toko || '').replace(/\s+/g, ' ').trim().slice(0, 60), tanggal: tgl, jam: /^\d{1,2}[:.]\d{2}$/.test(o.jam || '') ? String(o.jam).replace('.', ':') : '', bayar: String(o.bayar || ''),
+    const kataD = String(o.bayar || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !/^(bank|mobile|banking|app|digital)$/.test(w));
+    const dompet = (Store.wallets().find(w => kataD.some(k => w.nama.toLowerCase().indexOf(k) > -1)) || (/tunai|cash/i.test(o.bayar || '') && Store.wallets().find(w => w.jenis === 'tunai')) || {}).id || '';
+    const arah = String(o.arah || '') === 'masuk' ? 'masuk' : 'keluar';
+    return { toko: String(o.toko || '').replace(/\s+/g, ' ').trim().slice(0, 60), tanggal: tgl, walletId: dompet, arah, jam: /^\d{1,2}[:.]\d{2}$/.test(o.jam || '') ? String(o.jam).replace('.', ':') : '', bayar: String(o.bayar || ''),
       items, pajak: angka(o.pajak), potongan: angka(o.potongan), total, yakin: Number(o.yakin) || 0,
-      kategoriId: items.length ? '' : cariKat(o.kategori, o.toko) };
+      kategoriId: items.length ? '' : arah === 'masuk' ? (window.Kamus && Kamus.tebak(o.toko + ' ' + (o.kategori || ''), 'masuk')) || '' : cariKat(o.kategori, o.toko) };
   };
   /** Kelompokkan beberapa catatan teks yang belum berkategori, sekali panggil. names → [kategoriId|'']. */
   AI.kategorikan = async (list, arah) => {
@@ -255,6 +259,7 @@
   // ---------- Mode demo: jawaban contoh tanpa kunci ----------
   AI.contohDemo = async (prompt, opt) => {
     await new Promise(r => setTimeout(r, 600));
+    if (opt.gambar && opt.gambar.bukti) return JSON.stringify({ toko: 'Kopi Kenangan Mampang', tanggal: U.today(), bayar: 'GoPay', total: 25000, arah: 'keluar', kategori: '', items: [] });
     if (opt.gambar) return JSON.stringify({ toko: 'Superindo Ciputat', tanggal: U.today(), jam: '10:42', bayar: 'tunai', total: 187500, pajak: 0, potongan: 0, yakin: 0.9, items: [
       { nama: 'Beras Premium 5kg', qty: 1, harga: 74500, jumlah: 74500, kategori: '' }, { nama: 'Minyak Goreng 2L', qty: 1, harga: 36500, jumlah: 31500, kategori: '', cek: true },
       { nama: 'Sabun Cuci Piring 755ml', qty: 1, harga: 16900, jumlah: 16900, kategori: '' }, { nama: 'Sampo Anti Ketombe', qty: 1, harga: 44500, jumlah: 44500, kategori: '' },

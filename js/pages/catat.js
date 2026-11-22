@@ -441,7 +441,7 @@
       <div class="qt-bar"><input data-qt maxlength="400" placeholder="mis. cuci motor 15rb, makan 25rb gopay" enterkeyhint="go" autocomplete="off" value="${U.esc(opt.teks || '')}" aria-label="Ketik catatan">
         <button type="button" class="qt-go" data-qtgo aria-label="Baca">${I('arrow-right')}</button></div>
       <p class="muted small qt-hint">Bisa beberapa sekaligus, pisahkan dengan koma. Sebut dompetnya (tunai, gopay, bca) dan "kemarin" bila perlu.</p>
-      <div class="qt-acts">${window.AI && AI.siap() ? `<button type="button" data-struk>${I('scan-line')}<b>Scan struk</b><small>per barang</small></button>` : ''}${bisaSuara ? `<button type="button" data-suara>${I('mic')}<b>Suara</b><small>bicara saja</small></button>` : ''}<button type="button" data-manual>${I('arrow-left-right')}<b>Manual</b><small>transfer, dll.</small></button></div>
+      <div class="qt-acts">${window.AI && AI.siap() ? `<button type="button" data-struk>${I('scan-line')}<b>Scan</b><small>struk / bukti bayar</small></button>` : ''}${bisaSuara ? `<button type="button" data-suara>${I('mic')}<b>Suara</b><small>bicara saja</small></button>` : ''}<button type="button" data-manual>${I('arrow-left-right')}<b>Manual</b><small>transfer, dll.</small></button></div>
       ${tpl.length ? `<div class="chips scroll qt-fav">${tpl.map(x => `<button type="button" class="chip" data-tpl="${x.id}">${I('zap')} ${U.esc(x.nama)}${x.jumlah ? ' · ' + U.rpShort(x.jumlah) : ''}</button>`).join('')}</div>` : ''}
       <div class="voice vq-voice" ${opt.suara ? '' : 'hidden'}><button type="button" class="mic-pulse" data-mic aria-label="Mulai / berhenti bicara">${I('mic', 'big')}</button>
         <div class="vq-say"><div class="voice-txt">Menyiapkan mikrofon…</div><p class="muted small vq-hint">Contoh: <i>"gudeg empat puluh lima ribu tunai"</i> · beberapa sekaligus pakai kata <i>"dan"</i></p></div></div>
@@ -530,7 +530,7 @@
       if (items.some(r => !lengkap(r)) || aiJalan) return;
       const now = new Date().toISOString();
       const ops = items.map(r => ({ op: 'upsert', t: 'Transaksi', row: { id: U.uid('t'), tanggal: r.tanggal || U.today(), jenis: r.jenis, jumlah: r.jumlah, kategoriId: r.kategoriId, walletId: r.walletId, walletTujuan: '', biaya: 0,
-        catatan: r.catatan || '', dibayarOleh: Store.me.email, tag: '', sumber: dengar || opt.suara ? 'suara' : 'cepat', refId: '', periodeRef: '', dicatatOleh: Store.me.email, dibuat: now, riwayat: [] } }));
+        catatan: r.catatan || '', dibayarOleh: Store.me.email, tag: '', sumber: opt.sumber === 'bukti' ? 'struk' : dengar || opt.suara ? 'suara' : 'cepat', refId: '', periodeRef: '', dicatatOleh: Store.me.email, dibuat: now, riwayat: [] } }));
       if (!(await UI.commitPriv(ops))) return;
       items.forEach(r => { if (r.dipilih || r.dariAI) Voice.ajari(r.raw || r.catatan, r.kategoriId); });
       const ids = ops.map(o => o.row.id);
@@ -539,7 +539,8 @@
     };
     gambar();
     if (opt.teks) { inp.value = ''; tambah(opt.teks); }
-    if (opt.suara) setTimeout(mulai, 250); else setTimeout(() => inp.focus(), 200);
+    if (opt.items && opt.items.length) { items = opt.items.map(r => Object.assign({ jenis: 'keluar', jumlah: 0, kategoriId: '', walletId: '', catatan: '', raw: '', tanggal: U.today() }, r, { walletId: r.walletId || UI.defWallet() })); gambar(); isiAI(); }
+    if (opt.suara) setTimeout(mulai, 250); else if (!(opt.items && opt.items.length)) setTimeout(() => inp.focus(), 200);
   };
   /** Dompet bawaan untuk catat cepat: dompet yang paling sering dipakai 30 hari terakhir. */
   UI.defWallet = () => {

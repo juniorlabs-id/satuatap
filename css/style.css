@@ -973,3 +973,11 @@ details.adv summary { cursor: pointer; font-weight: 600; color: var(--primary); 
 .mw-card { padding: 12px 14px; margin-bottom: 10px; }
 .mw-card-h { display: flex; gap: 8px; align-items: flex-end; } .mw-card-h .field { flex: 1; }
 .mw-foot { display: flex; gap: 8px; margin-top: 20px; } .mw-foot .grow { flex: 1; }
+/* Kartu Beranda: jarak seragam apa pun urutannya */
+.bd-blk { margin-bottom: 14px; }
+.bd-blk > :last-child { margin-bottom: 0; }
+.bd-blk > .sec-head:first-child { margin-top: 8px; }
+.co-card .row { align-items: flex-start; }
+.co-card .tx-txt b, .co-card .tx-txt small { white-space: normal; overflow: visible; text-overflow: clip; display: block; }
+.co-card .tx-txt small b { display: inline; }
+.co-card .row-btns { margin: 4px 0 6px; }

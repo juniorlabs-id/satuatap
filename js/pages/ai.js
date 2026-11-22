@@ -47,27 +47,42 @@
   // ---------- Foto struk (T-11): dibaca per barang → 1 mutasi berisi rincian ----------
   UI.fotoStruk = () => {
     if (!AI.siap()) return UI.toast('Fitur AI belum tersedia. Pastikan lisensi aktif dan internet tersambung.', 'warn');
-    const pil = UI.sheet({ title: 'Scan struk', cls: 'small', body: `<p class="muted small">AI membaca setiap barang, memilihkan kategorinya, lalu Anda cek sebelum disimpan sebagai satu catatan.</p>
-      <div class="setor-via dua"><button type="button" data-src="kamera">${I('camera')}Kamera<small>foto sekarang</small></button><button type="button" data-src="galeri">${I('image')}Galeri<small>foto / screenshot</small></button></div>` });
+    const pil = UI.sheet({ title: 'Scan struk / bukti bayar', cls: 'small', body: `<p class="muted small">Struk belanja dibaca per barang; screenshot bukti bayar (m-banking, e-wallet, QRIS) dibaca nominal & tujuannya. Anda cek dulu sebelum disimpan.</p>
+      <div class="setor-via dua"><button type="button" data-src="kamera">${I('camera')}Kamera<small>foto sekarang</small></button><button type="button" data-src="galeri">${I('image')}Galeri<small>foto / screenshot</small></button></div>
+      <div class="note small">${I('share-2')} <span>Lebih cepat: setelah bayar, screenshot halaman "Berhasil" lalu <b>Bagikan › SatuAtap</b> dari galeri. (Aplikasi perlu dipasang di layar utama.)</span></div>` });
     pil.el.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { pil.close(); pilihFoto(b.dataset.src === 'kamera'); });
   };
   function pilihFoto(kamera) {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
     if (kamera) inp.setAttribute('capture', 'environment');
     inp.style.display = 'none'; document.body.appendChild(inp);
-    inp.onchange = async () => {
-      const f = inp.files[0]; inp.remove(); if (!f) return;
-      const s = UI.sheet({ title: 'Membaca struk', cls: 'small', body: `<div class="voice"><div class="mic-pulse">${I('scan-line', 'big')}</div><p class="muted">AI sedang membaca setiap barang di struk…<br><small>Biasanya 5–20 detik.</small></p></div>` });
-      try {
-        const gb = await AI.kecilkan(f, 1600), r = await AI.bacaStruk(gb);
-        s.close();
-        if (!r.items.length && !r.total) { UI.toast('Struk tidak terbaca. Coba foto lebih terang dan lurus, atau isi manual.', 'warn'); return UI.catat({ preset: { jenis: 'keluar', sumber: 'struk' } }); }
-        if (!r.items.length) return UI.catat({ preset: { jenis: 'keluar', jumlah: r.total, tanggal: r.tanggal, kategoriId: r.kategoriId, catatan: r.toko, sumber: 'struk' } });
-        UI.cekStruk(r, gb);
-      } catch (e) { s.close(); UI.toast(e.message, 'warn'); }
-    };
+    inp.onchange = () => { const f = inp.files[0]; inp.remove(); if (f) UI.bacaFoto(f); };
     inp.click();
   }
+  /** Foto/screenshot → AI → struk per barang (Cek hasil scan) atau bukti bayar (Catat cepat berisi 1 catatan). */
+  UI.bacaFoto = async (f) => {
+    if (!AI.siap()) return UI.toast('Fitur AI belum tersedia. Pastikan lisensi aktif dan internet tersambung.', 'warn');
+    const s = UI.sheet({ title: 'Membaca gambar', cls: 'small', body: `<div class="voice"><div class="mic-pulse">${I('scan-line', 'big')}</div><p class="muted">AI sedang membaca struk / bukti bayar…<br><small>Biasanya 5–20 detik.</small></p></div>` });
+    try {
+      const gb = await AI.kecilkan(f, 1600); if (AI.demo()) gb.bukti = /bukti|screenshot|bayar/i.test(f.name || '');
+      const r = await AI.bacaStruk(gb);
+      s.close();
+      if (!r.items.length && !r.total) { UI.toast('Tidak terbaca sebagai struk atau bukti bayar. Coba gambar yang lebih jelas, atau ketik saja.', 'warn'); return UI.cepat(); }
+      if (r.items.length) return UI.cekStruk(r, gb);
+      UI.cepat({ items: [{ jenis: r.arah, jumlah: r.total, kategoriId: r.kategoriId || '', walletId: r.walletId || '', catatan: r.toko || '', raw: r.toko || '', tanggal: r.tanggal }], sumber: 'bukti' });
+    } catch (e) { s.close(); UI.toast(e.message, 'warn'); }
+  };
+  /** Kiriman "Bagikan → SatuAtap" (diterima service worker). */
+  UI.terimaBagikan = async () => {
+    let foto = null, teks = '';
+    try { const c = await caches.open('sa-bagikan'), a = await c.match('/__bagikan/foto'), b = await c.match('/__bagikan/teks');
+      if (a) { const bl = await a.blob(); foto = new File([bl], 'bagikan.jpg', { type: bl.type || 'image/jpeg' }); }
+      if (b) teks = (await b.text()).trim();
+      await c.delete('/__bagikan/foto'); await c.delete('/__bagikan/teks'); } catch (e) {}
+    if (foto) return UI.bacaFoto(foto);
+    if (teks) return UI.cepat({ teks: teks.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim().slice(0, 300) });
+    UI.toast('Kiriman tidak berisi gambar atau teks.', 'warn');
+  };
   /** Layar periksa hasil scan: ubah nama/nominal/kategori per barang, lalu simpan sebagai 1 mutasi. */
   UI.cekStruk = (r, gb) => {
     const wl = Store.wallets();

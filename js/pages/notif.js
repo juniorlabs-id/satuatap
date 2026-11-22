@@ -72,6 +72,16 @@
         ${Store.isAdminLike() ? `<div class="row" style="margin-top:10px"><span class="cat-ic ${pendAktif() ? 'ok' : ''}">${I(pendAktif() ? 'circle-check' : 'circle')}</span><div class="tx-txt"><b>Script sudah terpasang</b><small>${pendAktif() ? 'Pengingat tagihan & rapat dikirim script sekali tiap pagi (±08.00) ke Telegram dan WhatsApp — aplikasi tidak mengirim lagi saat dibuka.' : 'Nyalakan setelah script terpasang agar pengingat tidak ganda.'}</small></div><button class="btn ${pendAktif() ? 'ghost ' : ''}xs" data-act="pend-aktif">${pendAktif() ? 'Matikan' : 'Nyalakan'}</button></div>` : ''}</div>`;
   };
   UI.pendampingKartu = () => '';
+  /** Kartu "Catat otomatis": email bank (lewat Pendamping) & bagikan screenshot. */
+  UI.catatOtomatisKartu = () => {
+    const on = Store.setting('emailCatat', '') !== '0', adm = Store.isAdminLike();
+    return `<div class="card co-card"><h4 class="mini-h">${I('wand-sparkles')} Catat otomatis <span class="pill ok">baru</span></h4>
+      <div class="row"><span class="cat-ic">${I('mail')}</span><div class="tx-txt"><b>Dari email bank & e-wallet</b><small>Transaksi yang dikirim lewat email (BCA, Mandiri, BRI, GoPay, OVO, DANA, …) masuk sendiri sebagai draf. Butuh script Pendamping.</small></div>
+        ${adm ? `<button class="btn ${on ? 'ghost ' : ''}xs" data-act="email-catat">${on ? 'Matikan' : 'Nyalakan'}</button>` : ''}</div>
+      ${adm ? `<div class="row-btns"><button class="btn sm" data-act="panduan" data-k="email">${I('book-open')} Pasang (± 5 menit)</button></div>` : ''}
+      <div class="row"><span class="cat-ic">${I('share-2')}</span><div class="tx-txt"><b>Dari screenshot bukti bayar</b><small>Setelah bayar, screenshot halaman "Berhasil" › <b>Bagikan › SatuAtap</b>. AI membaca nominal & tujuannya. Bisa juga lewat tombol + › Scan. Aplikasi perlu dipasang di layar utama.</small></div></div></div>`;
+  };
+  UI.act('email-catat', () => { const on = Store.setting('emailCatat', '') !== '0'; Store.setSetting('emailCatat', on ? '0' : '1'); UI.toast(on ? 'Catat dari email dimatikan.' : 'Catat dari email dinyalakan.'); UI.render(); });
 
   // ---------- Panduan pasang Skrip Pendamping & WhatsApp (wizard langkah demi langkah) ----------
   const PEND = { teks: '', json: '' };
@@ -136,6 +146,21 @@
         <div class="note small">${I('triangle-alert')} <span>Ada tulisan merah? Foto layar log-nya dan kirim ke JuniorLabs.</span></div>
         <div class="note small">${I('info')} <span>Terakhir: di <b>Lainnya › Notifikasi</b> nyalakan <b>"Script sudah terpasang"</b> agar pengingat hanya datang sekali tiap pagi (dari script), tidak ganda.</span></div>
         <div class="row-btns"><button type="button" class="btn sm" data-pa="ke-wa">${I('message-circle')} Lanjut pasang WhatsApp</button></div>`)
+    ] },
+    email: { judul: 'Catat dari email bank', langkah: () => [
+      T('Apa ini', `<p>Bank & dompet digital mengirim <b>email untuk setiap transaksi</b>. Script Pendamping memeriksa Gmail <b>${U.esc(admin())}</b> tiap 15 menit, lalu memasukkan transaksinya ke <b>Menunggu konfirmasi</b> — tinggal geser kanan.</p>
+        <ul class="ul"><li>Didukung: BCA, Mandiri, BRI, BNI, BSI, Jago, SeaBank, CIMB, Permata, Danamon, BTN, Jenius, blu, GoPay, OVO, DANA, ShopeePay, LinkAja, Flip, dan lainnya.</li><li>Hanya <b>membaca</b> email dari pengirim di daftar itu. Promo, OTP, dan e-statement diabaikan; top up antar dompet tidak dicatat agar tidak dobel.</li><li>Email lama tidak ikut — hanya transaksi setelah diaktifkan.</li></ul>
+        <div class="note small">${I('clock')} <span>± 5 menit. Butuh <b>script Pendamping</b> yang sudah terpasang.</span></div>
+        <div class="row-btns"><button type="button" class="btn ghost sm" data-pa="ke-pend">${I('book-open')} Belum pasang script? Mulai di sini</button></div>`),
+      T('Perbarui script', `<ol class="steps"><li>Buka proyek <b>SatuAtap Pendamping</b> di <a href="https://script.google.com/home" target="_blank" rel="noopener">script.google.com</a>.</li><li>Ketuk <b>Salin appsscript.json</b> › klik file <b>appsscript.json</b> › <kbd>Ctrl</kbd>+<kbd>A</kbd> › tempel › simpan.</li><li>Ketuk <b>Salin kode script</b> › klik <b>Kode.gs</b> › <kbd>Ctrl</kbd>+<kbd>A</kbd> › tempel › simpan.</li></ol>
+        <div class="row-btns">${btn('json', 'copy', 'Salin appsscript.json', '')}${btn('kode', 'copy', 'Salin kode script', '')}</div>
+        <p class="muted small">appsscript.json baru menambah satu izin: <b>membaca email</b> (tidak bisa mengirim, menghapus, atau mengubah email).</p>`),
+      T('Aktifkan', `<ol class="steps"><li>Di kotak pilihan fungsi pilih <b>setupEmail</b> › <b>▶ Jalankan</b>.</li><li>Muncul permintaan izin › pilih akun <b>${U.esc(admin())}</b> › <b>Lanjutan</b> › <b>Buka SatuAtap Pendamping</b> › <b>Izinkan</b>.</li><li>Log menampilkan <b>✅ Catat dari email aktif</b>.</li></ol>
+        <div class="note small">${I('info')} <span>Setelah memperbarui kode, perbarui juga deployment WA (bila dipakai): <b>Terapkan › Kelola deployment › ✏️ › Versi baru</b>.</span></div>`),
+      T('Nyalakan email transaksi di bank', `<p>Di aplikasi bank / e-wallet: buka <b>Pengaturan › Notifikasi</b> lalu nyalakan <b>notifikasi email untuk transaksi</b>, ke alamat <b>${U.esc(admin())}</b>.</p>
+        <div class="note small">${I('users')} <span>Rekening pasangan memakai email lain? Di Gmail pasangan buat filter dari email bank › <b>Teruskan ke</b> ${U.esc(admin())}. Atau cukup pakai <b>Bagikan screenshot › SatuAtap</b> di HP pasangan.</span></div>`),
+      T('Uji', `<ol class="steps"><li>Lakukan transaksi kecil (mis. bayar QRIS Rp 1.000).</li><li>Tunggu email bank masuk, lalu maksimal 15 menit.</li><li>Buka aplikasi › <b>Menunggu konfirmasi</b> › muncul draf berlabel <b>Email bank</b> › periksa kategori › geser kanan.</li></ol>
+        <div class="note small">${I('circle-help')} <span>Tidak muncul? Di editor jalankan <b>cekEmailLog</b> — terlihat email mana yang terbaca dan alasannya. Bank Anda belum dikenali? Tambahkan domain pengirimnya di Properti skrip <code>EMAIL_PENGIRIM</code> (mis. <code>bankku.co.id</code>).</span></div>`)
     ] },
     wa: { judul: 'Pasang WhatsApp (Fonnte)', langkah: () => [
       T('Sebelum mulai', `<p>Dengan WhatsApp, keluarga mendapat <b>2 pesan sehari</b> dari nomor pengirim:</p>
@@ -243,26 +268,34 @@
   /** Dipanggil saat Beranda/Mutasi digambar: ambil draf baru di latar (dibatasi 1×/menit). */
   UI.kotakAlert = () => { if (App.ready) setTimeout(() => App.ambilKotak().catch(() => {}), 300); return ''; };
   /** Baris draf chat — tampil bersama draf tagihan rutin di "Menunggu konfirmasi". */
-  UI.kotakRow = x => { const r = Voice.parse(x.teks), ok = lengkap(r), k = Store.byId.Kategori[r.kategoriId];
+  /** Draf chat/email → isian transaksi. Draf email berformat kolom "nama | nominal | dompet | arah". */
+  UI.parseKotak = x => {
+    const p = String(x.teks || '').split(' | ');
+    if (x.sumber !== 'email' || p.length < 3) return Voice.parse(x.teks);
+    const jenis = p[3] === 'masuk' ? 'masuk' : 'keluar', nama = p[0].trim(), r = Voice.parse((p[2] || '') + ' ' + p[1]);
+    const kat = jenis === 'keluar' && window.AI && AI.kategoriBarang ? AI.kategoriBarang(nama, '') : (window.Kamus ? Kamus.tebak(nama, jenis) : '');
+    return Object.assign(r, { jenis, jumlah: Number(String(p[1]).replace(/\D/g, '')) || r.jumlah, catatan: nama.replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w+/g, w => w.toLowerCase()), kategoriId: kat || '', raw: nama });
+  };
+  UI.kotakRow = x => { const r = UI.parseKotak(x), ok = lengkap(r), k = Store.byId.Kategori[r.kategoriId];
     return `<div class="swipe" data-kotak="${U.esc(x.id)}" ${ok ? 'data-draft="1"' : ''}>
       <div class="sw-l">${I('check')} Simpan</div><div class="sw-r"><button class="danger" data-act="kotak-buang" data-id="${U.esc(x.id)}">${I('trash-2')}<span>Buang</span></button></div>
       <div class="sw-main tx draft" data-act="kotak-ubah" data-id="${U.esc(x.id)}">
-        <span class="cat-ic chat">${I(k ? k.ikon || 'tag' : (x.sumber === 'wa' ? 'message-circle' : 'send'))}</span>
-        <div class="tx-txt"><b>${U.esc(r.catatan || x.teks)}</b><small>${x.email && x.email !== Store.me.email ? U.esc(Store.memberName(x.email)) + ' · ' : ''}${x.sumber === 'wa' ? 'WhatsApp' : 'Telegram'} · ${U.timeAgo(x.waktu)} · ${ok ? U.esc(K(r.kategoriId) + ' · ' + W(r.walletId)) : `<span class="vq-need">${!r.jumlah ? 'isi nominal' : !r.kategoriId ? 'pilih kategori' : 'pilih dompet'}</span>`}</small></div>
+        <span class="cat-ic chat">${I(k ? k.ikon || 'tag' : (x.sumber === 'wa' ? 'message-circle' : x.sumber === 'email' ? 'mail' : 'send'))}</span>
+        <div class="tx-txt"><b>${U.esc(r.catatan || x.teks)}</b><small>${x.email && x.email !== Store.me.email ? U.esc(Store.memberName(x.email)) + ' · ' : ''}${x.sumber === 'wa' ? 'WhatsApp' : x.sumber === 'email' ? 'Email bank' : 'Telegram'} · ${U.timeAgo(x.waktu)} · ${ok ? U.esc(K(r.kategoriId) + ' · ' + W(r.walletId)) : `<span class="vq-need">${!r.jumlah ? 'isi nominal' : !r.kategoriId ? 'pilih kategori' : 'pilih dompet'}</span>`}</small></div>
         <div class="tx-amt">${r.jumlah ? UI.amount(r.jumlah, r.jenis) : '<b class="muted">Rp ?</b>'}<small>draf</small></div>
         <button class="kebab" data-act="kotak-ubah" data-id="${U.esc(x.id)}" aria-label="Periksa">${I('ellipsis-vertical')}</button>
       </div></div>`; };
   UI.kotakSimpan = async (id) => {
     const x = bacaKotak().find(z => z.id === id); if (!x) return;
-    const r = Voice.parse(x.teks); if (!lengkap(r)) return UI.acts['kotak-ubah']({ dataset: { id } });
+    const r = UI.parseKotak(x); if (!lengkap(r)) return UI.acts['kotak-ubah']({ dataset: { id } });
     if (!(await UI.commitPriv([rowOf(x, r)]))) return;
     hapus([id]); selesai([id], { [id]: ringkas(r) });
     UI.toast('Tersimpan · ' + ringkas(r), 'ok', { undo: () => Store.commit([{ op: 'delete', t: 'Transaksi', id: txId(x) }]), ms: 4500 });
   };
   UI.act('kotak-ubah', el => {
-    const x = bacaKotak().find(z => z.id === el.dataset.id); if (!x) return; const r = Voice.parse(x.teks);
+    const x = bacaKotak().find(z => z.id === el.dataset.id); if (!x) return; const r = UI.parseKotak(x);
     UI.catat({ preset: { jenis: r.jenis, jumlah: r.jumlah, kategoriId: r.kategoriId, walletId: r.walletId, catatan: r.catatan || x.teks, tanggal: String(x.waktu || '').slice(0, 10), sumber: x.sumber || 'telegram' },
-      onSaved: (ops) => { const t = (ops || []).map(o => o.row).find(Boolean) || r; if (t.kategoriId && t.kategoriId !== r.kategoriId) Voice.ajari(x.teks, t.kategoriId); hapus([x.id]); selesai([x.id], { [x.id]: ringkas(Object.assign({}, r, t)) }); } });
+      onSaved: (ops) => { const t = (ops || []).map(o => o.row).find(Boolean) || r; if (t.kategoriId && t.kategoriId !== r.kategoriId) Voice.ajari(r.raw || x.teks, t.kategoriId); hapus([x.id]); selesai([x.id], { [x.id]: ringkas(Object.assign({}, r, t)) }); } });
   });
   UI.act('kotak-buang', async el => {
     const x = bacaKotak().find(z => z.id === el.dataset.id); if (!x) return;

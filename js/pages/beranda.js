@@ -102,7 +102,7 @@
       if (UI.atur) return `      <section class="hello"><div><small>${greet()},</small><h2>${U.esc(Store.me.nama)} 👋</h2></div>
         <div class="hello-r">${gaj ? `<span class="pill gold">${I('banknote')} Gajian ${U.diffDays(U.today(), gaj.tanggal)} hari lagi</span>` : ''}</div></section>` + UI.berandaAtur();
       return `      <section class="hello"><div><small>${greet()},</small><h2>${U.esc(Store.me.nama)} 👋</h2></div>
-        <div class="hello-r">${gaj ? `<span class="pill gold">${I('banknote')} Gajian ${U.diffDays(U.today(), gaj.tanggal)} hari lagi</span>` : ''}</div></section>` + UI.berandaUrut().filter(k => B[k]).map(k => `<div class="bd-blk" data-blk="${k}">${B[k]()}</div>`).join('')
+        <div class="hello-r">${gaj ? `<span class="pill gold">${I('banknote')} Gajian ${U.diffDays(U.today(), gaj.tanggal)} hari lagi</span>` : ''}</div></section>` + UI.berandaUrut().filter(k => B[k]).map(k => { const h = B[k]().trim(); return h ? `<div class="bd-blk" data-blk="${k}">${h}</div>` : ''; }).join('')
         + `<button class="link bd-atur" data-act="bd-atur">${I('grip-vertical')} Atur urutan Beranda</button><div class="spacer"></div>`;
     }
   });
