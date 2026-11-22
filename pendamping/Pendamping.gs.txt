@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.8)
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.9)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
  *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (tagihan < Rp 1 juta: H-1 & hari H saja) (lewat @SatuAtapBot, bila anggota sudah
@@ -357,8 +357,12 @@ function bacaEmailTrx_(subjek, teks) {
   const s = (subjek + '\n' + teks).replace(/ /g, ' ');
   if (EMAIL_SKIP.test(subjek) || !EMAIL_TRX.test(s) || !EMAIL_TERJADI.test(s)) return null;
   if (/\btop[ -]?up\b|isi saldo|tarik tunai|penarikan tunai/i.test(s)) return { lewati: 'top up / tarik tunai — dicatat sebagai transfer antar dompet secara manual' };
-  const re = /(?:rp|idr)\.?\s*([0-9][0-9.,]*[0-9]|[0-9])/ig; let m, semua = [];
+  const re = /(?:rp|idr)\.?[\s:\-]*([0-9][0-9.,]*[0-9]|[0-9])/ig; let m, semua = [];
   while ((m = re.exec(s))) { const v = rupiah_(m[1]); if (v >= 100) semua.push({ v: v, i: m.index }); }
+  if (!semua.length) {   // tanpa "Rp": angka ribuan setelah kata total/jumlah/nominal
+    const re2 = /(total|jumlah|nominal|amount|sebesar)[^0-9\n]{0,20}([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]{2})?)/ig;
+    while ((m = re2.exec(s))) { const v = rupiah_(m[2]); if (v >= 100) semua.push({ v: v, i: m.index }); }
+  }
   if (!semua.length) return null;
   const kunci = /(total(?: pembayaran| bayar| transaksi)?|jumlah(?: transaksi| pembayaran| transfer)?|nominal(?: transaksi| transfer)?|amount|sebesar|total amount|nilai transaksi)/ig; let pilih = null;
   while ((m = kunci.exec(s)) && !pilih) { const k = m.index; pilih = semua.find(function (a) { return a.i > k && a.i - k < 60; }) || null; }
@@ -380,10 +384,11 @@ function bacaEmailAI_(subjek, teks) {
       'Promo, OTP, tagihan yang belum dibayar, dan e-statement → transaksi false.\n\nSubjek: ' + subjek + '\n\n' + teks.slice(0, 2500) });
     const o = JSON.parse(String(r.teks || '').replace(/^```json|```$/g, '').trim());
     if (!o.transaksi) return { bukan: true };
+    if (!(Math.round(Number(o.jumlah) || 0) >= 100)) return { gagal: 'nominal tidak ditemukan' };
     if (o.topup) return { lewati: 'top up / tarik tunai — dicatat sebagai transfer antar dompet secara manual' };
-    const j = Math.round(Number(o.jumlah) || 0); if (j < 100) return null;
+    const j = Math.round(Number(o.jumlah) || 0);
     return { arah: o.arah === 'masuk' ? 'masuk' : 'keluar', jumlah: j, nama: String(o.nama || '').slice(0, 40), ai: true };
-  } catch (e) { return null; }
+  } catch (e) { return { gagal: String(e.message || e).slice(0, 80) }; }
 }
 function cekEmail() { return cekEmail_(); }
 function cekEmail_() {
@@ -406,10 +411,11 @@ function cekEmail_() {
       const H = {}; ((msg.payload && msg.payload.headers) || []).forEach(function (h) { H[String(h.name).toLowerCase()] = h.value; });
       const dari = String(H.from || '').toLowerCase(), subjek = String(H.subject || ''), p = peng.find(function (x) { return dari.indexOf(x[0]) > -1; });
       const teks = teksEmail_(msg.payload);
-      let r = bacaEmailTrx_(subjek, teks);
-      if (r && !r.lewati && (!r.nama || r.nama.length < 3)) r = bacaEmailAI_(subjek, teks) || r;   // format tak biasa → minta AI
-      else if (!r && EMAIL_TRX.test(subjek + ' ' + teks.slice(0, 400)) && !EMAIL_SKIP.test(subjek)) r = bacaEmailAI_(subjek, teks);
-      if (!r || r.bukan) { hasil.push({ s: 'bukan transaksi', id: m.id, subjek: subjek.slice(0, 50) }); return; }
+      let r = bacaEmailTrx_(subjek, teks), alasan = '';
+      if (!r) alasan = EMAIL_SKIP.test(subjek) ? 'promo/OTP/info' : !EMAIL_TRX.test(subjek + ' ' + teks) ? 'tidak ada kata transaksi' : !EMAIL_TERJADI.test(subjek + ' ' + teks) ? 'belum terjadi' : 'nominal tidak terbaca';
+      if (r && !r.lewati && (!r.nama || r.nama.length < 3)) { const a = bacaEmailAI_(subjek, teks); if (a && !a.gagal && !a.bukan) r = a; }   // format tak biasa → minta AI
+      else if (!r && !EMAIL_SKIP.test(subjek) && EMAIL_TRX.test(subjek + ' ' + teks)) { const a = bacaEmailAI_(subjek, teks); if (a && a.gagal) alasan += ' · AI: ' + a.gagal; else if (a && a.bukan) alasan += ' · AI: bukan transaksi'; else if (a) r = a; }
+      if (!r || r.bukan) { hasil.push({ s: 'bukan transaksi (' + alasan + ')', id: m.id, dari: (dari.match(/@([^>\s]+)/) || [])[1] || dari.slice(0, 30), subjek: subjek.slice(0, 50) }); return; }
       if (r.lewati) { hasil.push({ s: 'dilewati: ' + r.lewati, id: m.id, subjek: subjek.slice(0, 50) }); return; }
       // Format kolom "nama | nominal | dompet | arah" — dibaca aplikasi per kolom (nama orang tidak tertukar dengan nama dompet)
       const teksDraf = [String(r.nama || 'Transaksi').replace(/\|/g, ' '), 'Rp ' + r.jumlah.toLocaleString('id-ID'), (p && p[1]) || '', r.arah].join(' | ');
@@ -450,12 +456,24 @@ function prosesUlangEmail() {
   Logger.log('Membaca ulang ' + (sudah.length - sisa.length) + ' email…');
   cekEmailLog();
 }
+/** Diagnosa: tampilkan isi 3 email bank/e-wallet terbaru apa adanya (yang dibaca Pendamping), untuk menyesuaikan pembaca. */
+function lihatEmail() {
+  const peng = pengirimEmail_(), q = 'newer_than:2d -in:spam -in:trash {' + peng.map(function (p) { return 'from:' + p[0]; }).join(' ') + '}';
+  (gmail_('messages?maxResults=3&q=' + encodeURIComponent(q)).messages || []).forEach(function (m, i) {
+    const msg = gmail_('messages/' + m.id + '?format=full'), H = {}; ((msg.payload && msg.payload.headers) || []).forEach(function (h) { H[String(h.name).toLowerCase()] = h.value; });
+    const teks = teksEmail_(msg.payload);
+    Logger.log('── Email ' + (i + 1) + ' ── Dari: ' + H.from + ' · Subjek: ' + H.subject);
+    Logger.log(teks.slice(0, 1200));
+    Logger.log('Terbaca sebagai: ' + JSON.stringify(bacaEmailTrx_(String(H.subject || ''), teks)));
+  });
+}
 /** Diagnosa: periksa sekarang & tampilkan 20 hasil terakhir. */
 function cekEmailLog() {
   Logger.log(PROPS.getProperty('EMAIL_MULAI') ? '✅ Catat dari email aktif sejak ' + new Date(Number(PROPS.getProperty('EMAIL_MULAI'))).toLocaleString('id-ID') : '⚠️ Belum aktif — jalankan setupEmail.');
   try { Logger.log('Pemeriksaan sekarang: ' + JSON.stringify(cekEmail_())); } catch (e) { Logger.log('❌ ' + e.message); }
   let j = []; try { j = JSON.parse(PROPS.getProperty('EMAIL_JEJAK') || '[]'); } catch (e) {}
-  Logger.log('Hasil terakhir:'); j.forEach(function (x) { Logger.log('   ' + x.t + ' · ' + x.s + (x.draf ? ' → ' + x.draf : x.subjek ? ' · ' + x.subjek : '')); });
+  Logger.log('Hasil terakhir:'); j.forEach(function (x) { Logger.log('   ' + x.t + ' · ' + x.s + (x.draf ? ' → ' + x.draf : (x.dari ? ' · ' + x.dari : '') + (x.subjek ? ' · ' + x.subjek : ''))); });
+  Logger.log('Ada email yang seharusnya tercatat? Jalankan lihatEmail lalu kirim screenshot log-nya ke JuniorLabs.');
 }
 
 function nominalTeks_(t) {
