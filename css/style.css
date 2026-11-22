@@ -145,7 +145,7 @@ code.wrap { word-break: break-all; }
 /* ---------- Baris & daftar ---------- */
 .row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; min-height: 56px; }
 .list > .row:last-child, .list > .swipe:last-child .sw-main { border-bottom: 0; }
-.row:hover, .sw-main:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+@media (hover: hover) { .row:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); } .sw-main:hover { background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); } }
 .row.muted { cursor: default; }
 .row-sp { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .tx-txt { flex: 1; min-width: 0; } .tx-txt b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -923,3 +923,16 @@ button.mic-pulse { border: 0; padding: 0; cursor: pointer; animation: none; opac
 details.adv { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 details.adv summary { cursor: pointer; font-weight: 600; color: var(--primary); font-size: 14px; }
 .note.ok { background: var(--ok-c); } .note.ok > .ic:first-child { color: var(--ok); }
+.qt-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin: 4px 0 10px; }
+.qt-acts button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; }
+.qt-acts button .ic { width: 22px; height: 22px; color: var(--primary); margin-bottom: 2px; }
+.qt-acts b { font-size: 14px; } .qt-acts small { font-size: 11px; color: var(--muted); }
+.qt-fav { margin-bottom: 8px; }
+.vq-sheet.punya .qt-hint, .vq-sheet.punya .qt-fav { display: none; }
+.cs-split { margin-top: 12px; }
+.cs-split .split-row { grid-template-columns: 1fr 36px; }
+.cs-split-sum { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--text-2); margin-top: 6px; }
+.cs-split-sum:empty { display: none; }
+.cs-t .cs-milik { margin-top: 4px; }
+.cs-milik.teman { background: var(--gold-c); color: var(--gold-d, #8a5a00); }
+.btn.block[data-split] { margin-top: 12px; }

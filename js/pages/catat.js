@@ -185,7 +185,7 @@
   UI.evalExpr = evalExpr;
 
   // ---------- Catat Cepat ----------
-  UI.act('catat', () => UI.catat());
+  UI.act('catat', () => UI.cepat());   // tombol + → ketik cepat / scan struk / suara; isian manual lewat tautan di sana
   UI.catat = (opt) => {
     opt = opt || {};
     const me = Store.me ? Store.me.email : '';
@@ -204,14 +204,11 @@
       dibayarOleh: src.dibayarOleh || me, split: null, patungan: null, more: false
     };
     const special = edit && ['keluar', 'masuk', 'transfer'].indexOf(edit.jenis) < 0;
-    const s = UI.sheet({ title: edit ? 'Ubah transaksi' : 'Catat', cls: 'catat', body: (edit || opt.preset ? '' : `<div class="qt-bar qt-mini"><input data-qt maxlength="400" placeholder="Ketik cepat: kopi 18rb, makan 25rb…" enterkeyhint="go" autocomplete="off" aria-label="Ketik cepat beberapa catatan"><button type="button" class="qt-go" data-qtgo aria-label="Baca">${I('arrow-right')}</button></div>`)
+    const s = UI.sheet({ title: edit ? 'Ubah transaksi' : 'Catat', cls: 'catat', body: ''
         + (edit && Array.isArray(edit.rincian) && edit.rincian.length ? `<div class="note small">${I('receipt')} <span>Transaksi struk berisi ${edit.rincian.length} item — kategori per barang diubah dari <b>Detail transaksi</b>.</span></div>` : '') + '<div class="catat-body"></div>',
       foot: `${edit ? '' : `<button class="btn ghost" data-save="again">Simpan & lagi</button>`}<button class="btn" data-save="1">${I('check')} Simpan</button>` });
     const body = s.el.querySelector('.catat-body');
     const amount = () => evalExpr(st.expr);
-    const qt = s.el.querySelector('[data-qt]');
-    if (qt) { const go = () => { const v = qt.value.trim(); if (!v) return; s.close(); UI.cepat({ teks: v }); };
-      s.el.querySelector('[data-qtgo]').onclick = go; qt.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); go(); } }; }
 
     function render() {
       const isT = st.jenis === 'transfer';
@@ -241,11 +238,7 @@
         ${UI.field('Catatan', `<input name="catatan" maxlength="140" placeholder="mis. Makan siang soto" value="${U.esc(st.catatan)}">`)}
         ${(edit && edit.lampiran) || pre.lampiran ? `<a class="link" href="https://drive.google.com/file/d/${encodeURIComponent((edit && edit.lampiran) || pre.lampiran)}/view" target="_blank" rel="noopener">${I('paperclip')} Lihat foto struk</a>` : ''}
         <div class="grid2">${Store.members().length > 1 ? UI.field('Dibayar oleh', `<select name="dibayarOleh">${UI.memberOpts(st.dibayarOleh)}</select>`) : ''}${UI.field('Tag', `<input name="tag" maxlength="40" placeholder="mis. liburan-bali" value="${U.esc(st.tag)}">`)}</div>
-        ${st.jenis === 'keluar' && !edit ? `<div class="chips">
-            <button class="chip ${st.split ? 'on' : ''}" data-x="split">${I('receipt')} Pecah struk</button>
-            <button class="chip ${st.patungan ? 'on' : ''}" data-x="patungan">${I('users')} Patungan</button>
-            ${Voice.supported() ? `<button class="chip" data-x="voice">${I('mic')} Suara</button>` : ''}${window.AI && AI.siap() ? `<button class="chip" data-x="struk">${I('scan-line')} Scan struk</button>` : ''}</div>
-            ${st.split ? splitHtml() : ''}${st.patungan ? patunganHtml() : ''}` : ''}`;
+        `;
       UI.bindRp(body);
     }
     function splitHtml() {
@@ -443,14 +436,17 @@
     opt = opt || {};
     let items = [], dengar = false, teks = '', aiJalan = false;
     const bisaSuara = Voice.supported();
+    const tpl = (Store.t.Template || []).filter(x => x.jenis === 'keluar' || x.jenis === 'masuk').sort((a, b) => a.urutan - b.urutan).slice(0, 12);
     const s = UI.sheet({ title: 'Catat cepat', cls: 'small vq-sheet', body: `
       <div class="qt-bar"><input data-qt maxlength="400" placeholder="mis. cuci motor 15rb, makan 25rb gopay" enterkeyhint="go" autocomplete="off" value="${U.esc(opt.teks || '')}" aria-label="Ketik catatan">
         <button type="button" class="qt-go" data-qtgo aria-label="Baca">${I('arrow-right')}</button></div>
       <p class="muted small qt-hint">Bisa beberapa sekaligus, pisahkan dengan koma. Sebut dompetnya (tunai, gopay, bca) dan "kemarin" bila perlu.</p>
+      <div class="qt-acts">${window.AI && AI.siap() ? `<button type="button" data-struk>${I('scan-line')}<b>Scan struk</b><small>per barang</small></button>` : ''}${bisaSuara ? `<button type="button" data-suara>${I('mic')}<b>Suara</b><small>bicara saja</small></button>` : ''}<button type="button" data-manual>${I('arrow-left-right')}<b>Manual</b><small>transfer, dll.</small></button></div>
+      ${tpl.length ? `<div class="chips scroll qt-fav">${tpl.map(x => `<button type="button" class="chip" data-tpl="${x.id}">${I('zap')} ${U.esc(x.nama)}${x.jumlah ? ' · ' + U.rpShort(x.jumlah) : ''}</button>`).join('')}</div>` : ''}
       <div class="voice vq-voice" ${opt.suara ? '' : 'hidden'}><button type="button" class="mic-pulse" data-mic aria-label="Mulai / berhenti bicara">${I('mic', 'big')}</button>
         <div class="vq-say"><div class="voice-txt">Menyiapkan mikrofon…</div><p class="muted small vq-hint">Contoh: <i>"gudeg empat puluh lima ribu tunai"</i> · beberapa sekaligus pakai kata <i>"dan"</i></p></div></div>
       <div class="vq-ai" hidden></div><div class="vq-list"></div><div class="vq-sum"></div>`,
-      foot: `${bisaSuara ? `<button class="btn ghost" data-suara>${I('mic')} Suara</button>` : ''}<button class="btn" data-ok disabled>${I('check')} Simpan</button>`, onClose: () => Voice.stop() });
+      foot: `<button class="btn block" data-ok disabled>${I('check')} Simpan</button>`, onClose: () => Voice.stop() });
     const q = x => s.el.querySelector(x);
     const mic = q('[data-mic]'), txt = q('.voice-txt'), list = q('.vq-list'), ok = q('[data-ok]'), sum = q('.vq-sum'), box = q('.vq-voice'), inp = q('[data-qt]'), aiBox = q('.vq-ai');
     const lengkap = r => r.jumlah > 0 && r.kategoriId && r.walletId;
@@ -462,7 +458,7 @@
       ok.innerHTML = I('check') + (items.length > 1 ? ' Simpan ' + items.length + ' catatan' : ' Simpan');
     };
     const gambar = () => {
-      box.classList.toggle('kecil', items.length > 0);
+      box.classList.toggle('kecil', items.length > 0); s.el.classList.toggle('punya', items.length > 0);
       list.innerHTML = items.map((r, i) => { const k = kat(r.kategoriId);
         return `<div class="vq-card ${r.jenis === 'masuk' ? 'masuk' : 'keluar'} ${lengkap(r) ? '' : 'kurang'}" data-i="${i}">
         <div class="vq-head"><span class="cat-ic">${I(k ? k.ikon || 'tag' : 'circle-help')}</span>
@@ -525,6 +521,10 @@
     };
     mic.onclick = mulai;
     if (q('[data-suara]')) q('[data-suara]').onclick = mulai;
+    if (q('[data-struk]')) q('[data-struk]').onclick = () => { s.close(); UI.fotoStruk(); };
+    q('[data-manual]').onclick = () => { s.close(); UI.catat(); };
+    s.el.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => { const x = Store.byId.Template[b.dataset.tpl]; if (!x) return;
+      items.push({ jenis: x.jenis === 'masuk' ? 'masuk' : 'keluar', jumlah: Number(x.jumlah) || 0, kategoriId: x.kategoriId || '', walletId: x.walletId || UI.defWallet(), catatan: x.catatan || x.nama, raw: x.nama, tanggal: U.today() }); gambar(); });
     ok.onclick = async () => {
       if (items.some(r => !lengkap(r)) || aiJalan) return;
       const now = new Date().toISOString();

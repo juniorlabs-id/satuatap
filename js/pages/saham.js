@@ -63,10 +63,20 @@
     }).sort((a, b) => b.mv - a.mv);
     return { posisi: H, H, realisasi: R, R, dividen: D, fee, materai };
   };
+  /** Tautan saham ke Goals: per posisi ("akun:KODE") atau seluruh portofolio akun ("akun"). Disimpan di Pengaturan sahamTujuan. */
+  Calc.sahamTujuanMap = () => { try { const m = JSON.parse(Store.setting('sahamTujuan', '{}') || '{}'); return m && typeof m === 'object' ? m : {}; } catch (e) { return {}; } };
+  Calc.sahamTujuan = (akun, kode) => { const m = Calc.sahamTujuanMap(), t = m[akun + ':' + kode] || m[akun] || ''; return t && Store.byId.Tujuan[t] ? t : ''; };
+  UI.sahamTautkan = (akun, kode, tujuanId, semua) => {
+    const m = Calc.sahamTujuanMap();
+    if (semua) { m[akun] = tujuanId; Object.keys(m).forEach(k => { if (k.indexOf(akun + ':') === 0) delete m[k]; }); }
+    else { const kk = akun + ':' + kode; if (tujuanId === (m[akun] || '')) delete m[kk]; else m[kk] = tujuanId; }
+    Object.keys(m).forEach(k => { if (!m[k] && k.indexOf(':') < 0) delete m[k]; });
+    Store.setSetting('sahamTujuan', JSON.stringify(m));
+  };
   /** Posisi → item virtual untuk kekayaan bersih, zakat & alokasi (lewat Calc.investasi). */
   Calc.sahamItems = () => Calc.saham().H.map(p => {
     const w = Store.byId.Wallet[p.walletId] || {}, pemilik = w.pemilik && w.pemilik !== 'bersama' ? w.pemilik : '';
-    return { x: { id: 'sh:' + p.walletId + ':' + p.kode, kelas: 'saham', nama: p.kode, kode: p.kode, unit: p.lembar, modal: Math.round(p.cost), nilai: Math.round(p.mv), tglNilai: p.tglHarga, tanggal: p.mulai, walletId: p.walletId, tujuanId: '', kepemilikan: pemilik ? { [pemilik]: 100 } : {}, zakat: true, status: 'aktif', virtual: true }, nilai: p.mv, modal: p.cost, untung: p.mv - p.cost, pct: p.cost ? (p.mv - p.cost) / p.cost : 0, basi: !p.tglHarga || U.diffDays(p.tglHarga, U.today()) > 45 };
+    return { x: { id: 'sh:' + p.walletId + ':' + p.kode, kelas: 'saham', nama: p.kode, kode: p.kode, unit: p.lembar, modal: Math.round(p.cost), nilai: Math.round(p.mv), tglNilai: p.tglHarga, tanggal: p.mulai, walletId: p.walletId, tujuanId: Calc.sahamTujuan(p.walletId, p.kode), kepemilikan: pemilik ? { [pemilik]: 100 } : {}, zakat: true, status: 'aktif', virtual: true }, nilai: p.mv, modal: p.cost, untung: p.mv - p.cost, pct: p.cost ? (p.mv - p.cost) / p.cost : 0, basi: !p.tglHarga || U.diffDays(p.tglHarga, U.today()) > 45 };
   });
 
   // ---------- Kas & modal per akun (dari transaksi SatuAtap) ----------
@@ -414,8 +424,14 @@
       <div class="kv-list"><div class="kv"><span>Average</span><b>${U.rp(Math.round(h.avg))}</b></div><div class="kv"><span>Last</span><b>${h.l ? U.rp(h.l) + ' · ' + U.tgl(h.tglHarga, 'dm') : 'n/a'}</b></div>
         <div class="kv"><span>Invested</span><b>${U.rp(Math.round(h.cost))}</b></div>${real ? `<div class="kv"><span>Realized</span><b class="${cls(real)}">${tanda(real)}${UI.m(Math.abs(real))}</b></div>` : ''}${div ? `<div class="kv"><span>Dividen</span><b class="ok">${U.rp(div)}</b></div>` : ''}
         <div class="kv"><span>Dipegang sejak</span><b>${U.tgl(h.mulai)}</b></div>${h.plan.setup ? `<div class="kv"><span>Setup</span><b>${U.esc(h.plan.setup)}</b></div>` : ''}</div>` : `<p class="muted">Posisi ${kode} sudah ditutup.</p>`) +
+      (h ? `<div class="sh-goal">${UI.field('Untuk goals', `<select data-goal>${UI.tujuanOpts(Calc.sahamTujuan(akun, kode))}</select>`, 'Nilai pasar saham ini ikut dihitung sebagai dana goals tersebut.')}
+        <label class="check"><input type="checkbox" data-goal-semua ${Calc.sahamTujuanMap()[akun] && !Calc.sahamTujuanMap()[akun + ':' + kode] ? 'checked' : ''}> Terapkan ke seluruh portofolio ${U.esc(akunNama(akun))}</label></div>` : '') +
       `<h4 class="mini-h">Riwayat ${kode}</h4><div class="list">${tr.map(t => rowLog(LOG().find(x => x.id === t.id) || { k: 'trade', id: t.id, d: t.tanggal, ty: 'BELI', kode, amt: 0, t })).join('')}</div>`,
       foot: `${h ? `<button class="btn ghost" data-a="plan" aria-label="Ubah rencana">${I('target')}</button><button class="btn ghost" data-a="kalk" aria-label="Kalkulator">${I('calculator')}</button>` : ''}<button class="btn ghost" data-a="jual">Jual</button><button class="btn" data-a="beli">Beli</button>` });
+    const gs = s.el.querySelector('[data-goal]');
+    if (gs) { const simpan = () => { const v = gs.value, semua = s.el.querySelector('[data-goal-semua]').checked; UI.sahamTautkan(akun, kode, v, semua);
+        const g = Store.byId.Tujuan[v]; UI.toast(g ? (semua ? 'Portofolio ' + akunNama(akun) : kode) + ' ditautkan ke ' + g.nama + '.' : 'Tautan goals dilepas.'); };
+      gs.onchange = simpan; s.el.querySelector('[data-goal-semua]').onchange = simpan; }
     s.el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { s.close(); const a = b.dataset.a;
       if (a === 'kalk') { K.kode = kode; K.akun = akun; UI.go('saham/kalkulator'); }
       else if (a === 'plan') { const t = h.plan.id ? h.plan : trades().filter(x => x.kode === kode && x.walletId === akun && x.aksi === 'beli').pop(); if (t) UI.tradeForm(t, { fokusPlan: true }); }

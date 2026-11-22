@@ -72,17 +72,23 @@
   UI.cekStruk = (r, gb) => {
     const wl = Store.wallets();
     const tunai = /tunai|cash/i.test(r.bayar || '') ? (wl.find(w => w.jenis === 'tunai') || {}).id : '';
-    const st = { toko: r.toko || 'Belanja', tanggal: r.tanggal || U.today(), walletId: tunai || UI.defWallet(), total: r.total, items: r.items.map(x => Object.assign({ asli: x.kategoriId }, x)) };
+    const st = { toko: r.toko || 'Belanja', tanggal: r.tanggal || U.today(), walletId: tunai || UI.defWallet(), total: r.total, items: r.items.map(x => Object.assign({ asli: x.kategoriId, milik: '' }, x)), teman: null };
     const s = UI.sheet({ title: 'Cek hasil scan', cls: 'struk-sheet', body: '<div class="cs-body"></div>',
       foot: `<button class="btn block" data-ok>${I('check')} Simpan</button>` });
     const body = s.el.querySelector('.cs-body');
     const subtotal = () => U.sum(st.items, x => x.jumlah || 0);
+    /** Bagian tiap pemilik (''=saya, '0','1'..=teman) dari total dibayar, termasuk bagian pajak/diskon secara sebanding. */
+    const bagian = () => { const sub = subtotal(), tot = st.total || sub, o = {}; st.items.forEach(x => { const m = st.teman ? x.milik || '' : ''; o[m] = (o[m] || 0) + (x.jumlah || 0); });
+      Object.keys(o).forEach(k => { o[k] = sub ? Math.round(o[k] / sub * tot) : 0; }); return o; };
+    const splitInfo = () => { const el = body.querySelector('.cs-split-sum'); if (!el || !st.teman) return; const b = bagian();
+      el.innerHTML = `<span>Bagian Anda <b>${U.rp(b[''] || 0)}</b></span>` + st.teman.map((n, i) => `<span>${U.esc(n || 'Teman ' + (i + 1))} <b>${U.rp(b[String(i)] || 0)}</b></span>`).join(''); };
     const ringkas = () => {
       const sub = subtotal(), tot = st.total || sub, sel = tot - sub, el = body.querySelector('.cs-sum');
       if (!el) return;
       el.querySelector('[data-sub]').textContent = U.rp(sub);
       const adj = el.querySelector('[data-adj]'); adj.hidden = !sel;
       adj.innerHTML = `<span>${sel > 0 ? 'Pajak & biaya' : 'Potongan'}</span><b>${sel > 0 ? '+' : '−'}${U.rp(Math.abs(sel))}</b>`;
+      splitInfo();
     };
     const render = () => {
       const cek = st.items.filter(x => x.cek).map(x => x.nama), kosong = st.items.filter(x => !x.kategoriId).length;
@@ -93,11 +99,17 @@
         <div class="card cs-list">${st.items.map((x, i) => { const k = Store.byId.Kategori[x.kategoriId];
           return `<div class="cs-row ${x.cek ? 'cek' : ''}" data-i="${i}"><div class="cs-t"><input class="cs-nama" data-f="nama" value="${U.esc(x.nama)}" maxlength="60" aria-label="Nama barang">
               <small>${x.qty > 1 ? x.qty + ' × ' + U.rp(x.harga) : ''}</small>
-              <label class="vq-pill ${x.kategoriId ? '' : 'kosong'}">${I(k ? k.ikon || 'tag' : 'tag')}<select data-f="kategoriId" aria-label="Kategori"><option value="">Pilih kategori</option>${UI.katOpts('keluar', x.kategoriId)}</select>${I('chevron-down')}</label></div>
+              <label class="vq-pill ${x.kategoriId ? '' : 'kosong'}">${I(k ? k.ikon || 'tag' : 'tag')}<select data-f="kategoriId" aria-label="Kategori"><option value="">Pilih kategori</option>${UI.katOpts('keluar', x.kategoriId)}</select>${I('chevron-down')}</label>
+              ${st.teman ? `<label class="vq-pill cs-milik ${x.milik ? 'teman' : ''}">${I(x.milik ? 'user' : 'house')}<select data-f="milik" aria-label="Milik siapa"><option value="">Saya</option>${st.teman.map((n, j) => `<option value="${j}" ${x.milik === String(j) ? 'selected' : ''}>${U.esc(n || 'Teman ' + (j + 1))}</option>`).join('')}</select>${I('chevron-down')}</label>` : ''}</div>
             <div class="cs-r"><div class="cs-amt"><span>Rp</span><input data-f="jumlah" data-rp inputmode="numeric" value="${U.fmtNum(x.jumlah)}" aria-label="Nominal"></div><button type="button" class="icon-btn sm" data-hapus aria-label="Hapus barang">${I('x')}</button></div></div>`; }).join('')}
           <button type="button" class="link cs-add" data-tambah>${I('plus')} Tambah barang</button>
           <div class="cs-sum"><div class="kv"><span>Subtotal</span><b data-sub></b></div><div class="kv" data-adj hidden></div>
             <div class="kv cs-total"><span>Total dibayar</span><div class="cs-amt big"><span>Rp</span><input data-g="total" data-rp inputmode="numeric" value="${U.fmtNum(st.total || subtotal())}" aria-label="Total dibayar"></div></div></div></div>
+        ${st.teman ? `<div class="subbox cs-split"><div class="subbox-h">${I('users')} Split bill — Anda membayar total <small>Pilih "milik" tiap barang. Bagian teman dicatat sebagai piutang (pajak & diskon ikut terbagi).</small></div>
+            ${st.teman.map((n, i) => `<div class="split-row"><input data-tm="${i}" placeholder="Nama teman" maxlength="40" value="${U.esc(n)}"><button type="button" class="icon-btn" data-tmdel="${i}" aria-label="Hapus teman">${I('x')}</button></div>`).join('')}
+            <div class="chips"><button type="button" class="link" data-tmadd>${I('plus')} Tambah teman</button><button type="button" class="link" data-tmoff>Batalkan split bill</button></div>
+            <div class="cs-split-sum"></div></div>`
+          : `<button type="button" class="btn ghost block" data-split>${I('users')} Split bill dengan teman</button>`}
         <button type="button" class="link block" data-satu>Simpan sebagai 1 transaksi tanpa item</button>`;
       UI.bindRp(body); ringkas();
     };
@@ -105,6 +117,7 @@
     body.addEventListener('input', e => {
       const g = e.target.dataset.g, f = e.target.dataset.f, row = e.target.closest('.cs-row');
       if (g === 'total') { st.total = U.parseRp(e.target.value); return ringkas(); }
+      if (e.target.dataset.tm !== undefined) { st.teman[+e.target.dataset.tm] = e.target.value; return splitInfo(); }
       if (g) { st[g] = e.target.value; return; }
       if (!row || !f) return; const x = st.items[+row.dataset.i];
       if (f === 'jumlah') { x.jumlah = U.parseRp(e.target.value); ringkas(); } else if (f === 'nama') x.nama = e.target.value;
@@ -113,8 +126,14 @@
       const row = e.target.closest('.cs-row'); if (!row || e.target.dataset.f !== 'kategoriId') return;
       const x = st.items[+row.dataset.i]; x.kategoriId = e.target.value; x.cek = false; render();
     });
+    body.addEventListener('change', e => { const row = e.target.closest('.cs-row'); if (row && e.target.dataset.f === 'milik') { st.items[+row.dataset.i].milik = e.target.value; render(); } else if (e.target.dataset.tm !== undefined) render(); });
     body.addEventListener('click', e => {
       const row = e.target.closest('.cs-row');
+      if (e.target.closest('[data-split]')) { st.teman = ['']; render(); const t = body.querySelector('[data-tm]'); if (t) t.focus(); return; }
+      if (e.target.closest('[data-tmadd]')) { st.teman.push(''); render(); const t = body.querySelectorAll('[data-tm]'); t[t.length - 1].focus(); return; }
+      if (e.target.closest('[data-tmoff]')) { st.teman = null; st.items.forEach(x => { x.milik = ''; }); return render(); }
+      const td = e.target.closest('[data-tmdel]');
+      if (td) { const k = +td.dataset.tmdel; st.teman.splice(k, 1); st.items.forEach(x => { if (x.milik === String(k)) x.milik = ''; else if (x.milik && +x.milik > k) x.milik = String(+x.milik - 1); }); if (!st.teman.length) st.teman = null; return render(); }
       if (row && e.target.closest('[data-hapus]')) { st.items.splice(+row.dataset.i, 1); render(); }
       else if (row) x0(row);
       else if (e.target.closest('[data-tambah]')) { st.items.push({ nama: 'Barang', qty: 1, harga: 0, jumlah: 0, kategoriId: '', cek: false }); render(); const n = body.querySelectorAll('.cs-nama'); if (n.length) { n[n.length - 1].focus(); n[n.length - 1].select(); } }
@@ -125,16 +144,29 @@
       if (!items.length) return UI.toast('Belum ada barang dengan nominal.', 'warn');
       if (items.some(x => !x.kategoriId)) return UI.toast('Pilih kategori untuk semua barang dulu.', 'warn');
       const total = st.total || U.sum(items, x => x.jumlah);
-      const rincian = items.map(x => ({ n: String(x.nama || 'Barang').trim().slice(0, 60), q: x.qty || 1, h: x.qty > 1 ? x.harga : x.jumlah, j: x.jumlah, k: x.kategoriId }));
+      const split = !!(st.teman && items.some(x => x.milik));
+      if (split && st.teman.some((n, i) => !String(n || '').trim() && items.some(x => x.milik === String(i)))) return UI.toast('Isi nama teman dulu.', 'warn');
+      const b = split ? bagian() : { '': total }, punyaSaya = split ? items.filter(x => !x.milik) : items;
+      const rincian = punyaSaya.map(x => ({ n: String(x.nama || 'Barang').trim().slice(0, 60), q: x.qty || 1, h: x.qty > 1 ? x.harga : x.jumlah, j: x.jumlah, k: x.kategoriId }));
       let lampiran = '';
       if (Store.mode === 'live' && gb && Cloud.simpanStruk) { try { lampiran = await Cloud.simpanStruk(gb.blob, st.toko + ' ' + st.tanggal + '.jpg'); } catch (e) { /* foto opsional */ } }
-      const me = Store.me.email, row = { id: U.uid('t'), tanggal: st.tanggal, jenis: 'keluar', jumlah: total, kategoriId: UI.katUtama(rincian), walletId: st.walletId, walletTujuan: '', biaya: 0,
-        catatan: st.toko, dibayarOleh: me, tag: '', sumber: 'struk', refId: '', periodeRef: '', dicatatOleh: me, dibuat: new Date().toISOString(), riwayat: [], lampiran, rincian };
-      if (!(await UI.commitPriv([{ op: 'upsert', t: 'Transaksi', row }]))) return;
+      const me = Store.me.email, now = new Date().toISOString(), ops = [];
+      const mk = o => Object.assign({ id: U.uid('t'), tanggal: st.tanggal, jenis: 'keluar', jumlah: 0, kategoriId: '', walletId: st.walletId, walletTujuan: '', biaya: 0, catatan: st.toko, dibayarOleh: me, tag: '', sumber: 'struk', refId: '', periodeRef: '', dicatatOleh: me, dibuat: now, riwayat: [], lampiran }, o);
+      const row = mk({ jumlah: split ? b[''] || 0 : total, kategoriId: UI.katUtama(rincian), rincian });
+      if (row.jumlah > 0) ops.push({ op: 'upsert', t: 'Transaksi', row });
+      if (split) st.teman.forEach((n, i) => {
+        const j = b[String(i)] || 0, nama = String(n || '').trim(); if (!j) return;
+        const brg = items.filter(x => x.milik === String(i)).map(x => x.nama).join(', '), pid = U.uid('p');
+        ops.push({ op: 'upsert', t: 'Pinjaman', row: { id: pid, arah: 'piutang', jenis: 'patungan', pihak: nama, pokok: j, bunga: 0, metode: 'tanpa', tenor: 1, mulai: st.tanggal, tanggalBayar: 0, cicilan: j, walletId: st.walletId, lunas: false, catatan: 'Split bill ' + st.toko + ': ' + brg.slice(0, 200), dibuat: now } });
+        ops.push({ op: 'upsert', t: 'Transaksi', row: mk({ jenis: 'pinjam_beri', jumlah: j, refId: pid, catatan: 'Split bill · ' + nama + ' · ' + st.toko, sumber: 'patungan', lampiran: '' }) });
+      });
+      if (!(await UI.commitPriv(ops))) return;
       items.forEach(x => { if (x.kategoriId !== x.asli && window.Voice) Voice.ajari(x.nama, x.kategoriId); });   // belajar dari koreksi
       try { localStorage.setItem('sa:lastWallet', st.walletId); } catch (e) {}
       s.close();
-      UI.toast('Tersimpan · ' + st.toko + ' ' + U.rp(total) + ' (' + items.length + ' item)', 'ok', { undo: () => Store.remove('Transaksi', row.id), ms: 5000 });
+      const ids = ops.map(o => [o.t, o.row.id]);
+      UI.toast(split ? 'Tersimpan · bagian Anda ' + U.rp(b[''] || 0) + ', piutang teman ' + U.rp(total - (b[''] || 0)) : 'Tersimpan · ' + st.toko + ' ' + U.rp(total) + ' (' + items.length + ' item)', 'ok',
+        { undo: () => Store.commit(ids.map(([t, id]) => ({ op: 'delete', t, id }))), ms: 5000 });
     };
     render();
   };
