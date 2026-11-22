@@ -49,7 +49,7 @@
     if (!AI.siap()) return UI.toast('Fitur AI belum tersedia. Pastikan lisensi aktif dan internet tersambung.', 'warn');
     const pil = UI.sheet({ title: 'Scan struk / bukti bayar', cls: 'small', body: `<p class="muted small">Struk belanja dibaca per barang; screenshot bukti bayar (m-banking, e-wallet, QRIS) dibaca nominal & tujuannya. Anda cek dulu sebelum disimpan.</p>
       <div class="setor-via dua"><button type="button" data-src="kamera">${I('camera')}Kamera<small>foto sekarang</small></button><button type="button" data-src="galeri">${I('image')}Galeri<small>foto / screenshot</small></button></div>
-      <div class="note small">${I('share-2')} <span>Lebih cepat: setelah bayar, screenshot halaman "Berhasil" lalu <b>Bagikan › SatuAtap</b> dari galeri. (Aplikasi perlu dipasang di layar utama.)</span></div>` });
+      <div class="note small">${I('share-2')} <span>Lebih cepat: setelah bayar, screenshot halaman "Berhasil" lalu <b>Bagikan › SatuAtap</b> dari galeri. (Aplikasi perlu dipasang di layar utama.) <a class="link" href="#/panduan/bukti">Lihat caranya</a></span></div>` });
     pil.el.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { pil.close(); pilihFoto(b.dataset.src === 'kamera'); });
   };
   function pilihFoto(kamera) {

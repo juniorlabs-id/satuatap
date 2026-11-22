@@ -981,3 +981,20 @@ details.adv summary { cursor: pointer; font-weight: 600; color: var(--primary); 
 .co-card .tx-txt b, .co-card .tx-txt small { white-space: normal; overflow: visible; text-overflow: clip; display: block; }
 .co-card .tx-txt small b { display: inline; }
 .co-card .row-btns { margin: 4px 0 6px; }
+
+/* ---------- Panduan Penggunaan ---------- */
+.pg-intro { margin: 2px 2px 12px; }
+.pg-list { padding: 0; overflow: hidden; }
+.pg-item { border-bottom: 1px solid var(--line); } .pg-item:last-child { border-bottom: 0; }
+.pg-item > summary { list-style: none; cursor: pointer; border-bottom: 0; }
+.pg-item > summary::-webkit-details-marker { display: none; }
+.pg-item > summary > .ic:last-child { color: var(--muted); transition: transform .2s; }
+.pg-item[open] > summary > .ic:last-child { transform: rotate(180deg); }
+.pg-item[open] > summary { background: var(--surface-2); }
+.pg-isi { padding: 4px 16px 16px; font-size: 14px; line-height: 1.55; }
+.pg-isi p { margin: 8px 0; }
+.pg-isi .row-btns { margin-top: 12px; }
+.pg-exs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.pg-ex { background: var(--primary-c); color: var(--primary); border-radius: 8px; padding: 3px 8px; font-size: 13px; }
+.pg-help { margin-top: 14px; padding: 14px 16px; }
+.pg-item .tx-txt b { white-space: normal; overflow: visible; text-overflow: clip; color: var(--text); }

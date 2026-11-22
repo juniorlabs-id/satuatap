@@ -43,6 +43,7 @@
           { id: 'dat', icon: 'database', label: 'Data & Sinkron', to: 'pengaturan/data' }
         ])}
         ${UI.sec('Bantuan')}${UI.tiles([
+          { id: 'pgn', icon: 'book-open', label: 'Panduan Penggunaan', to: 'panduan' },
           { id: 'lap', icon: 'message-square-warning', label: 'Laporkan Masalah', to: 'laporan' },
           { id: 'ide', icon: 'lightbulb', label: 'Usul Fitur', to: 'laporan/ide' },
           { id: 'wa', icon: 'message-circle', label: 'Chat Dukungan', act: 'wa-support' },
@@ -222,7 +223,7 @@
     return `<div class="card"><h4 class="mini-h">${I('bell-ring')} Pengingat tagihan</h4>
         <p class="small">Tagihan, cicilan & acara yang jatuh tempo ≤ 3 hari tampil di <b>Beranda</b>, lengkap dengan tombol bayar; jadwal lengkapnya ada di <b>Kalender</b>. Tagihan yang sudah lunas atau ditunda tidak ditampilkan.</p>
 </div>
-      ${UI.notifKartu ? UI.notifKartu() : ''}${UI.catatOtomatisKartu ? UI.catatOtomatisKartu() : ''}
+      ${UI.notifKartu ? UI.notifKartu() : ''}
       ${needAdmin()}<div class="card" id="f-not">
       <label class="check"><input type="checkbox" name="notifEmail" ${on ? 'checked' : ''} ${Store.isAdminLike() ? '' : 'disabled'}><span><b>Email ringkasan bulanan</b><br><small class="muted">Laporan (bukan pengingat): pemasukan, pengeluaran, kategori terbesar & tujuan periode lalu untuk Admin & Pasangan — terkirim saat aplikasi pertama kali dibuka di periode baru.</small></span></label>
       ${Store.isAdminLike() ? `<button class="btn" data-act="save-not">Simpan</button>` : ''}</div>`;

@@ -1,4 +1,4 @@
-# Panduan Instalasi SatuAtap 1.8.10 (arsitektur relay)
+# Panduan Instalasi SatuAtap 1.8.11 (arsitektur relay)
 
 **SatuAtap — Keuangan keluarga, di bawah satu atap.**
 
@@ -299,11 +299,11 @@ Telegram mengirim pesan ke `https://satuatap.vercel.app/api/tg`, lalu fungsi Ver
 
 Batas: maksimal 60 pesan per jam per keluarga. Kode penghubung berlaku 15 menit dan sekali pakai. Ketik `/putus` di bot untuk memutus.
 
-## Bagian I — Catat otomatis (email bank & screenshot)
+## Bagian I — Catat dari screenshot bukti bayar
 
-**Dari email bank & e-wallet** (butuh script Pendamping): di aplikasi buka **Lainnya › Notifikasi › Catat otomatis › Pasang (± 5 menit)**. Ringkasnya: tempel `appsscript.json` dan kode Pendamping terbaru, jalankan `setupEmail` sekali (izin *membaca* Gmail), lalu nyalakan notifikasi email transaksi di aplikasi bank/e-wallet. Email transaksi masuk ke **Menunggu konfirmasi** dengan label *Email bank* paling lambat 15 menit setelah email tiba. Promo, OTP, e-statement, dan top up antar dompet diabaikan. Diagnosa: jalankan `cekEmailLog`. Bank lain: tambahkan domain pengirimnya di Properti skrip `EMAIL_PENGIRIM`. Mematikan sementara: tombol **Matikan** di kartu yang sama; berhenti total: jalankan `hentikanEmail`.
+Tanpa pemasangan apa pun. Setelah membayar di m-banking/e-wallet/QRIS, screenshot halaman "Berhasil", lalu dari galeri **Bagikan › SatuAtap** (Android, aplikasi sudah dipasang di layar utama), atau **+ › Scan › Galeri** di semua HP termasuk iPhone. AI membaca nominal, tujuan, dan sumber dana, lalu membuka Catat cepat untuk dicek. Cara pakainya untuk pelanggan ada di aplikasi: **Lainnya › Bantuan › Panduan Penggunaan**.
 
-**Dari screenshot bukti bayar** (tanpa pemasangan): setelah membayar di m-banking/e-wallet/QRIS, screenshot halaman "Berhasil", lalu dari galeri **Bagikan › SatuAtap**. AI membaca nominal, tujuan, dan sumber dana, lalu membuka Catat cepat untuk dicek. Syaratnya aplikasi sudah dipasang di layar utama (Android/Chrome). Setelah pembaruan, ikon SatuAtap bisa butuh beberapa jam sebelum muncul di daftar Bagikan; bila tak kunjung muncul, hapus lalu pasang ulang aplikasi dari browser. Di iPhone, gunakan tombol **+ › Scan › Galeri**.
+> Fitur "catat dari email bank" (1.8.4–1.8.10) sudah dihapus. Bila script Pendamping pernah menjalankan `setupEmail`, tempel kode Pendamping & appsscript.json terbaru lalu jalankan `setupPendamping` — pemicu email lama ikut dibersihkan.
 
 ## Bagian H — Fitur AI (aktif otomatis)
 

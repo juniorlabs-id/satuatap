@@ -72,16 +72,6 @@
         ${Store.isAdminLike() ? `<div class="row" style="margin-top:10px"><span class="cat-ic ${pendAktif() ? 'ok' : ''}">${I(pendAktif() ? 'circle-check' : 'circle')}</span><div class="tx-txt"><b>Script sudah terpasang</b><small>${pendAktif() ? 'Pengingat tagihan & rapat dikirim script sekali tiap pagi (±08.00) ke Telegram dan WhatsApp — aplikasi tidak mengirim lagi saat dibuka.' : 'Nyalakan setelah script terpasang agar pengingat tidak ganda.'}</small></div><button class="btn ${pendAktif() ? 'ghost ' : ''}xs" data-act="pend-aktif">${pendAktif() ? 'Matikan' : 'Nyalakan'}</button></div>` : ''}</div>`;
   };
   UI.pendampingKartu = () => '';
-  /** Kartu "Catat otomatis": email bank (lewat Pendamping) & bagikan screenshot. */
-  UI.catatOtomatisKartu = () => {
-    const on = Store.setting('emailCatat', '') !== '0', adm = Store.isAdminLike();
-    return `<div class="card co-card"><h4 class="mini-h">${I('wand-sparkles')} Catat otomatis <span class="pill ok">baru</span></h4>
-      <div class="row"><span class="cat-ic">${I('mail')}</span><div class="tx-txt"><b>Dari email bank & e-wallet</b><small>Transaksi yang dikirim lewat email (BCA, Mandiri, BRI, GoPay, OVO, DANA, …) masuk sendiri sebagai draf. Butuh script Pendamping.</small></div>
-        ${adm ? `<button class="btn ${on ? 'ghost ' : ''}xs" data-act="email-catat">${on ? 'Matikan' : 'Nyalakan'}</button>` : ''}</div>
-      ${adm ? `<div class="row-btns"><button class="btn sm" data-act="panduan" data-k="email">${I('book-open')} Pasang (± 5 menit)</button></div>` : ''}
-      <div class="row"><span class="cat-ic">${I('share-2')}</span><div class="tx-txt"><b>Dari screenshot bukti bayar</b><small>Setelah bayar, screenshot halaman "Berhasil" › <b>Bagikan › SatuAtap</b>. AI membaca nominal & tujuannya. Bisa juga lewat tombol + › Scan. Aplikasi perlu dipasang di layar utama.</small></div></div></div>`;
-  };
-  UI.act('email-catat', () => { const on = Store.setting('emailCatat', '') !== '0'; Store.setSetting('emailCatat', on ? '0' : '1'); UI.toast(on ? 'Catat dari email dimatikan.' : 'Catat dari email dinyalakan.'); UI.render(); });
 
   // ---------- Panduan pasang Skrip Pendamping & WhatsApp (wizard langkah demi langkah) ----------
   const PEND = { teks: '', json: '' };
@@ -146,23 +136,6 @@
         <div class="note small">${I('triangle-alert')} <span>Ada tulisan merah? Foto layar log-nya dan kirim ke JuniorLabs.</span></div>
         <div class="note small">${I('info')} <span>Terakhir: di <b>Lainnya › Notifikasi</b> nyalakan <b>"Script sudah terpasang"</b> agar pengingat hanya datang sekali tiap pagi (dari script), tidak ganda.</span></div>
         <div class="row-btns"><button type="button" class="btn sm" data-pa="ke-wa">${I('message-circle')} Lanjut pasang WhatsApp</button></div>`)
-    ] },
-    email: { judul: 'Catat dari email bank', langkah: () => [
-      T('Apa ini', `<p>Bank & dompet digital mengirim <b>email untuk setiap transaksi</b>. Script Pendamping memeriksa Gmail <b>${U.esc(admin())}</b> tiap 15 menit, lalu memasukkan transaksinya ke <b>Menunggu konfirmasi</b> — tinggal geser kanan.</p>
-        <ul class="ul"><li>Didukung: BCA, Mandiri, BRI, BNI, BSI, Jago, SeaBank, CIMB, Permata, Danamon, BTN, Jenius, blu, GoPay, OVO, DANA, ShopeePay, LinkAja, Flip, dan lainnya.</li><li>Hanya <b>membaca</b> email dari pengirim di daftar itu. Promo, OTP, dan e-statement diabaikan; top up antar dompet tidak dicatat agar tidak dobel.</li><li>Email lama tidak ikut — hanya transaksi setelah diaktifkan.</li></ul>
-        <div class="note small">${I('clock')} <span>± 5 menit. Butuh <b>script Pendamping</b> yang sudah terpasang.</span></div>
-        <div class="row-btns"><button type="button" class="btn ghost sm" data-pa="ke-pend">${I('book-open')} Belum pasang script? Mulai di sini</button></div>`),
-      T('Perbarui script', `<ol class="steps"><li>Buka proyek <b>SatuAtap Pendamping</b> di <a href="https://script.google.com/home" target="_blank" rel="noopener">script.google.com</a>.</li><li>Ketuk <b>Salin appsscript.json</b> › klik file <b>appsscript.json</b> › <kbd>Ctrl</kbd>+<kbd>A</kbd> › tempel › simpan.</li><li>Ketuk <b>Salin kode script</b> › klik <b>Kode.gs</b> › <kbd>Ctrl</kbd>+<kbd>A</kbd> › tempel › simpan.</li></ol>
-        <div class="row-btns">${btn('json', 'copy', 'Salin appsscript.json', '')}${btn('kode', 'copy', 'Salin kode script', '')}</div>
-        <p class="muted small">appsscript.json baru menambah satu izin: <b>membaca email</b> (tidak bisa mengirim, menghapus, atau mengubah email).</p>`),
-      T('Aktifkan', `<ol class="steps"><li>Di kotak pilihan fungsi pilih <b>setupEmail</b> › <b>▶ Jalankan</b>.</li><li>Muncul permintaan izin › pilih akun <b>${U.esc(admin())}</b> › <b>Lanjutan</b> › <b>Buka SatuAtap Pendamping</b> › <b>Izinkan</b>.</li><li>Log menampilkan <b>✅ Catat dari email aktif</b>.</li></ol>
-        <div class="note warn small">${I('triangle-alert')} <span>Log menulis <b>"Gmail API belum aktif"</b>? Di editor, panel kiri › <b>Layanan</b> (ikon <b>+</b>) › pilih <b>Gmail API</b> › <b>Tambahkan</b>. Tunggu 1 menit › jalankan <b>setupEmail</b> lagi.</span></div>
-        <div class="note warn small">${I('triangle-alert')} <span>Log menulis <b>"belum berisi izin baca Gmail"</b>, atau tidak muncul permintaan izin? appsscript.json belum tersimpan — ulangi langkah 2, pastikan menekan <b>Simpan</b>.</span></div>
-        <div class="note small">${I('info')} <span>Setelah memperbarui kode, perbarui juga deployment WA (bila dipakai): <b>Terapkan › Kelola deployment › ✏️ › Versi baru</b>.</span></div>`),
-      T('Nyalakan email transaksi di bank', `<p>Di aplikasi bank / e-wallet: buka <b>Pengaturan › Notifikasi</b> lalu nyalakan <b>notifikasi email untuk transaksi</b>, ke alamat <b>${U.esc(admin())}</b>.</p>
-        <div class="note small">${I('users')} <span>Rekening pasangan memakai email lain? Di Gmail pasangan buat filter dari email bank › <b>Teruskan ke</b> ${U.esc(admin())}. Atau cukup pakai <b>Bagikan screenshot › SatuAtap</b> di HP pasangan.</span></div>`),
-      T('Uji', `<ol class="steps"><li>Lakukan transaksi kecil (mis. bayar QRIS Rp 1.000).</li><li>Tunggu email bank masuk, lalu maksimal 15 menit.</li><li>Buka aplikasi › <b>Menunggu konfirmasi</b> › muncul draf berlabel <b>Email bank</b> › periksa kategori › geser kanan.</li></ol>
-        <div class="note small">${I('circle-help')} <span>Tidak muncul? Di editor jalankan <b>cekEmailLog</b> — terlihat email mana yang terbaca dan alasannya. Bank Anda belum dikenali? Tambahkan domain pengirimnya di Properti skrip <code>EMAIL_PENGIRIM</code> (mis. <code>bankku.co.id</code>).</span></div>`)
     ] },
     wa: { judul: 'Pasang WhatsApp (Fonnte)', langkah: () => [
       T('Sebelum mulai', `<p>Dengan WhatsApp, keluarga mendapat <b>2 pesan sehari</b> dari nomor pengirim:</p>
