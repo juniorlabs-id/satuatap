@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.9)
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.10)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
  *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (tagihan < Rp 1 juta: H-1 & hari H saja) (lewat @SatuAtapBot, bila anggota sudah
@@ -334,11 +334,25 @@ function izinGmail_() {
     return /gmail\.readonly/.test(String(JSON.parse(r.getContentText()).scope || '')); } catch (e) { return true; }   // tidak bisa dicek → lanjut saja
 }
 /** Isi teks email (text/plain diutamakan; HTML dibersihkan). */
-function teksEmail_(payload) {
-  const dek = function (d) { try { return Utilities.newBlob(Utilities.base64DecodeWebSafe(String(d).replace(/=+$/, '') + '==='.slice((String(d).replace(/=+$/, '').length + 3) % 4))).getDataAsString('UTF-8'); } catch (e) { return ''; } };
+function teksEmail_(payload, msgId) {
+  // Layanan Gmail Apps Script memberi isi sebagai deret byte; REST API memberi base64 web-safe. Keduanya ditangani.
+  const dek = function (d) {
+    try {
+      if (d && typeof d !== 'string') return Utilities.newBlob(d).getDataAsString('UTF-8');
+      const s = String(d || '').replace(/=+$/, '');
+      return Utilities.newBlob(Utilities.base64DecodeWebSafe(s + '==='.slice((s.length + 3) % 4))).getDataAsString('UTF-8');
+    } catch (e) { return ''; }
+  };
+  const isiBagian = function (p) {
+    if (p.body && p.body.data && (typeof p.body.data !== 'string' || p.body.data.length)) return dek(p.body.data);
+    if (p.body && p.body.attachmentId && msgId) {   // email panjang: isi disimpan sebagai lampiran
+      try { const a = typeof Gmail !== 'undefined' && Gmail.Users ? Gmail.Users.Messages.Attachments.get('me', msgId, p.body.attachmentId) : gmail_('messages/' + msgId + '/attachments/' + p.body.attachmentId); return dek(a && a.data); } catch (e) { return ''; }
+    }
+    return '';
+  };
   let plain = '', html = '';
   (function jelajah(p) { if (!p) return; const mt = p.mimeType || '';
-    if (p.body && p.body.data) { if (mt === 'text/plain' && !plain) plain = dek(p.body.data); else if (mt === 'text/html' && !html) html = dek(p.body.data); }
+    if (mt === 'text/plain' && !plain) plain = isiBagian(p); else if (mt === 'text/html' && !html) html = isiBagian(p);
     (p.parts || []).forEach(jelajah); })(payload);
   const t = plain || html.replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<br\s*\/?>|<\/(p|div|tr|li|h\d)>/gi, '\n').replace(/<\/t[dh]>/gi, ' : ').replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -410,9 +424,9 @@ function cekEmail_() {
       if (waktu < mulai) return;
       const H = {}; ((msg.payload && msg.payload.headers) || []).forEach(function (h) { H[String(h.name).toLowerCase()] = h.value; });
       const dari = String(H.from || '').toLowerCase(), subjek = String(H.subject || ''), p = peng.find(function (x) { return dari.indexOf(x[0]) > -1; });
-      const teks = teksEmail_(msg.payload);
+      const teks = teksEmail_(msg.payload, m.id);
       let r = bacaEmailTrx_(subjek, teks), alasan = '';
-      if (!r) alasan = EMAIL_SKIP.test(subjek) ? 'promo/OTP/info' : !EMAIL_TRX.test(subjek + ' ' + teks) ? 'tidak ada kata transaksi' : !EMAIL_TERJADI.test(subjek + ' ' + teks) ? 'belum terjadi' : 'nominal tidak terbaca';
+      if (!r) alasan = !teks ? 'isi email kosong' : EMAIL_SKIP.test(subjek) ? 'promo/OTP/info' : !EMAIL_TRX.test(subjek + ' ' + teks) ? 'tidak ada kata transaksi' : !EMAIL_TERJADI.test(subjek + ' ' + teks) ? 'belum terjadi' : 'nominal tidak terbaca';
       if (r && !r.lewati && (!r.nama || r.nama.length < 3)) { const a = bacaEmailAI_(subjek, teks); if (a && !a.gagal && !a.bukan) r = a; }   // format tak biasa → minta AI
       else if (!r && !EMAIL_SKIP.test(subjek) && EMAIL_TRX.test(subjek + ' ' + teks)) { const a = bacaEmailAI_(subjek, teks); if (a && a.gagal) alasan += ' · AI: ' + a.gagal; else if (a && a.bukan) alasan += ' · AI: bukan transaksi'; else if (a) r = a; }
       if (!r || r.bukan) { hasil.push({ s: 'bukan transaksi (' + alasan + ')', id: m.id, dari: (dari.match(/@([^>\s]+)/) || [])[1] || dari.slice(0, 30), subjek: subjek.slice(0, 50) }); return; }
@@ -461,7 +475,7 @@ function lihatEmail() {
   const peng = pengirimEmail_(), q = 'newer_than:2d -in:spam -in:trash {' + peng.map(function (p) { return 'from:' + p[0]; }).join(' ') + '}';
   (gmail_('messages?maxResults=3&q=' + encodeURIComponent(q)).messages || []).forEach(function (m, i) {
     const msg = gmail_('messages/' + m.id + '?format=full'), H = {}; ((msg.payload && msg.payload.headers) || []).forEach(function (h) { H[String(h.name).toLowerCase()] = h.value; });
-    const teks = teksEmail_(msg.payload);
+    const teks = teksEmail_(msg.payload, m.id);
     Logger.log('── Email ' + (i + 1) + ' ── Dari: ' + H.from + ' · Subjek: ' + H.subject);
     Logger.log(teks.slice(0, 1200));
     Logger.log('Terbaca sebagai: ' + JSON.stringify(bacaEmailTrx_(String(H.subject || ''), teks)));
