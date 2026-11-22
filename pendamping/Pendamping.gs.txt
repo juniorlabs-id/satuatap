@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.6)
+ *  SatuAtap — SKRIP PENDAMPING (opsional, v1.8.7)
  *  Dipasang Admin keluarga di akun Google-nya sendiri untuk hal yang
  *  harus berjalan walau aplikasi tidak dibuka:
  *   1. Pengingat Telegram H-7, H-3, H-1 & hari H pukul 08.00 (tagihan < Rp 1 juta: H-1 & hari H saja) (lewat @SatuAtapBot, bila anggota sudah
@@ -294,8 +294,9 @@ const EMAIL_PENGIRIM = [
   ['danamon.co.id', 'danamon'], ['btn.co.id', 'btn'], ['jenius.com', 'jenius'], ['btpn.com', 'jenius'], ['allobank.com', 'allo'], ['bankneocommerce.co.id', 'neo'],
   ['ocbc.id', 'ocbc'], ['maybank.co.id', 'maybank'], ['gojek.com', 'gopay'], ['gopay.co.id', 'gopay'], ['ovo.id', 'ovo'], ['dana.id', 'dana'],
   ['shopee.co.id', 'shopeepay'], ['shopeepay.co.id', 'shopeepay'], ['linkaja.id', 'linkaja'], ['flip.id', 'flip']];
-const EMAIL_SKIP = /(otp|kode verifikasi|one[- ]time|password|kata sandi|promo|penawaran|diskon s\.?d|voucher|newsletter|undian|e-?statement|rekening koran|tagihan .*terbit|login|perangkat baru|pembaruan|syarat dan ketentuan|survei|survey|webinar)/i;
-const EMAIL_TRX = /(menerima|kiriman|berhasil|sukses|successful|success|transaksi|pembayaran|payment|transfer|bukti|receipt|struk|debit|dana masuk|uang masuk|diterima|received|purchase|pembelian|tarik tunai|qris)/i;
+const EMAIL_SKIP = /(hemat|gratis|spesial|special|flash ?sale|jangan lewatkan|kesempatan|yuk|ayo|reward|poin|hadiah menanti|undang teman|otp|kode verifikasi|one[- ]time|password|kata sandi|promo|penawaran|diskon s\.?d|voucher|newsletter|undian|e-?statement|rekening koran|tagihan .*terbit|login|perangkat baru|pembaruan|syarat dan ketentuan|survei|survey|webinar)/i;
+const EMAIL_TERJADI = /(menerima|diterima|received|dana masuk|uang masuk|berhasil|sukses|success|telah|sudah|transaksi|bukti|receipt|struk|terima kasih|thank you|detail pembayaran|rincian)/i;
+const EMAIL_TRX = /(bayar|membayar|dibayar|terbayar|kirim|mengirim|terkirim|belanja|beli|menerima|kiriman|berhasil|sukses|successful|success|transaksi|pembayaran|payment|transfer|bukti|receipt|struk|debit|dana masuk|uang masuk|diterima|received|purchase|pembelian|tarik tunai|qris)/i;
 
 function pengirimEmail_() {
   const extra = String(PROPS.getProperty('EMAIL_PENGIRIM') || '').split(/[,\s]+/).filter(Boolean).map(function (d) { return [d.toLowerCase(), '']; });
@@ -354,7 +355,7 @@ function rupiah_(s) {
  */
 function bacaEmailTrx_(subjek, teks) {
   const s = (subjek + '\n' + teks).replace(/ /g, ' ');
-  if (EMAIL_SKIP.test(subjek) || !EMAIL_TRX.test(s)) return null;
+  if (EMAIL_SKIP.test(subjek) || !EMAIL_TRX.test(s) || !EMAIL_TERJADI.test(s)) return null;
   if (/\btop[ -]?up\b|isi saldo|tarik tunai|penarikan tunai/i.test(s)) return { lewati: 'top up / tarik tunai — dicatat sebagai transfer antar dompet secara manual' };
   const re = /(?:rp|idr)\.?\s*([0-9][0-9.,]*[0-9]|[0-9])/ig; let m, semua = [];
   while ((m = re.exec(s))) { const v = rupiah_(m[1]); if (v >= 100) semua.push({ v: v, i: m.index }); }
@@ -408,16 +409,17 @@ function cekEmail_() {
       let r = bacaEmailTrx_(subjek, teks);
       if (r && !r.lewati && (!r.nama || r.nama.length < 3)) r = bacaEmailAI_(subjek, teks) || r;   // format tak biasa → minta AI
       else if (!r && EMAIL_TRX.test(subjek + ' ' + teks.slice(0, 400)) && !EMAIL_SKIP.test(subjek)) r = bacaEmailAI_(subjek, teks);
-      if (!r || r.bukan) { hasil.push({ s: 'bukan transaksi', subjek: subjek.slice(0, 40) }); return; }
-      if (r.lewati) { hasil.push({ s: 'dilewati: ' + r.lewati, subjek: subjek.slice(0, 40) }); return; }
+      if (!r || r.bukan) { hasil.push({ s: 'bukan transaksi', id: m.id, subjek: subjek.slice(0, 50) }); return; }
+      if (r.lewati) { hasil.push({ s: 'dilewati: ' + r.lewati, id: m.id, subjek: subjek.slice(0, 50) }); return; }
       // Format kolom "nama | nominal | dompet | arah" — dibaca aplikasi per kolom (nama orang tidak tertukar dengan nama dompet)
       const teksDraf = [String(r.nama || 'Transaksi').replace(/\|/g, ' '), 'Rp ' + r.jumlah.toLocaleString('id-ID'), (p && p[1]) || '', r.arah].join(' | ');
       relay_('kotak.tambah', { email: me, teks: teksDraf.slice(0, 300), sumber: 'email', waktu: new Date(waktu).toISOString() });
       hasil.push({ s: 'OK', draf: teksDraf });
-    } catch (e) { hasil.push({ s: 'GAGAL: ' + e.message }); }
+    } catch (e) { hasil.push({ s: 'GAGAL: ' + e.message, id: m.id }); }
   });
   PROPS.setProperty('EMAIL_SUDAH', JSON.stringify(sudah.slice(-300)));
-  const log = hasil.slice(-20); try { PROPS.setProperty('EMAIL_JEJAK', JSON.stringify(log.map(function (x) { return Object.assign({ t: Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM HH.mm') }, x); }))); } catch (e) {}
+  let lama = []; try { lama = JSON.parse(PROPS.getProperty('EMAIL_JEJAK') || '[]'); } catch (e) {}
+  const log = hasil; try { PROPS.setProperty('EMAIL_JEJAK', JSON.stringify(lama.concat(log.map(function (x) { return Object.assign({ t: Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM HH.mm') }, x); })).slice(-20))); } catch (e) {}
   return { baru: baru.length, hasil: hasil };
 }
 /** Jalankan sekali: izinkan baca Gmail & pasang pemeriksaan tiap 15 menit. Email lama tidak ikut dicatat. */
@@ -434,6 +436,15 @@ function setupEmail() {
 function hentikanEmail() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'cekEmail') ScriptApp.deleteTrigger(t); });
   PROPS.deleteProperty('EMAIL_MULAI'); Logger.log('Catat dari email dihentikan.');
+}
+/** Baca ulang email yang tadi dilewati / gagal (mis. setelah kode diperbarui). Email yang sudah jadi draf tidak diulang. */
+function prosesUlangEmail() {
+  let j = [], sudah = []; try { j = JSON.parse(PROPS.getProperty('EMAIL_JEJAK') || '[]'); sudah = JSON.parse(PROPS.getProperty('EMAIL_SUDAH') || '[]'); } catch (e) {}
+  const ulang = j.filter(function (x) { return x.id && x.s !== 'OK'; }).map(function (x) { return x.id; });
+  PROPS.setProperty('EMAIL_SUDAH', JSON.stringify(sudah.filter(function (id) { return ulang.indexOf(id) < 0; })));
+  PROPS.setProperty('EMAIL_JEJAK', JSON.stringify(j.filter(function (x) { return ulang.indexOf(x.id) < 0; })));
+  Logger.log('Membaca ulang ' + ulang.length + ' email…');
+  cekEmailLog();
 }
 /** Diagnosa: periksa sekarang & tampilkan 20 hasil terakhir. */
 function cekEmailLog() {
