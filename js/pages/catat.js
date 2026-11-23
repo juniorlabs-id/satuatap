@@ -565,10 +565,10 @@
     if (o.kind === 'rapat') return UI.go('rapat');
     const me = Store.me.email, now = new Date().toISOString();
     const cicKat = (Store.t.Kategori.find(k => /cicilan/i.test(k.nama) && k.jenis === 'keluar') || {}).id || '';
-    const mkRow = (jumlah, walletId, tanggal, biayaLain) => {
+    const mkRow = (jumlah, walletId, tanggal, biayaLain, sebagian) => {
       const jenis = o.kind === 'pinjaman' ? (o.arah === 'masuk' ? 'pinjam_kembali' : 'keluar') : (o.arah === 'masuk' ? 'masuk' : 'keluar');
       return { id: U.uid('t'), tanggal, jenis, jumlah, kategoriId: o.kind === 'pinjaman' ? (jenis === 'keluar' ? cicKat : '') : (o.kategoriId || ''), walletId, walletTujuan: '', biaya: biayaLain || 0,
-        catatan: o.nama + (o.periodeRef ? ' · ' + (o.periodeRef.length === 4 ? o.periodeRef : U.tgl(o.periodeRef + '-01', 'my')) : ''), dibayarOleh: me, tag: '', sumber: 'rutin', refId: o.refId, periodeRef: o.periodeRef, dicatatOleh: me, dibuat: now, riwayat: [] };
+        catatan: o.nama + (o.periodeRef ? ' · ' + (o.periodeRef.length === 4 ? o.periodeRef : U.tgl(o.periodeRef + '-01', 'my')) : ''), dibayarOleh: me, tag: '', sumber: sebagian ? 'rutin-sebagian' : 'rutin', refId: o.refId, periodeRef: o.periodeRef, dicatatOleh: me, dibuat: now, riwayat: [] };
     };
     const done = (row) => {
       Store.upsert('Transaksi', row);
@@ -576,9 +576,9 @@
     };
     if (opt.quick) { done(mkRow(o.sisa, o.walletId || Store.wallets()[0].id, o.tanggal <= U.today() ? U.today() : U.today())); return; }
     const s = UI.sheet({ title: o.nama, cls: 'small', body: `
-      <div class="kv-list"><div class="kv"><span>Jatuh tempo</span><b>${U.tgl(o.tanggal, 'long')}</b></div><div class="kv"><span>Tagihan</span><b>${U.rp(o.jumlah)}</b></div>${o.dibayar ? `<div class="kv"><span>Sudah dibayar</span><b>${U.rp(o.dibayar)}</b></div>` : ''}</div>
+      <div class="kv-list"><div class="kv"><span>Jatuh tempo</span><b>${U.tgl(o.tanggal, 'long')}</b></div><div class="kv"><span>${o.arah === 'masuk' ? 'Perkiraan' : 'Tagihan'}</span><b>${U.rp(o.jumlah)}</b></div>${o.dibayar ? `<div class="kv"><span>Sudah dibayar</span><b>${U.rp(o.dibayar)}</b></div>` : ''}</div>
       ${UI.seg('aksi', [['lunas', o.arah === 'masuk' ? 'Sudah diterima' : 'Sudah dibayar'], ['sebagian', 'Sebagian'], ['tunda', 'Tunda']], 'lunas')}
-      <div data-p="lunas sebagian">${UI.field('Jumlah', UI.rpInput('jumlah', o.sisa))}<div class="grid2">${UI.field(o.arah === 'masuk' ? 'Masuk ke' : 'Dari dompet', `<select name="walletId">${UI.walletOpts(o.walletId)}</select>`)}${UI.field('Tanggal bayar', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>${UI.biayaField(0, 'Opsional — denda, biaya admin, biaya transfer.')}</div>
+      <div data-p="lunas sebagian">${UI.field('Jumlah', UI.rpInput('jumlah', o.sisa), o.kind === 'rutin' ? 'Nominalnya beda bulan ini? Isi jumlah sebenarnya — tetap dianggap ' + (o.arah === 'masuk' ? 'sudah diterima.' : 'lunas.') : '')}<div class="grid2">${UI.field(o.arah === 'masuk' ? 'Masuk ke' : 'Dari dompet', `<select name="walletId">${UI.walletOpts(o.walletId)}</select>`)}${UI.field('Tanggal bayar', `<input type="date" name="tanggal" value="${U.today()}">`)}</div>${UI.biayaField(0, 'Opsional — denda, biaya admin, biaya transfer.')}</div>
       <div data-p="tunda" hidden>${UI.field('Ingatkan lagi pada', `<input type="date" name="tunda" value="${U.addDays(U.today(), 3)}">`, 'Pengingat untuk tagihan ini ditunda sampai tanggal tersebut.')}</div>`,
       foot: `<button class="btn" data-ok>${I('check')} Simpan</button>` });
     UI.bindRp(s.el);
@@ -588,7 +588,7 @@
       const f = UI.formData(s.el);
       if (f.aksi === 'tunda') { Store.setSetting('tunda_' + o.id, f.tunda); UI.toast('Ditunda sampai ' + U.tgl(f.tunda)); s.close(); return; }
       if (!f.jumlah) return UI.toast('Isi jumlah.', 'warn');
-      done(mkRow(f.jumlah, f.walletId, f.tanggal || U.today(), f.biayaLain || 0));
+      done(mkRow(f.jumlah, f.walletId, f.tanggal || U.today(), f.biayaLain || 0, f.aksi === 'sebagian' && o.kind === 'rutin'));
       s.close();
     };
   };

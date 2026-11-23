@@ -166,6 +166,7 @@
       const k = t.refId + '|' + t.periodeRef;
       const o = m[k] || (m[k] = { total: 0, last: '' });
       o.total += t.jumlah; if (t.tanggal > o.last) o.last = t.tanggal;
+      if (t.sumber !== 'rutin-sebagian') o.tuntas = true;   // "Sudah diterima/dibayar" = periode selesai walau nominalnya beda
     });
     return m;
   });
@@ -192,8 +193,10 @@
         const key = r.frekuensi === 'tahunan' ? d.slice(0, 4) : d.slice(0, 7);
         const pd = paid[r.id + '|' + key] || { total: 0 };
         if (d < awal && !pd.total) return;       // sebelum mulai memakai aplikasi
+        // Nominal rutin bisa berubah tiap bulan (tunjangan, listrik): sekali dicatat "sudah diterima/dibayar", periode dianggap selesai
+        const tuntas = pd.total > 0 && (pd.tuntas || pd.total >= r.jumlah * 0.999);
         out.push({ id: r.id + '|' + key, ref: r, refId: r.id, periodeRef: key, kind: 'rutin', nama: r.nama, tanggal: d, jumlah: r.jumlah,
-          arah: r.jenis === 'masuk' ? 'masuk' : 'keluar', dibayar: pd.total, sisa: Math.max(0, r.jumlah - pd.total), lunas: pd.total >= r.jumlah * 0.999 && pd.total > 0, tglBayar: pd.last,
+          arah: r.jenis === 'masuk' ? 'masuk' : 'keluar', dibayar: pd.total, sisa: tuntas ? 0 : Math.max(0, r.jumlah - pd.total), lunas: tuntas, tglBayar: pd.last,
           kategoriId: r.kategoriId, walletId: r.walletId, langganan: r.langganan, frekuensi: r.frekuensi });
       });
       loans.forEach(p => {

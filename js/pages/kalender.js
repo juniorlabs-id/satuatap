@@ -84,8 +84,8 @@
 
   const occRow = (o) => `<div class="row" data-act="occ-pay" data-occ="${U.esc(o.id)}">
     <span class="cat-ic ${o.lunas ? 'ok' : o.tanggal < U.today() && o.arah !== 'info' ? 'bad' : ''}">${I(o.kind === 'acara' ? 'party-popper' : o.kind === 'tujuan' ? 'target' : o.kind === 'rapat' ? 'users' : o.kind === 'pinjaman' ? 'landmark' : o.arah === 'masuk' ? 'banknote' : 'receipt')}</span>
-    <div class="tx-txt"><b>${U.esc(o.nama)}</b><small>${o.lunas ? (o.kind === 'rapat' ? 'Sudah dilaksanakan ' : 'Lunas ') + (o.tglBayar ? U.tgl(o.tglBayar, 'dm') : '') : o.kind === 'acara' ? 'Rencana' : o.kind === 'rapat' ? 'Rapat rutin · ' + U.relDay(o.tanggal) : o.dibayar ? 'Dibayar ' + UI.ms(o.dibayar) : U.relDay(o.tanggal)}${UI.isTunda(o) ? ' · ditunda' : ''}</small></div>
-    ${o.arah === 'info' ? '' : UI.amount(o.lunas ? o.jumlah : o.sisa, o.arah === 'masuk' ? 'masuk' : 'keluar')}</div>`;
+    <div class="tx-txt"><b>${U.esc(o.nama)}</b><small>${o.lunas ? (o.kind === 'rapat' ? 'Sudah dilaksanakan ' : o.arah === 'masuk' ? 'Diterima ' : 'Lunas ') + (o.tglBayar ? U.tgl(o.tglBayar, 'dm') : '') : o.kind === 'acara' ? 'Rencana' : o.kind === 'rapat' ? 'Rapat rutin · ' + U.relDay(o.tanggal) : o.dibayar ? 'Dibayar ' + UI.ms(o.dibayar) : U.relDay(o.tanggal)}${UI.isTunda(o) ? ' · ditunda' : ''}</small></div>
+    ${o.arah === 'info' ? '' : UI.amount(o.lunas ? (o.dibayar || o.jumlah) : o.sisa, o.arah === 'masuk' ? 'masuk' : 'keluar')}</div>`;
 
   function monthGrid() {
     const first = K.ym + '-01', dt = U.parseDate(first), dim = U.daysInMonth(dt.getFullYear(), dt.getMonth() + 1);
